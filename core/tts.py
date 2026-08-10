@@ -115,7 +115,13 @@ def _play_audio_bytes(audio_bytes: bytes) -> None:
             nchannels=1,
         )
         samples = np.array(decoded.samples, dtype=np.float32)
-        sd.play(samples, decoded.sample_rate)
+        if samples.ndim == 2 and samples.shape[1] == 2:
+            samples = samples.mean(axis=1)
+        elif samples.ndim > 1 and samples.shape[-1] == 2:
+            samples = samples.mean(axis=-1)
+
+        flat_samples = samples.astype(np.float32, copy=False).reshape(-1)
+        sd.play(flat_samples.tolist(), decoded.sample_rate)
         sd.wait()
         return
     except Exception as _e:
@@ -137,7 +143,8 @@ def _play_audio_bytes(audio_bytes: bytes) -> None:
     if ch > 1:
         arr = arr.reshape(-1, ch).mean(axis=1)
 
-    sd.play(arr, sr)
+    arr = arr.astype(np.float32, copy=False).reshape(-1)
+    sd.play(arr.tolist(), sr)
     sd.wait()
 
 
