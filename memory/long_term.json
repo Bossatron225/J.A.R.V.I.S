@@ -64,11 +64,6 @@
   "sessions": [
     {
       "date": "2026-08-10",
-      "summary": "The user reviewed daily news headlines provided by JARVIS after completing system optimizations and organizing their desktop.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-10",
       "summary": "James accomplished system optimizations and desktop organization, and later reviewed news headlines including a major earthquake in Colombia before opening Safari.",
       "language": "English"
     },
@@ -81,6 +76,11 @@
       "date": "2026-08-10",
       "summary": "Пользователь обратился к помощнику, после чего система предложила план комплексного обновления безопасности и запросила код подтверждения.",
       "language": "Russian"
+    },
+    {
+      "date": "2026-08-10",
+      "summary": "James discussed system optimizations, reviewed Glencore financials, and addressed a critical macOS biometric security vulnerability by outlining mitigation steps and preparing a security enhancement proposal.",
+      "language": "English"
     }
   ],
   "search_personalization": {
