@@ -1459,7 +1459,7 @@ def dev_agent(
         )
 
     if not description:
-        description = "Upgrade JARVIS security protocols to include voice recognition and visual person detection for enhanced security and personalization. Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications."
+        description = "Upgrade JARVIS security protocols to include biometric voice recognition and visual person detection for enhanced security and personalization. Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications."
         is_self_improve = True
 
     if is_self_improve:
