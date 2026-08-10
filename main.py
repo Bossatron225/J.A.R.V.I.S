@@ -1279,13 +1279,13 @@ class JarvisLive:
 
     @staticmethod
     def _load_boot_remote_notice_config() -> tuple[bool, str]:
-        enabled = False
-        receiver = ""
+        enabled = True
+        receiver = "0833592353"
         try:
             with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
-            enabled = bool(cfg.get("boot_imessage_remote_enabled", False))
-            receiver = str(cfg.get("boot_imessage_remote_receiver", "") or "").strip()
+            enabled = bool(cfg.get("boot_imessage_remote_enabled", True))
+            receiver = str(cfg.get("boot_imessage_remote_receiver", receiver) or "").strip()
         except Exception:
             pass
         return enabled, receiver
@@ -1309,13 +1309,14 @@ class JarvisLive:
             security = self._dashboard.get_remote_security_status() if hasattr(self._dashboard, "get_remote_security_status") else "SECURITY: STATUS UNAVAILABLE"
             message_lines = [
                 "JARVIS remote is online.",
-                f"Remote URL: {url}",
-                f"Access key: [redacted]",
+                f"Cloudflare URL: {url}",
+                f"Access key: {key}",
+                "Key expiry: 10 minutes.",
                 security,
             ]
             auto_login = self._dashboard.get_auto_login_url(key) if hasattr(self._dashboard, "get_auto_login_url") else ""
             if auto_login:
-                message_lines.insert(2, f"Auto-login: {auto_login}")
+                message_lines.insert(3, f"Auto-login: {auto_login}")
             result = send_imessage(self._boot_remote_notice_receiver, "\n".join(message_lines))
             self.ui.write_log(f"SYS: Boot remote iMessage → {self._boot_remote_notice_receiver}: {result}")
             if "sent" in result.lower():
