@@ -386,7 +386,7 @@ def _is_jarvis_running(target_script: Path) -> bool:
         return False
 
 
-def _python_app_binary_from_exec(python_exec: str) -> str | None:
+def _python_app_bundle_from_exec(python_exec: str) -> str | None:
     p = Path(python_exec)
     s = str(p)
     marker = "/Frameworks/Python.framework/Versions/"
@@ -395,7 +395,7 @@ def _python_app_binary_from_exec(python_exec: str) -> str | None:
     try:
         head, tail = s.split(marker, 1)
         version = tail.split("/", 1)[0]
-        app_bin = (
+        app_bundle = (
             Path(head)
             / "Frameworks"
             / "Python.framework"
@@ -403,12 +403,9 @@ def _python_app_binary_from_exec(python_exec: str) -> str | None:
             / version
             / "Resources"
             / "Python.app"
-            / "Contents"
-            / "MacOS"
-            / "Python"
         )
-        if app_bin.exists():
-            return str(app_bin)
+        if app_bundle.exists():
+            return str(app_bundle)
     except Exception:
         return None
     return None
@@ -449,11 +446,11 @@ def _launch_jarvis(python_exec: str, target_script: Path) -> bool:
                         _log(f"frontmost activation failed: {e}")
                     return True
 
-                py_app_bin = _python_app_binary_from_exec(python_exec)
-                if py_app_bin:
-                    _log(f"direct launch not running; trying LaunchServices fallback (attempt={attempt})")
+                py_app_bundle = _python_app_bundle_from_exec(python_exec)
+                if py_app_bundle:
+                    _log(f"direct launch not running; trying app-bundle fallback (attempt={attempt}, bundle={py_app_bundle})")
                     subprocess.Popen(
-                        ["open", "-a", py_app_bin, "--args", str(target_script)],
+                        ["open", "-n", "-a", py_app_bundle, "--args", str(target_script)],
                         cwd=str(BASE_DIR),
                         stdout=launch_log,
                         stderr=launch_log,
