@@ -1891,7 +1891,7 @@ class JarvisLive:
     def _is_authorized_shutdown_sender(self, sender: str, chat_name: str) -> bool:
         expected_sender = str(self._shutdown_protocol_cfg.get("sender", "") or "").strip()
         if not expected_sender:
-            return bool((sender or chat_name or "").strip())
+            return True
         return self._is_authorized_imessage_sender(expected_sender, sender, chat_name)
 
     def _schedule_shutdown(self, reason: str) -> bool:
@@ -2090,20 +2090,26 @@ class JarvisLive:
 
         sender = str(alert.get("sender") or "").strip()
         chat_name = str(alert.get("chat_name") or "").strip()
+        self.ui.write_log(
+            f"SYS: Shutdown protocol candidate sender={sender or 'unknown'} chat={chat_name or 'unknown'} text={text[:160]}"
+        )
         if not self._is_authorized_shutdown_sender(sender=sender, chat_name=chat_name):
+            self.ui.write_log("SYS: Shutdown protocol rejected (sender not authorized).")
             return False
 
         phrase = str(self._shutdown_protocol_cfg.get("phrase", "jarvis shutdown") or "jarvis shutdown")
         if not self._phrase_in_text(phrase, text):
+            self.ui.write_log(f"SYS: Shutdown protocol rejected (phrase '{phrase}' not found).")
             return False
 
         rowid = int(alert.get("rowid") or 0)
         cooldown = int(self._shutdown_protocol_cfg.get("cooldown_seconds", 120) or 120)
         now = time.time()
         if rowid and rowid <= self._last_shutdown_protocol_rowid:
+            self.ui.write_log(f"SYS: Shutdown protocol ignored (duplicate rowid {rowid}).")
             return True
         if (now - self._last_shutdown_protocol_ts) < cooldown:
-            self.ui.write_log("SYS: iMessage shutdown suppressed (cooldown).")
+            self.ui.write_log(f"SYS: iMessage shutdown suppressed (cooldown {cooldown}s).")
             if rowid:
                 self._last_shutdown_protocol_rowid = rowid
             return True
