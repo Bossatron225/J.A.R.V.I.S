@@ -403,14 +403,29 @@ class KokoroTTSEngine:
 class ElevenLabsTTSEngine:
     """ElevenLabs cloud TTS – API key required."""
 
+    _DEFAULT_FALLBACK_VOICES = (
+        "pNInz6obpgDQGcFmaJgB",
+        "JBFqnCBsd6RMkjVDRZzb",
+    )
+
     def __init__(self, api_key: str, voice_id: str = "pNInz6obpgDQGcFmaJgB"):
         if not (api_key or "").strip():
             raise ValueError("Missing elevenlabs_api_key in config/api_keys.json")
         self.api_key  = api_key
-        self.voice_id = voice_id
+        self.voice_id = (voice_id or "").strip() or "pNInz6obpgDQGcFmaJgB"
+
+    def _voice_candidates(self) -> list[str]:
+        seen: set[str] = set()
+        candidates: list[str] = []
+        for voice_id in [self.voice_id, *self._DEFAULT_FALLBACK_VOICES]:
+            if voice_id and voice_id not in seen:
+                seen.add(voice_id)
+                candidates.append(voice_id)
+        return candidates
 
     def speak(self, text: str) -> None:
         import requests
+
         headers = {
             "xi-api-key":   self.api_key,
             "Content-Type": "application/json",
@@ -420,12 +435,28 @@ class ElevenLabsTTSEngine:
             "model_id": "eleven_multilingual_v2",
             "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
         }
-        resp = requests.post(
-            f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice_id}",
-            json=payload, headers=headers, timeout=30,
-        )
-        resp.raise_for_status()
-        _play_audio_bytes(resp.content)
+
+        last_error: Exception | None = None
+        for voice_id in self._voice_candidates():
+            try:
+                resp = requests.post(
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+                    json=payload,
+                    headers=headers,
+                    timeout=60,
+                )
+                resp.raise_for_status()
+                self.voice_id = voice_id
+                _play_audio_bytes(resp.content)
+                return
+            except Exception as exc:
+                last_error = exc
+                if exc.__class__.__name__ == "HTTPError" and getattr(getattr(exc, "response", None), "status_code", None) in {400, 401, 404, 422}:
+                    print(f"[TTS] ElevenLabs voice '{voice_id}' rejected: {exc}")
+                else:
+                    print(f"[TTS] ElevenLabs request failed for '{voice_id}': {exc}")
+
+        raise RuntimeError(f"ElevenLabs TTS failed for all candidate voices: {last_error}") from last_error
 
 
 # ---------------------------------------------------------------------------
