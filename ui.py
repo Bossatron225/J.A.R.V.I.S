@@ -17,6 +17,8 @@ import functools
 
 import psutil
 
+from actions.face_auth import enroll_face_profile, verify_face_profile
+
 if platform.system() == "Windows":
     _WIN_HIDE: dict = {"creationflags": subprocess.CREATE_NO_WINDOW}
 else:
@@ -1777,7 +1779,7 @@ class RemoteKeyOverlay(QWidget):
 
 class SecurityOverlay(QWidget):
     """Stark-style biometrics verification overlay for voice recognition and visual person detection."""
-    
+
     verified = pyqtSignal(str) # Emits recognized identity name
     failed = pyqtSignal()
     
@@ -1842,6 +1844,19 @@ class SecurityOverlay(QWidget):
         
         btn_row = QHBoxLayout(); btn_row.setSpacing(8)
         
+        self._enroll_btn = QPushButton("ENROLL FACE")
+        self._enroll_btn.setFixedHeight(32)
+        self._enroll_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        self._enroll_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._enroll_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.ACC2}; border: 1px solid {C.ACC2}; border-radius: 4px;
+            }}
+            QPushButton:hover {{ background: rgba(84,255,213,0.12); border-color: {C.ACC2}; }}
+        """)
+        self._enroll_btn.clicked.connect(self._enroll_face_profile)
+        btn_row.addWidget(self._enroll_btn)
+
         override_btn = QPushButton("MANUAL OVERRIDE")
         override_btn.setFixedHeight(32)
         override_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
@@ -1880,14 +1895,43 @@ class SecurityOverlay(QWidget):
         self._voice_prog.setValue(min(100, self._sim_tick))
         if self._sim_tick < 50:
             self._status_lbl.setText("STATUS: ANALYZING VOICE SIGNATURE...")
-        elif self._sim_tick < 90:
+            return
+
+        if self._sim_tick < 90:
             self._status_lbl.setText("STATUS: VISUAL PERSON DETECTION MATCHING...")
-        else:
-            self._timer.stop()
-            self._status_lbl.setText("STATUS: IDENTITY CONFIRMED — ACCESS GRANTED")
-            self._status_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
-            QTimer.singleShot(800, lambda: self.verified.emit("Tony Stark"))
+            return
+
+        self._timer.stop()
+        try:
+            from actions.screen_processor import _capture_camera
+            image_bytes, _mime = _capture_camera()
+            result = verify_face_profile(image_bytes)
+            if result.get("authorized"):
+                self._status_lbl.setText(f"STATUS: IDENTITY CONFIRMED — WELCOME {result.get('label', 'USER').upper()}")
+                self._status_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+                QTimer.singleShot(800, lambda: self.verified.emit(result.get("label", "User")))
+            else:
+                self._status_lbl.setText("STATUS: FACE PROFILE MISMATCH — ACCESS DENIED")
+                self._status_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
+                QTimer.singleShot(800, self.failed.emit)
+        except Exception as exc:
+            self._status_lbl.setText(f"STATUS: FACE CHECK FAILED — {exc}")
+            self._status_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
+            QTimer.singleShot(800, self.failed.emit)
             
+    def _enroll_face_profile(self):
+        self._status_lbl.setText("STATUS: ENROLLING FACE PROFILE...")
+        self._status_lbl.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
+        try:
+            from actions.screen_processor import _capture_camera
+            image_bytes, _mime = _capture_camera()
+            profile = enroll_face_profile(image_bytes, label="James")
+            self._status_lbl.setText(f"STATUS: FACE PROFILE STORED — {profile['label']}")
+            self._status_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+        except Exception as exc:
+            self._status_lbl.setText(f"STATUS: ENROLLMENT FAILED — {exc}")
+            self._status_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
+
     def _manual_override(self):
         self._timer.stop()
         self.verified.emit("Authorized Personnel")
