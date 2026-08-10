@@ -99,12 +99,14 @@ def _play_np(samples, sample_rate: int) -> None:
     sd.wait()
 
 
-def _play_audio_bytes(audio_bytes: bytes) -> None:
+def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> None:
     """Decode compressed audio bytes and play via sounddevice.
 
     Primary path uses miniaudio for broad format support.
     Fallback path decodes PCM WAV directly using stdlib wave, so audio output
     can still play even if miniaudio is missing in the runtime environment.
+    Raw PCM data is also supported when ElevenLabs returns a byte stream instead
+    of a RIFF/WAV container.
     """
     try:
         import miniaudio
@@ -127,24 +129,41 @@ def _play_audio_bytes(audio_bytes: bytes) -> None:
     except Exception as _e:
         print(f"[TTS] miniaudio decode/play failed: {_e}")
 
-    with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
-        sr = wav_file.getframerate()
-        ch = wav_file.getnchannels()
-        width = wav_file.getsampwidth()
-        raw = wav_file.readframes(wav_file.getnframes())
+    if audio_bytes.startswith(b"RIFF"):
+        with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
+            sr = wav_file.getframerate()
+            ch = wav_file.getnchannels()
+            width = wav_file.getsampwidth()
+            raw = wav_file.readframes(wav_file.getnframes())
 
-    if width == 2:
-        arr = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
-    elif width == 4:
-        arr = np.frombuffer(raw, dtype=np.int32).astype(np.float32) / 2147483648.0
-    else:
-        raise RuntimeError("Unsupported WAV sample width without miniaudio")
+        if width == 2:
+            arr = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+        elif width == 4:
+            arr = np.frombuffer(raw, dtype=np.int32).astype(np.float32) / 2147483648.0
+        else:
+            raise RuntimeError("Unsupported WAV sample width without miniaudio")
 
-    if ch > 1:
-        arr = arr.reshape(-1, ch).mean(axis=1)
+        if ch > 1:
+            arr = arr.reshape(-1, ch).mean(axis=1)
+
+        arr = arr.astype(np.float32, copy=False).reshape(-1)
+        sd.play(arr.tolist(), sr)
+        sd.wait()
+        return
+
+    # Raw PCM fallback: treat the bytes as 16-bit mono PCM when no WAV header is present.
+    if sample_rate is None:
+        sample_rate = 16000
+    payload = audio_bytes[: len(audio_bytes) - (len(audio_bytes) % 2)]
+    if not payload:
+        return
+    try:
+        arr = np.frombuffer(payload, dtype=np.int16).astype(np.float32) / 32768.0
+    except ValueError as exc:
+        raise RuntimeError("Unsupported raw PCM audio payload") from exc
 
     arr = arr.astype(np.float32, copy=False).reshape(-1)
-    sd.play(arr.tolist(), sr)
+    sd.play(arr.tolist(), sample_rate)
     sd.wait()
 
 
@@ -433,6 +452,7 @@ class ElevenLabsTTSEngine:
         payload = {
             "text":     text,
             "model_id": "eleven_multilingual_v2",
+            "output_format": "pcm_16000",
             "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
         }
 
@@ -447,7 +467,7 @@ class ElevenLabsTTSEngine:
                 )
                 resp.raise_for_status()
                 self.voice_id = voice_id
-                _play_audio_bytes(resp.content)
+                _play_audio_bytes(resp.content, sample_rate=16000)
                 return
             except Exception as exc:
                 last_error = exc

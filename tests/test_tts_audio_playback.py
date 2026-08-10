@@ -1,4 +1,5 @@
 import pathlib
+import struct
 import sys
 
 import numpy as np
@@ -65,6 +66,7 @@ def test_elevenlabs_falls_back_to_default_voice(monkeypatch):
             self.status_code = status_code
             self.content = content
             self.text = ""
+            self.headers = {}
 
         def raise_for_status(self):
             if self.status_code >= 400:
@@ -88,7 +90,7 @@ def test_elevenlabs_falls_back_to_default_voice(monkeypatch):
     captured = {}
 
     monkeypatch.setitem(sys.modules, "requests", FakeRequestsModule())
-    monkeypatch.setattr(tts, "_play_audio_bytes", lambda payload: captured.setdefault("payload", payload))
+    monkeypatch.setattr(tts, "_play_audio_bytes", lambda payload, sample_rate=None: captured.setdefault("payload", payload))
 
     engine = tts.ElevenLabsTTSEngine(api_key="abc", voice_id="invalid-voice")
     engine.speak("hello")
@@ -97,3 +99,20 @@ def test_elevenlabs_falls_back_to_default_voice(monkeypatch):
     assert sys.modules["requests"].calls[0][0].endswith("invalid-voice")
     assert sys.modules["requests"].calls[1][0].endswith("pNInz6obpgDQGcFmaJgB")
     assert captured["payload"] == b"audio"
+
+
+def test_play_audio_bytes_handles_raw_pcm_bytes(monkeypatch):
+    pcm_bytes = struct.pack("<4h", 0, 16384, -16384, 0)
+    captured = {}
+
+    def fake_play(data, sample_rate):
+        captured["data"] = data
+        captured["sample_rate"] = sample_rate
+
+    monkeypatch.setattr(tts.sd, "play", fake_play)
+    monkeypatch.setattr(tts.sd, "wait", lambda: None)
+
+    tts._play_audio_bytes(pcm_bytes, sample_rate=16000)
+
+    assert captured["sample_rate"] == 16000
+    np.testing.assert_allclose(captured["data"], [0.0, 0.5, -0.5, 0.0], atol=1e-6)
