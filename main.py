@@ -1296,14 +1296,14 @@ class JarvisLive:
         if not self._boot_remote_notice_enabled:
             return
         if not self._boot_remote_notice_receiver:
-            self.ui.write_log("SYS: Boot iMessage remote notice skipped (no receiver configured).")
+            self.ui.write_log("SYS: Boot remote notice skipped.")
             return
         if self._dashboard is None:
             return
 
         try:
             if not self._boot_remote_notice_receiver:
-                self.ui.write_log("SYS: Boot remote iMessage skipped (no receiver configured).")
+                self.ui.write_log("SYS: Boot remote notice skipped.")
                 return
             key = self._dashboard.new_key() if hasattr(self._dashboard, "new_key") else ""
             security = self._dashboard.get_remote_security_status() if hasattr(self._dashboard, "get_remote_security_status") else "SECURITY: STATUS UNAVAILABLE"
@@ -1312,13 +1312,13 @@ class JarvisLive:
                 f"Cloudflare URL: {url}",
                 f"Access key: {key}",
                 "Key expiry: 10 minutes.",
-                security,
             ]
             auto_login = self._dashboard.get_auto_login_url(key) if hasattr(self._dashboard, "get_auto_login_url") else ""
             if auto_login:
-                message_lines.insert(3, f"Auto-login: {auto_login}")
+                message_lines.append(f"Auto-login: {auto_login}")
+            message_lines.append(security)
             result = send_imessage(self._boot_remote_notice_receiver, "\n".join(message_lines))
-            self.ui.write_log(f"SYS: Boot remote iMessage → {self._boot_remote_notice_receiver}: {result}")
+            self.ui.write_log("SYS: Boot remote notice sent.")
             if "sent" in result.lower():
                 self._boot_remote_notice_sent = True
         except Exception as e:
@@ -1907,15 +1907,15 @@ class JarvisLive:
 
     def _schedule_shutdown(self, reason: str) -> bool:
         if self._shutdown_in_progress:
-            self.ui.write_log(f"SYS: Shutdown already in progress ({reason}).")
+            self.ui.write_log("SYS: Shutdown in progress.")
             return False
 
         if self._reboot_in_progress:
-            self.ui.write_log(f"SYS: Reboot already in progress ({reason}).")
+            self.ui.write_log("SYS: Reboot in progress.")
             return False
 
         self._shutdown_in_progress = True
-        self.ui.write_log(f"SYS: Shutdown requested ({reason}).")
+        self.ui.write_log("SYS: Shutdown requested.")
 
         async def _wait_for_speech_drain(timeout_seconds: float = 1.5) -> bool:
             deadline = time.monotonic() + max(0.5, timeout_seconds)
@@ -1930,7 +1930,7 @@ class JarvisLive:
             return False
 
         async def _do_shutdown():
-            self.ui.write_log("SYS: Shutdown sequence started.")
+            self.ui.write_log("SYS: Shutting down.")
             try:
                 await self._save_session_summary()
             except Exception as save_error:
@@ -1949,9 +1949,9 @@ class JarvisLive:
 
             drained = await _wait_for_speech_drain(timeout_seconds=1.5)
             if not drained:
-                self.ui.write_log("SYS: Shutdown proceeding without waiting for full speech drain.")
+                self.ui.write_log("SYS: Shutdown continuing.")
             await asyncio.sleep(0.2)
-            self.ui.write_log("SYS: Exiting process.")
+            self.ui.write_log("SYS: Exiting.")
             import os as _os
             _os._exit(0)
 
@@ -1960,14 +1960,14 @@ class JarvisLive:
 
     def _schedule_reboot(self, reason: str) -> bool:
         if self._reboot_in_progress:
-            self.ui.write_log(f"SYS: Reboot already in progress ({reason}).")
+            self.ui.write_log("SYS: Reboot in progress.")
             return False
         if self._shutdown_in_progress:
             self.ui.write_log(f"SYS: Shutdown in progress; reboot ignored ({reason}).")
             return False
 
         self._reboot_in_progress = True
-        self.ui.write_log(f"SYS: Reboot requested ({reason}).")
+        self.ui.write_log("SYS: Reboot requested.")
 
         async def _wait_for_speech_drain(timeout_seconds: float = 14.0) -> bool:
             deadline = time.monotonic() + max(1.0, timeout_seconds)
@@ -1996,7 +1996,7 @@ class JarvisLive:
 
             drained = await _wait_for_speech_drain(timeout_seconds=14.0)
             if not drained:
-                self.ui.write_log("SYS: Reboot timeout reached; forcing restart.")
+                self.ui.write_log("SYS: Restarting.")
 
             restart_cmd = [sys.executable] + list(sys.argv)
             self.ui.write_log(f"SYS: Relaunch command: {' '.join(restart_cmd)}")
@@ -2008,7 +2008,7 @@ class JarvisLive:
                     env=os.environ.copy(),
                     close_fds=True,
                 )
-                self.ui.write_log("SYS: Relaunch spawned; exiting old process.")
+                self.ui.write_log("SYS: Relaunching.")
                 os._exit(0)
             except Exception as spawn_error:
                 self.ui.write_log(f"SYS: Relaunch spawn failed: {spawn_error}")
@@ -2035,7 +2035,7 @@ class JarvisLive:
 
         sender = str(alert.get("sender") or "").strip()
         chat_name = str(alert.get("chat_name") or "").strip()
-        self.ui.write_log(f"SYS: Wake protocol candidate sender={sender or 'unknown'} chat={chat_name or 'unknown'} text={text[:160]}")
+        self.ui.write_log("SYS: Wake protocol received.")
         if not self._is_authorized_wake_sender(sender=sender, chat_name=chat_name):
             self.ui.write_log("SYS: Wake protocol rejected (sender not authorized).")
             return False
@@ -2063,13 +2063,13 @@ class JarvisLive:
             self.ui.write_log("SYS: iMessage wake command rejected (secret mismatch).")
             return True
 
-        self.ui.write_log("SYS: Wake protocol accepted; sending acknowledgement.")
+        self.ui.write_log("SYS: Wake accepted.")
 
         self._last_wake_protocol_ts = now
         if rowid:
             self._last_wake_protocol_rowid = rowid
 
-        self.ui.write_log(f"SYS: iMessage wake protocol accepted from {chat_name or sender}.")
+        self.ui.write_log("SYS: Wake acknowledged.")
         if self.session:
             try:
                 await self.session.send_client_content(
@@ -2101,9 +2101,7 @@ class JarvisLive:
 
         sender = str(alert.get("sender") or "").strip()
         chat_name = str(alert.get("chat_name") or "").strip()
-        self.ui.write_log(
-            f"SYS: Shutdown protocol candidate sender={sender or 'unknown'} chat={chat_name or 'unknown'} text={text[:160]}"
-        )
+        self.ui.write_log("SYS: Shutdown protocol received.")
         if not self._is_authorized_shutdown_sender(sender=sender, chat_name=chat_name):
             self.ui.write_log("SYS: Shutdown protocol rejected (sender not authorized).")
             return False
@@ -2135,7 +2133,7 @@ class JarvisLive:
         if rowid:
             self._last_shutdown_protocol_rowid = rowid
 
-        self.ui.write_log(f"SYS: iMessage shutdown protocol accepted from {chat_name or sender}.")
+        self.ui.write_log("SYS: Shutdown accepted.")
 
         ack_target = sender or chat_name
         if ack_target:
@@ -2153,7 +2151,7 @@ class JarvisLive:
             return
         self._last_public_url = url
         self.ui.set_remote_url_status(url)
-        self.ui.write_log(f"SYS: Public tunnel URL updated: {url}")
+        self.ui.write_log("SYS: Remote URL updated.")
         sec = ""
         if self._dashboard and hasattr(self._dashboard, "get_remote_security_status"):
             try:
