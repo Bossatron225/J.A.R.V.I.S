@@ -3769,7 +3769,6 @@ class MainWindow(QMainWindow):
         self._apply_state("LISTENING")
         self._assistant_name = _read_full_config().get("assistant_name", "JARVIS") or "JARVIS"
         self._log.append_log(f"SYS: Initialised. OS={os_name.upper()}. {self._assistant_name} online.")
-        QTimer.singleShot(300, self._show_security_overlay)
 
 class _RootShim:
     def __init__(self, app: QApplication):
