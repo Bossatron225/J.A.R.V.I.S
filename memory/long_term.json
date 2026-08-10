@@ -5,7 +5,7 @@
       "updated": "2026-08-06"
     },
     "language": {
-      "value": "Russian",
+      "value": "English",
       "updated": "2026-08-10"
     },
     "address_preference": {
@@ -64,11 +64,6 @@
   "sessions": [
     {
       "date": "2026-08-10",
-      "summary": "The user successfully organized their desktop files by type and confirmed they are ready for the next commands.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-10",
       "summary": "The user reviewed daily news headlines provided by JARVIS after completing system optimizations and organizing their desktop.",
       "language": "English"
     },
@@ -81,6 +76,11 @@
       "date": "2026-08-10",
       "summary": "The user reviewed world news headlines and financial market updates regarding Glencore while completing system optimization and desktop organization tasks.",
       "language": "English"
+    },
+    {
+      "date": "2026-08-10",
+      "summary": "Пользователь обратился к помощнику, после чего система предложила план комплексного обновления безопасности и запросила код подтверждения.",
+      "language": "Russian"
     }
   ],
   "search_personalization": {
