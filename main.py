@@ -1893,8 +1893,8 @@ class JarvisLive:
         self._shutdown_in_progress = True
         self.ui.write_log(f"SYS: Shutdown requested ({reason}).")
 
-        async def _wait_for_speech_drain(timeout_seconds: float = 14.0) -> bool:
-            deadline = time.monotonic() + max(1.0, timeout_seconds)
+        async def _wait_for_speech_drain(timeout_seconds: float = 1.5) -> bool:
+            deadline = time.monotonic() + max(0.5, timeout_seconds)
             while time.monotonic() < deadline:
                 with self._speaking_lock:
                     speaking = self._is_speaking
@@ -1906,7 +1906,12 @@ class JarvisLive:
             return False
 
         async def _do_shutdown():
-            await self._save_session_summary()
+            self.ui.write_log("SYS: Shutdown sequence started.")
+            try:
+                await self._save_session_summary()
+            except Exception as save_error:
+                self.ui.write_log(f"SYS: Shutdown summary skipped: {save_error}")
+
             if self.session:
                 try:
                     if self._turn_done_event:
@@ -1915,16 +1920,16 @@ class JarvisLive:
                         turns={"parts": [{"text": "Say a brief natural goodbye to the user."}]},
                         turn_complete=True,
                     )
-                except Exception:
-                    pass
-            drained = await _wait_for_speech_drain(timeout_seconds=14.0)
+                except Exception as send_error:
+                    self.ui.write_log(f"SYS: Shutdown goodbye skipped: {send_error}")
+
+            drained = await _wait_for_speech_drain(timeout_seconds=1.5)
             if not drained:
-                self.ui.write_log("SYS: Shutdown timeout reached; forcing exit.")
+                self.ui.write_log("SYS: Shutdown proceeding without waiting for full speech drain.")
+            await asyncio.sleep(0.2)
+            self.ui.write_log("SYS: Exiting process.")
             import os as _os
-            try:
-                _os._exit(0)
-            except Exception:
-                raise
+            _os._exit(0)
 
         asyncio.create_task(_do_shutdown())
         return True
