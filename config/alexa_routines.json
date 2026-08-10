@@ -1,0 +1,33 @@
+{
+  "provider": "webhook",
+  "timeout_seconds": 15,
+  "webhook": {
+    "auth_header": "Authorization",
+    "auth_token": "",
+    "verify_ssl": false,
+    "routines": {
+      "plug_on": {
+        "url": "https://maker.ifttt.com/trigger/plug_on/with/key/Su4WqciF5PC3Z25o2U93g",
+        "method": "POST",
+        "body": {}
+      },
+      "plug_off": {
+        "url": "https://maker.ifttt.com/trigger/plug_off/with/key/Su4WqciF5PC3Z25o2U93g",
+        "method": "POST",
+        "body": {}
+      }
+    }
+  },
+  "plugs": {
+    "ventilation_protocol": {
+      "on": "plug_on",
+      "off": "plug_off",
+      "status": ""
+    },
+    "smart_plug_1": {
+      "on": "plug_on",
+      "off": "plug_off",
+      "status": ""
+    }
+  }
+}
