@@ -133,13 +133,13 @@ def _take_screenshot() -> Path | None:
         print(f"[Code] ⚠️ Screenshot failed: {e}")
         return None
 
-def verify_security_biometrics() -> tuple[bool, str]:
+def verify_security_biometrics(voice_sample_path: str = None) -> tuple[bool, str]:
     """
     Stark Security Protocol: Enhanced Voice Recognition & Visual Person Detection.
     Minimizes RAM footprint by lazy-loading camera and audio modules, utilizing 
-    multimodal Gemini vision analysis for biometric authentication.
+    multimodal Gemini vision and acoustic analysis for robust biometric authentication.
     """
-    print("[Security] 🛡️ Initializing Stark Security Biometric Verification...")
+    print("[Security] 🛡️ Initializing Stark Security Biometric & Voice Verification...")
     screenshot_path = _take_screenshot()
     if not screenshot_path:
         return False, "Visual sensor array failed to initialize."
@@ -151,17 +151,25 @@ def verify_security_biometrics() -> tuple[bool, str]:
         client = genai.Client(api_key=_get_api_key())
         image_bytes = screenshot_path.read_bytes()
 
-        auth_prompt = (
-            "Analyze this security feed/environment capture. "
-            "Determine if an authorized user (Tony Stark or designated personnel) "
-            "is present and visually confirmed. "
-            "Respond in JSON format: {\"authorized\": true/false, \"confidence\": float, \"message\": \"string\"}"
-        )
-
         contents = [
             types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
-            auth_prompt,
         ]
+
+        if voice_sample_path and Path(voice_sample_path).exists():
+            try:
+                audio_bytes = Path(voice_sample_path).read_bytes()
+                contents.append(types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav"))
+                print("[Security] 🎙️ Audio voice sample integrated into biometric verification.")
+            except Exception as ex:
+                print(f"[Security] ⚠️ Failed to load voice sample: {ex}")
+
+        auth_prompt = (
+            "Analyze this security feed/environment capture (and optional voice biometric sample). "
+            "Determine strictly if an authorized user (Tony Stark or verified designated personnel) "
+            "is present, visually confirmed via facial/person detection, and acoustically verified via voice match if provided. "
+            "Respond ONLY in valid JSON format: {\"authorized\": true/false, \"confidence\": float, \"message\": \"string\"}"
+        )
+        contents.append(auth_prompt)
 
         response = client.models.generate_content(
             model="models/gemini-flash-lite-latest",
@@ -169,7 +177,6 @@ def verify_security_biometrics() -> tuple[bool, str]:
         )
 
         raw_text = response.text.strip()
-        # Clean potential markdown wrappers
         clean_json = re.sub(r"^```[a-zA-Z]*\n?", "", raw_text)
         clean_json = re.sub(r"\n?```$", "", clean_json).strip()
 
@@ -194,8 +201,8 @@ def verify_security_biometrics() -> tuple[bool, str]:
             screenshot_path.unlink()
         except Exception:
             pass
-        print(f"[Security] ⚠️ Biometric module exception: {e}. Falling back to standard override.")
-        return True, "Biometric override active due to sensor exception."
+        print(f"[Security] ⚠️ Biometric module strict authentication exception: {e}. Access denied per secure lockdown protocol.")
+        return False, f"Biometric security authentication failed: {e}"
 
 _VALID_INTENTS = {"write", "edit", "explain", "run", "build", "screen_debug", "optimize", "test", "security_check"}
 
@@ -658,6 +665,7 @@ def code_helper(
     code = p.get("code", "").strip()
     args = p.get("args", [])
     timeout = int(p.get("timeout", 30))
+    voice_sample = p.get("voice_sample", "").strip()
 
     if action == "auto":
         action = _detect_intent(description, file_path, code)
@@ -693,8 +701,8 @@ def code_helper(
 
     elif action == "security_check":
         if player:
-            player.write_log("[Security] Running biometric security protocols...")
-        authorized, message = verify_security_biometrics()
+            player.write_log("[Security] Running robust biometric & voice recognition security protocols...")
+        authorized, message = verify_security_biometrics(voice_sample_path=voice_sample)
         if speak:
             speak(message)
         return f"Security Biometric Verification Status: {'AUTHORIZED' if authorized else 'DENIED'}\nDetails: {message}"
