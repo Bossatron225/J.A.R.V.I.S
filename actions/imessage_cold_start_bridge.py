@@ -97,32 +97,31 @@ def _read_config() -> dict:
 
 
 def _preferred_python_exec(cfg: dict | None = None) -> str:
-    candidates: list[str] = []
-
+    project_candidates: list[str] = []
     for rel in (".venv-1/bin/python", ".venv/bin/python", ".venv-1/bin/python3", ".venv/bin/python3"):
         candidate = str((BASE_DIR / rel).expanduser())
         if candidate:
-            candidates.append(candidate)
+            project_candidates.append(candidate)
+
+    for candidate in project_candidates:
+        try:
+            p = Path(candidate).expanduser()
+            if p.exists():
+                return str(p)
+        except Exception:
+            continue
 
     if cfg is not None:
         for key in ("imessage_cold_start_python", "jarvis_python_exec"):
             value = str(cfg.get(key, "") or "").strip()
             if value:
-                candidates.append(value)
+                try:
+                    p = Path(value).expanduser()
+                    if p.exists():
+                        return str(p)
+                except Exception:
+                    continue
 
-    candidates.append(str(Path(sys.executable).resolve()))
-
-    seen: set[str] = set()
-    for candidate in candidates:
-        if not candidate or candidate in seen:
-            continue
-        seen.add(candidate)
-        try:
-            p = Path(candidate).expanduser()
-            if p.exists():
-                return str(p.resolve())
-        except Exception:
-            continue
     return str(Path(sys.executable).resolve())
 
 
@@ -583,8 +582,12 @@ def main() -> int:
                 if secret and secret not in text_l:
                     _log("wake phrase matched but secret mismatched")
                     continue
-                if not _sender_matches(sender_allowed, msg.get("sender", ""), msg.get("chat_name", "")):
-                    _log("wake phrase matched but sender unauthorized")
+                sender_ok = _sender_matches(sender_allowed, msg.get("sender", ""), msg.get("chat_name", ""))
+                if not sender_ok:
+                    _log(
+                        "wake phrase matched but sender unauthorized "
+                        f"(allowed={sender_allowed!r}, sender={msg.get('sender')!r}, chat={msg.get('chat_name')!r})"
+                    )
                     continue
 
                 state["last_wake_rowid"] = rowid
