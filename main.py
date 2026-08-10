@@ -1206,7 +1206,6 @@ class JarvisLive:
         return str(config.get("tts_engine", "")).strip().lower() in {
             "edgetts",
             "kokoro",
-            "elevenlabs",
         }
 
     @staticmethod
@@ -1215,11 +1214,10 @@ class JarvisLive:
         return {
             "edgetts": "EdgeTTS",
             "kokoro": "Kokoro",
-            "elevenlabs": "ElevenLabs",
         }.get(engine_name, engine_name or "external TTS")
 
     async def _tts_worker(self) -> None:
-        """Serialises ElevenLabs calls; speaks one sentence at a time."""
+        """Serialises external TTS calls; speaks one sentence at a time."""
         while True:
             text = await self._tts_sentence_queue.get()
             if text is None:  # sentinel
@@ -1227,10 +1225,10 @@ class JarvisLive:
             try:
                 await self._speak_external_tts(text)
             except Exception as e:
-                print(f"[ElevenLabs] Worker error: {e}")
+                print(f"[TTS] Worker error: {e}")
 
     def _enqueue_tts_sentence(self, sentence: str) -> None:
-        """Queue a sentence for ElevenLabs; drops if queue is not available."""
+        """Queue a sentence for external TTS; drops if the queue is not available."""
         if self._tts_sentence_queue and sentence.strip():
             try:
                 self._tts_sentence_queue.put_nowait(sentence.strip())
