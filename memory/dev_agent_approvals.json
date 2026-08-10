@@ -659,6 +659,66 @@
           }
         ]
       }
+    },
+    {
+      "approval_id": "e3e485db3b",
+      "created_at": "2026-08-10T18:59:16.938247Z",
+      "description": "Upgrade JARVIS security protocols to include voice recognition and visual person detection for enhanced security and personalization.",
+      "target_files": [
+        "main.py",
+        "ui.py",
+        "actions/dev_agent.py",
+        "actions/code_helper.py",
+        "core/llm_client.py",
+        "actions/file_controller.py",
+        "actions/web_search.py",
+        "actions/flight_finder.py",
+        "actions/computer_control.py"
+      ],
+      "plan": {
+        "improvements": [
+          {
+            "file": "main.py",
+            "change": "Upgrade JARVIS security protocols to include voice recognition and visual person detection for enhanced security and personalization.",
+            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
+          },
+          {
+            "file": "ui.py",
+            "change": "Upgrade JARVIS security protocols to include voice recognition and visual person detection for enhanced security and personalization.",
+            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
+          },
+          {
+            "file": "actions/dev_agent.py",
+            "change": "Upgrade JARVIS security protocols to include voice recognition and visual person detection for enhanced security and personalization.",
+            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
+          },
+          {
+            "file": "actions/code_helper.py",
+            "change": "Upgrade JARVIS security protocols to include voice recognition and visual person detection for enhanced security and personalization.",
+            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
+          },
+          {
+            "file": "core/llm_client.py",
+            "change": "Upgrade JARVIS security protocols to include voice recognition and visual person detection for enhanced security and personalization.",
+            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
+          },
+          {
+            "file": "actions/file_controller.py",
+            "change": "Upgrade JARVIS security protocols to include voice recognition and visual person detection for enhanced security and personalization.",
+            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
+          }
+        ],
+        "feature_suggestions": [
+          {
+            "name": "Biometric Multi-Modal Lockout",
+            "description": "Automatically secures the workshop mainframe and encrypts local data streams upon detecting an unauthorized individual via visual-audio corroboration."
+          },
+          {
+            "name": "Dynamic Holographic Persona Profiling",
+            "description": "Generates real-time contextual UI overlays and personalized greetings based on recognized personnel clearance levels."
+          }
+        ]
+      }
     }
   ]
 }
