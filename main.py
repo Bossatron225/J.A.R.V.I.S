@@ -108,7 +108,7 @@ from actions.mail_integration import (
 from actions.find_my import find_my
 from actions.alexa_routines import alexa_routines, ifttt_webhooks
 from memory.config_manager     import get_brief_enabled
-from core.tts import create_tts_player
+from core.tts import create_tts_player, reset_audio_output
 from core.context_optimizer.context import ContextManager as _CtxMgr
 from core.context_optimizer.optimizer import ToolExecutionOptimizer as _ToolOptimizer
 
@@ -1425,15 +1425,6 @@ class JarvisLive:
             cfg = {}
 
         # Keep a stable interpreter identity for launchd/macOS TCC permissions.
-        configured_exec = str(cfg.get("imessage_cold_start_python", "") or "").strip()
-        remembered_exec = str(cfg.get("jarvis_python_exec", "") or "").strip()
-        stable_exec = configured_exec or remembered_exec or str(Path(sys.executable).resolve())
-        try:
-            stable_exec = str(Path(stable_exec).expanduser().resolve())
-        except Exception:
-            stable_exec = str(Path(sys.executable).resolve())
-        if not Path(stable_exec).exists():
-            stable_exec = str(Path(sys.executable).resolve())
         for candidate in (
             BASE_DIR / ".venv-1" / "bin" / "python",
             BASE_DIR / ".venv" / "bin" / "python",
@@ -1443,6 +1434,16 @@ class JarvisLive:
             if candidate.exists():
                 stable_exec = str(candidate.resolve())
                 break
+        else:
+            configured_exec = str(cfg.get("imessage_cold_start_python", "") or "").strip()
+            remembered_exec = str(cfg.get("jarvis_python_exec", "") or "").strip()
+            stable_exec = configured_exec or remembered_exec or str(Path(sys.executable).resolve())
+            try:
+                stable_exec = str(Path(stable_exec).expanduser().resolve())
+            except Exception:
+                stable_exec = str(Path(sys.executable).resolve())
+            if not Path(stable_exec).exists():
+                stable_exec = str(Path(sys.executable).resolve())
 
         cfg_changed = False
         if str(cfg.get("jarvis_python_exec", "") or "").strip() != stable_exec:
@@ -2989,6 +2990,7 @@ class JarvisLive:
 
     async def _play_audio(self):
         print("[JARVIS] 🔊 Play started")
+        reset_audio_output()
 
         stream = sd.RawOutputStream(
             samplerate=RECEIVE_SAMPLE_RATE,

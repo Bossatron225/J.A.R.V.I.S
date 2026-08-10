@@ -82,10 +82,19 @@ def _compress_silence(
     return np.concatenate(out) if out else arr
 
 
+def reset_audio_output() -> None:
+    """Reset any stuck sounddevice stream before new playback starts."""
+    try:
+        sd.stop()
+    except Exception:
+        pass
+
+
 def _play_np(samples, sample_rate: int) -> None:
     """Play float32 mono (or stereo) audio via sounddevice.
     Accepts numpy arrays or PyTorch tensors.
     """
+    reset_audio_output()
     arr = _to_numpy(samples)
     if arr.ndim == 2 and arr.shape[1] == 2:
         arr = arr.mean(axis=1)
@@ -108,6 +117,7 @@ def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> Non
     Raw PCM data is also supported when ElevenLabs returns a byte stream instead
     of a RIFF/WAV container.
     """
+    reset_audio_output()
     try:
         import miniaudio
 
