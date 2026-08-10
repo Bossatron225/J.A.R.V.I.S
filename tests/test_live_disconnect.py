@@ -43,6 +43,14 @@ def test_billing_error_is_not_treated_as_disconnect() -> None:
     assert jarvis._is_billing_error(exc) is True
 
 
+def test_wake_protocol_accepts_any_sender_when_sender_is_unset() -> None:
+    jarvis = JarvisLive(DummyUI())
+    jarvis._wake_protocol_cfg = {"enabled": True, "sender": "", "phrase": "jarvis wake"}
+
+    assert jarvis._is_authorized_wake_sender("James", "James") is True
+    assert jarvis._is_authorized_wake_sender("+3531234567", "James") is True
+
+
 def test_receive_audio_disconnect_does_not_print_traceback(monkeypatch) -> None:
     jarvis = JarvisLive(DummyUI())
 

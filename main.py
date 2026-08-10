@@ -1657,7 +1657,7 @@ class JarvisLive:
     def _load_imessage_wake_config() -> dict:
         cfg = {
             "enabled": True,
-            "sender": "0833592353",
+            "sender": "",
             "phrase": "jarvis wake",
             "secret": "",
             "autostart": True,
@@ -1682,7 +1682,7 @@ class JarvisLive:
     def _load_imessage_shutdown_config() -> dict:
         cfg = {
             "enabled": True,
-            "sender": "0833592353",
+            "sender": "",
             "phrase": "jarvis shutdown",
             "secret": "",
             "cooldown_seconds": 120,
@@ -1875,10 +1875,14 @@ class JarvisLive:
 
     def _is_authorized_wake_sender(self, sender: str, chat_name: str) -> bool:
         expected_sender = str(self._wake_protocol_cfg.get("sender", "") or "").strip()
+        if not expected_sender:
+            return bool((sender or chat_name or "").strip())
         return self._is_authorized_imessage_sender(expected_sender, sender, chat_name)
 
     def _is_authorized_shutdown_sender(self, sender: str, chat_name: str) -> bool:
         expected_sender = str(self._shutdown_protocol_cfg.get("sender", "") or "").strip()
+        if not expected_sender:
+            return bool((sender or chat_name or "").strip())
         return self._is_authorized_imessage_sender(expected_sender, sender, chat_name)
 
     def _schedule_shutdown(self, reason: str) -> bool:
