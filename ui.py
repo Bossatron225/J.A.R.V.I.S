@@ -1820,6 +1820,7 @@ class MainWindow(QMainWindow):
         self.on_interrupt      = None   # callable: () -> None — stop JARVIS mid-speech
         self._muted            = False
         self._current_file: str | None = None
+        self._security_overlay: QWidget | None = None
         self._remote_overlay: RemoteKeyOverlay | None = None
         self._customize_overlay: CustomizeOverlay | None = None
 
@@ -2425,47 +2426,61 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         cw = self.centralWidget()
-        if self._overlay and self._overlay.isVisible():
+        if cw is None:
+            return
+
+        overlay = getattr(self, "_overlay", None)
+        if overlay is not None and overlay.isVisible():
             ow, oh = 460, 390
-            self._overlay.setGeometry(
-                (cw.width()  - ow) // 2,
+            overlay.setGeometry(
+                (cw.width() - ow) // 2,
                 (cw.height() - oh) // 2,
                 ow, oh,
             )
-        if self._security_overlay and self._security_overlay.isVisible():
+
+        security_overlay = getattr(self, "_security_overlay", None)
+        if security_overlay is not None and security_overlay.isVisible():
             ow, oh = 440, 360
-            self._security_overlay.setGeometry(
-                (cw.width()  - ow) // 2,
+            security_overlay.setGeometry(
+                (cw.width() - ow) // 2,
                 (cw.height() - oh) // 2,
                 ow, oh,
             )
-        if self._remote_overlay and self._remote_overlay.isVisible():
+
+        remote_overlay = getattr(self, "_remote_overlay", None)
+        if remote_overlay is not None and remote_overlay.isVisible():
             ow, oh = RemoteKeyOverlay._OW, RemoteKeyOverlay._OH
-            self._remote_overlay.setGeometry(
-                (cw.width()  - ow) // 2,
+            remote_overlay.setGeometry(
+                (cw.width() - ow) // 2,
                 (cw.height() - oh) // 2,
                 ow, oh,
             )
-        if self._customize_overlay and self._customize_overlay.isVisible():
+
+        customize_overlay = getattr(self, "_customize_overlay", None)
+        if customize_overlay is not None and customize_overlay.isVisible():
             ow, oh = CustomizeOverlay._OW, CustomizeOverlay._OH
-            self._customize_overlay.setGeometry(
-                (cw.width()  - ow) // 2,
+            customize_overlay.setGeometry(
+                (cw.width() - ow) // 2,
                 (cw.height() - oh) // 2,
                 ow, oh,
             )
-        # Camera preview — bottom-right corner of the center/HUD area
-        pw = _CameraPreview._W
-        ph = self._cam_preview.height() or _CameraPreview._H
-        self._cam_preview.setGeometry(
-            cw.width() - _RIGHT_W - pw - 12,
-            cw.height() - ph - 28,
-            pw, ph,
-        )
-        # Clipboard panel — bottom-center
-        if hasattr(self, '_clipboard_panel') and self._clipboard_panel.isVisible():
+
+        cam_preview = getattr(self, "_cam_preview", None)
+        if cam_preview is not None:
+            pw = _CameraPreview._W
+            ph = cam_preview.height() or _CameraPreview._H
+            cam_preview.setGeometry(
+                cw.width() - _RIGHT_W - pw - 12,
+                cw.height() - ph - 28,
+                pw, ph,
+            )
+
+        clipboard_panel = getattr(self, "_clipboard_panel", None)
+        if clipboard_panel is not None and clipboard_panel.isVisible():
             self._position_clipboard_panel()
-        # Quick drawer — reposition if open
-        if hasattr(self, '_quick_drawer') and self._quick_drawer.isVisible():
+
+        quick_drawer = getattr(self, "_quick_drawer", None)
+        if quick_drawer is not None and quick_drawer.isVisible():
             self._position_quick_drawer()
 
     def _update_metrics(self):
