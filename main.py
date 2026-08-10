@@ -1206,6 +1206,7 @@ class JarvisLive:
         return str(config.get("tts_engine", "")).strip().lower() in {
             "edgetts",
             "kokoro",
+            "elevenlabs",
         }
 
     @staticmethod
@@ -1214,6 +1215,7 @@ class JarvisLive:
         return {
             "edgetts": "EdgeTTS",
             "kokoro": "Kokoro",
+            "elevenlabs": "ElevenLabs",
         }.get(engine_name, engine_name or "external TTS")
 
     async def _tts_worker(self) -> None:
