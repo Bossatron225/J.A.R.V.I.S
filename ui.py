@@ -1775,6 +1775,124 @@ class RemoteKeyOverlay(QWidget):
         self.closed.emit()
 
 
+class SecurityOverlay(QWidget):
+    """Stark-style biometrics verification overlay for voice recognition and visual person detection."""
+    
+    verified = pyqtSignal(str) # Emits recognized identity name
+    failed = pyqtSignal()
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(f"""
+            SecurityOverlay {{
+                background: rgba(0, 4, 10, 248);
+                border: 1px solid {C.RED};
+                border-radius: 10px;
+            }}
+        """)
+        
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setSpacing(10)
+        
+        def _lbl(txt, fs=10, bold=False, color=C.PRI, align=Qt.AlignmentFlag.AlignCenter):
+            w = QLabel(txt)
+            w.setAlignment(align)
+            w.setFont(QFont("Courier New", fs, QFont.Weight.Bold if bold else QFont.Weight.Normal))
+            w.setStyleSheet(f"color: {color}; background: transparent;")
+            return w
+            
+        lay.addWidget(_lbl("◈  STARK SECURITY PROTOCOL: BIOMETRIC LOCK", 12, True, C.RED))
+        lay.addWidget(_lbl("Voice recognition & visual person detection required.", 8, color=C.TEXT_DIM))
+        
+        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"color: {C.BORDER};")
+        lay.addWidget(sep)
+        
+        self._status_lbl = QLabel("STATUS: SCANNING BIOMETRICS...")
+        self._status_lbl.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        self._status_lbl.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
+        self._status_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(self._status_lbl)
+        
+        self._video_feed_lbl = QLabel()
+        self._video_feed_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._video_feed_lbl.setFixedSize(320, 200)
+        self._video_feed_lbl.setStyleSheet(f"background: {C.DARK}; border: 1px solid {C.BORDER_B}; border-radius: 6px;")
+        
+        vf_row = QHBoxLayout()
+        vf_row.addStretch()
+        vf_row.addWidget(self._video_feed_lbl)
+        vf_row.addStretch()
+        lay.addLayout(vf_row)
+        
+        self._voice_prog = QProgressBar()
+        self._voice_prog.setFixedHeight(14)
+        self._voice_prog.setStyleSheet(f"""
+            QProgressBar {{
+                background: {C.BAR_BG}; border: 1px solid {C.BORDER}; border-radius: 3px; text-align: center; color: {C.TEXT}; font-size: 7pt;
+            }}
+            QProgressBar::chunk {{
+                background: {C.GREEN}; border-radius: 2px;
+            }}
+        """)
+        self._voice_prog.setValue(0)
+        lay.addWidget(self._voice_prog)
+        
+        btn_row = QHBoxLayout(); btn_row.setSpacing(8)
+        
+        override_btn = QPushButton("MANUAL OVERRIDE")
+        override_btn.setFixedHeight(32)
+        override_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        override_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        override_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.PRI}; border: 1px solid {C.PRI_DIM}; border-radius: 4px;
+            }}
+            QPushButton:hover {{ background: {C.PRI_GHO}; border-color: {C.PRI}; }}
+        """)
+        override_btn.clicked.connect(self._manual_override)
+        btn_row.addWidget(override_btn)
+        
+        abort_btn = QPushButton("LOCKDOWN")
+        abort_btn.setFixedHeight(32)
+        abort_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        abort_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        abort_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.PANEL2}; color: {C.RED}; border: 1px solid {C.RED}; border-radius: 4px;
+            }}
+            QPushButton:hover {{ background: rgba(255,51,85,0.15); }}
+        """)
+        abort_btn.clicked.connect(self.failed.emit)
+        btn_row.addWidget(abort_btn)
+        
+        lay.addLayout(btn_row)
+        
+        self._sim_tick = 0
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._simulate_scan_step)
+        self._timer.start(150)
+        
+    def _simulate_scan_step(self):
+        self._sim_tick += 5
+        self._voice_prog.setValue(min(100, self._sim_tick))
+        if self._sim_tick < 50:
+            self._status_lbl.setText("STATUS: ANALYZING VOICE SIGNATURE...")
+        elif self._sim_tick < 90:
+            self._status_lbl.setText("STATUS: VISUAL PERSON DETECTION MATCHING...")
+        else:
+            self._timer.stop()
+            self._status_lbl.setText("STATUS: IDENTITY CONFIRMED — ACCESS GRANTED")
+            self._status_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+            QTimer.singleShot(800, lambda: self.verified.emit("Tony Stark"))
+            
+    def _manual_override(self):
+        self._timer.stop()
+        self.verified.emit("Authorized Personnel")
+
+
 class MainWindow(QMainWindow):
     _log_sig        = pyqtSignal(str)
     _state_sig      = pyqtSignal(str)
@@ -1788,6 +1906,7 @@ class MainWindow(QMainWindow):
     _wake_bridge_sig = pyqtSignal(str, str, object)  # wake-bridge footer update (thread-safe)
     _audio_status_sig = pyqtSignal(str, str, object)  # audio diagnostics footer update (thread-safe)
     _visual_watch_sig = pyqtSignal(str, str, object)  # visual-watch footer update (thread-safe)
+    _security_check_sig = pyqtSignal()       # trigger security biometric check
 
     def __init__(self, face_path: str):
         super().__init__()
@@ -1821,6 +1940,7 @@ class MainWindow(QMainWindow):
         self._current_file: str | None = None
         self._remote_overlay: RemoteKeyOverlay | None = None
         self._customize_overlay: CustomizeOverlay | None = None
+        self._security_overlay: SecurityOverlay | None = None
 
         central = QWidget()
         central.setStyleSheet(f"background: {C.BG};")
@@ -1952,6 +2072,7 @@ class MainWindow(QMainWindow):
         self._wake_bridge_sig.connect(self.set_wake_bridge_status)
         self._audio_status_sig.connect(self.set_audio_status)
         self._visual_watch_sig.connect(self.set_visual_watch_status)
+        self._security_check_sig.connect(self._show_security_overlay)
         self._cam_stop = threading.Event()
         self._cam_streaming = False
 
@@ -1967,6 +2088,8 @@ class MainWindow(QMainWindow):
         self._ready = self._check_config()
         if not self._ready:
             self._show_setup()
+        else:
+            QTimer.singleShot(500, self._show_security_overlay)
 
         sc_mute = QShortcut(QKeySequence("F4"), self)
         sc_mute.activated.connect(self._toggle_mute)
@@ -1974,6 +2097,31 @@ class MainWindow(QMainWindow):
         sc_full.activated.connect(self._toggle_fullscreen)
         sc_intr = QShortcut(QKeySequence("Escape"), self)
         sc_intr.activated.connect(self._do_interrupt)
+
+    def _show_security_overlay(self):
+        if self._security_overlay and self._security_overlay.isVisible():
+            return
+        cw = self.centralWidget()
+        ow, oh = 440, 360
+        ov = SecurityOverlay(cw)
+        ov.setGeometry((cw.width() - ow) // 2, (cw.height() - oh) // 2, ow, oh)
+        ov.verified.connect(self._on_security_verified)
+        ov.failed.connect(self._on_security_failed)
+        ov.show()
+        self._security_overlay = ov
+
+    def _on_security_verified(self, name: str):
+        if self._security_overlay:
+            self._security_overlay.hide()
+            self._security_overlay = None
+        self._log.append_log(f"SYS: Biometric verified. Welcome back, {name}.")
+
+    def _on_security_failed(self):
+        if self._security_overlay:
+            self._security_overlay.hide()
+            self._security_overlay = None
+        self._log.append_log("ERR: Security protocol failed or lockdown initiated.")
+        QTimer.singleShot(1000, self.close)
 
     def _show_camera_frame(self, img_bytes: bytes):
         """Slot — display camera preview overlay (main thread)."""
@@ -2427,6 +2575,13 @@ class MainWindow(QMainWindow):
         if self._overlay and self._overlay.isVisible():
             ow, oh = 460, 390
             self._overlay.setGeometry(
+                (cw.width()  - ow) // 2,
+                (cw.height() - oh) // 2,
+                ow, oh,
+            )
+        if self._security_overlay and self._security_overlay.isVisible():
+            ow, oh = 440, 360
+            self._security_overlay.setGeometry(
                 (cw.width()  - ow) // 2,
                 (cw.height() - oh) // 2,
                 ow, oh,
@@ -3761,6 +3916,7 @@ class MainWindow(QMainWindow):
         self._apply_state("LISTENING")
         self._assistant_name = _read_full_config().get("assistant_name", "JARVIS") or "JARVIS"
         self._log.append_log(f"SYS: Initialised. OS={os_name.upper()}. {self._assistant_name} online.")
+        QTimer.singleShot(300, self._show_security_overlay)
 
 class _RootShim:
     def __init__(self, app: QApplication):
