@@ -2938,7 +2938,7 @@ class JarvisLive:
             if _is_disconnect_error(e):
                 print(f"[JARVIS] ⚠️ Live session disconnected: {e}")
                 self.session = None
-                raise
+                return
             print(f"[JARVIS] ❌ Recv: {e}")
             traceback.print_exc()
             raise
