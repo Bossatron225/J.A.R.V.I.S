@@ -1533,7 +1533,14 @@ class JarvisLive:
         elif not _service_loaded():
             # Only start when missing; avoid killing an in-flight wake launch.
             _launchctl(["bootstrap", f"gui/{os.getuid()}", str(plist_path)])
-        if str(Path(sys.executable).resolve()) != stable_exec:
+        try:
+            current_exec_resolved = str(Path(sys.executable).expanduser().resolve())
+            stable_exec_resolved = str(Path(stable_exec).expanduser().resolve())
+        except Exception:
+            current_exec_resolved = str(Path(sys.executable).expanduser())
+            stable_exec_resolved = str(Path(stable_exec).expanduser())
+
+        if current_exec_resolved != stable_exec_resolved:
             self.ui.write_log(
                 "SYS: Note: running with a different Python binary than the pinned "
                 "launchd interpreter; macOS permissions may differ for this session."
