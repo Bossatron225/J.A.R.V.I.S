@@ -31,4 +31,4 @@ def test_face_profile_enroll_and_verify(tmp_path):
     assert result["confidence"] >= 0.8
 
     payload = json.loads(profile_path.read_text(encoding="utf-8"))
-    assert payload["label"] == "James"
+    assert payload["profiles"][0]["label"] == "James"

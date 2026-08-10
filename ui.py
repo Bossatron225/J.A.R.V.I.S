@@ -1905,13 +1905,17 @@ class SecurityOverlay(QWidget):
         try:
             from actions.screen_processor import _capture_camera
             image_bytes, _mime = _capture_camera()
-            result = verify_face_profile(image_bytes)
+            result = verify_face_profile(image_bytes, threshold=0.82)
             if result.get("authorized"):
-                self._status_lbl.setText(f"STATUS: IDENTITY CONFIRMED — WELCOME {result.get('label', 'USER').upper()}")
+                self._status_lbl.setText(
+                    f"STATUS: IDENTITY CONFIRMED — WELCOME {result.get('label', 'USER').upper()} ({result.get('confidence', 0.0):.2f})"
+                )
                 self._status_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
                 QTimer.singleShot(800, lambda: self.verified.emit(result.get("label", "User")))
             else:
-                self._status_lbl.setText("STATUS: FACE PROFILE MISMATCH — ACCESS DENIED")
+                self._status_lbl.setText(
+                    f"STATUS: FACE PROFILE MISMATCH — ACCESS DENIED ({result.get('confidence', 0.0):.2f})"
+                )
                 self._status_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
                 QTimer.singleShot(800, self.failed.emit)
         except Exception as exc:
