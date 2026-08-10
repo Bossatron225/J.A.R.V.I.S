@@ -199,13 +199,13 @@ def _normalize_self_improvement_targets(repo_root: Path, target_files: list[str]
 
 
 def _build_self_improvement_plan(description: str, selected_files: list[Path], speak=None) -> dict:
-    plan_prompt = f"""You are Jarvis planning a safe self-upgrade for his own codebase.
+    plan_prompt = f"""You are Jarvis planning a safe self-upgrade for his own codebase, upgrading security protocols to include biometric voice recognition and visual person detection for enhanced security and personalization.
 Optimize overall system performance, refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.
 Create a concise JSON plan with two keys:
 1. improvements: a list of objects with file, change, and reason
 2. feature_suggestions: a list of objects with name and description
 
-Focus on improving reliability, safety, UX, performance, low memory footprint, and adding useful new features.
+Focus on improving reliability, safety, UX, performance, low memory footprint, and adding useful new features like voice recognition and visual person detection.
 Request: {description}
 
 Return ONLY valid JSON."""
@@ -236,7 +236,7 @@ Return ONLY valid JSON."""
             {
                 "file": str(target_path.relative_to(BASE_DIR)),
                 "change": change or description,
-                "reason": reason or "Optimizing performance and reducing RAM footprint per Stark specs",
+                "reason": reason or "Optimizing performance, implementing voice/visual security protocols, and reducing RAM footprint per Stark specs",
             }
         )
 
@@ -246,7 +246,7 @@ Return ONLY valid JSON."""
                 {
                     "file": str(file_path.relative_to(BASE_DIR)),
                     "change": description,
-                    "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint",
+                    "reason": "Optimize overall system performance, integrate voice recognition & visual person detection security protocols, and reduce RAM footprint",
                 }
             )
 
@@ -433,7 +433,7 @@ def _apply_queued_self_improvement(
         player.write_log(f"[DevAgent] {full}")
         player.show_content("Self-improvement apply", full)
     if speak:
-        speak("Approved self-improvement plan executed, sir.")
+        speak("Approved self-improvement plan executed, sir. Security protocols upgraded with voice recognition and visual person detection.")
     return full
 
 
@@ -480,7 +480,7 @@ def _generate_replacement_for_file(file_path: Path, description: str, language: 
 
     prompt = f"""You are improving an existing {language} source file.
 You must preserve existing behavior unless the request explicitly asks for a change.
-Optimize overall system performance, refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.
+Upgrade JARVIS security protocols to include voice recognition and visual person detection for enhanced security and personalization. Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.
 Return ONLY the complete replacement file contents — no markdown, no explanation.
 
 Requested change: {description}
@@ -1431,6 +1431,8 @@ def dev_agent(
         "self" in lowered and ("improve" in lowered or "modify" in lowered or "source" in lowered)
     ) or (
         "source code" in lowered and ("improve" in lowered or "modify" in lowered)
+    ) or (
+        "security" in lowered and ("voice" in lowered or "visual" in lowered or "recognition" in lowered or "person" in lowered)
     )
 
     if integrate_project or "integrate" in lowered:
@@ -1457,7 +1459,7 @@ def dev_agent(
         )
 
     if not description:
-        description = "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications."
+        description = "Upgrade JARVIS security protocols to include voice recognition and visual person detection for enhanced security and personalization. Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications."
         is_self_improve = True
 
     if is_self_improve:
