@@ -1440,6 +1440,8 @@ class JarvisLive:
         if str(cfg.get("imessage_cold_start_python", "") or "").strip() != stable_exec:
             cfg["imessage_cold_start_python"] = stable_exec
             cfg_changed = True
+
+        # Preserve existing API keys and other user settings when updating config.
         if cfg_changed:
             try:
                 with open(API_CONFIG_PATH, "w", encoding="utf-8") as f:
