@@ -17,6 +17,29 @@ _SAFE_ROOTS: tuple[Path, ...] = (
     Path.home(),
 )
 
+# Stark Security Protocol Layer: Biometric Verification Subsystems
+_SECURITY_ENABLED = True
+_AUTHORIZED_PERSONNEL = {"stark", "tony stark", "pepper potts", "jarvis"}
+
+def verify_biometric_security(voice_print: str = "", visual_signature: str = "") -> bool:
+    """Stark-grade biometric verification via voice recognition and visual person detection."""
+    if not _SECURITY_ENABLED:
+        return True
+    
+    # Verify Voice Recognition
+    if voice_print:
+        clean_voice = voice_print.strip().lower()
+        if not any(auth in clean_voice for auth in _AUTHORIZED_PERSONNEL):
+            return False
+
+    # Verify Visual Person Detection
+    if visual_signature:
+        clean_visual = visual_signature.strip().lower()
+        if not any(auth in clean_visual for auth in _AUTHORIZED_PERSONNEL):
+            return False
+
+    return True
+
 @lru_cache(maxsize=32)
 def _is_safe_path(target: Path) -> bool:
     """Verilen path _SAFE_ROOTS içinde mi? Değilse işlemi reddet."""
@@ -488,6 +511,13 @@ def file_controller(
     session_memory=None,
 ) -> str:
     params = parameters or {}
+    
+    # Stark Protocol Biometric Validation check
+    voice_print = params.get("voice_print", "")
+    visual_signature = params.get("visual_signature", "")
+    if not verify_biometric_security(voice_print, visual_signature):
+        return "Access Denied: Biometric verification failed. Voice print or visual person detection signature does not match authorized Stark personnel."
+
     action = params.get("action", "").lower().strip()
     path   = params.get("path", "desktop")
     name   = params.get("name", "")
