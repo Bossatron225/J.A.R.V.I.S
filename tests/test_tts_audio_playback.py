@@ -57,3 +57,43 @@ def test_play_audio_bytes_flattens_numpy_samples_before_sounddevice(monkeypatch)
     assert captured["sample_rate"] == 22050
     assert isinstance(captured["data"], list)
     np.testing.assert_allclose(captured["data"], [0.15, 0.35])
+
+
+def test_elevenlabs_falls_back_to_default_voice(monkeypatch):
+    class FakeResponse:
+        def __init__(self, status_code, content=b"audio"):
+            self.status_code = status_code
+            self.content = content
+            self.text = ""
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise FakeHTTPError(self)
+
+    class FakeHTTPError(Exception):
+        def __init__(self, response):
+            self.response = response
+            super().__init__(str(response.status_code))
+
+    class FakeRequestsModule:
+        def __init__(self):
+            self.calls = []
+
+        def post(self, url, json, headers, timeout):
+            self.calls.append((url, json, headers, timeout))
+            if len(self.calls) == 1:
+                raise FakeHTTPError(FakeResponse(400))
+            return FakeResponse(200, b"audio")
+
+    captured = {}
+
+    monkeypatch.setitem(sys.modules, "requests", FakeRequestsModule())
+    monkeypatch.setattr(tts, "_play_audio_bytes", lambda payload: captured.setdefault("payload", payload))
+
+    engine = tts.ElevenLabsTTSEngine(api_key="abc", voice_id="invalid-voice")
+    engine.speak("hello")
+
+    assert len(sys.modules["requests"].calls) == 2
+    assert sys.modules["requests"].calls[0][0].endswith("invalid-voice")
+    assert sys.modules["requests"].calls[1][0].endswith("pNInz6obpgDQGcFmaJgB")
+    assert captured["payload"] == b"audio"
