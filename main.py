@@ -1921,7 +1921,10 @@ class JarvisLive:
             if not drained:
                 self.ui.write_log("SYS: Shutdown timeout reached; forcing exit.")
             import os as _os
-            _os._exit(0)
+            try:
+                _os._exit(0)
+            except Exception:
+                raise
 
         asyncio.create_task(_do_shutdown())
         return True
@@ -2347,6 +2350,13 @@ class JarvisLive:
         args = dict(fc.args or {})
         self._predictive_daemon.record_tool_call(name, args)
 
+        if self._shutdown_in_progress or self._reboot_in_progress:
+            return types.FunctionResponse(
+                id=fc.id,
+                name=name,
+                response={"result": "Shutdown in progress; skipping tool execution."},
+            )
+
         print(f"[JARVIS] 🔧 {name}  {args}")
         self.ui.set_state("THINKING")
 
@@ -2368,7 +2378,10 @@ class JarvisLive:
         result = "Done."
 
         try:
-            if name == "open_app":
+            if self._shutdown_in_progress or self._reboot_in_progress:
+                result = "Shutdown in progress; skipping tool execution."
+
+            elif name == "open_app":
                 r = await loop.run_in_executor(None, lambda: open_app(parameters=args, response=None, player=self.ui))
                 result = r or f"Opened {args.get('app_name')}."
 
