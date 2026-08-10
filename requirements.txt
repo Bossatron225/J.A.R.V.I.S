@@ -1,0 +1,37 @@
+PyQt6
+sounddevice
+google-genai
+google-generativeai
+google-api-python-client
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+pillow
+pymupdf
+requests
+miniaudio
+beautifulsoup4
+ddgs
+playwright
+pyautogui
+pyperclip
+python-docx
+pygetwindow
+opencv-python
+numpy<2.5
+mss
+psutil
+send2trash
+youtube-transcript-api
+python-pptx
+fastapi
+uvicorn[standard]
+cryptography
+python-multipart
+comtypes; sys_platform == "win32"
+pycaw; sys_platform == "win32"
+win10toast; sys_platform == "win32"
+pywinauto; sys_platform == "win32"
+pywin32; sys_platform == "win32"
+qrcode[pil]
+pywizlight
