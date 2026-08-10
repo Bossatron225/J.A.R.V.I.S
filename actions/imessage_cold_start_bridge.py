@@ -96,6 +96,35 @@ def _read_config() -> dict:
     return {}
 
 
+def _preferred_python_exec(cfg: dict | None = None) -> str:
+    candidates: list[str] = []
+    if cfg is not None:
+        for key in ("imessage_cold_start_python", "jarvis_python_exec"):
+            value = str(cfg.get(key, "") or "").strip()
+            if value:
+                candidates.append(value)
+
+    for rel in (".venv-1/bin/python", ".venv/bin/python", ".venv-1/bin/python3", ".venv/bin/python3"):
+        candidate = str((BASE_DIR / rel).expanduser())
+        if candidate not in candidates:
+            candidates.append(candidate)
+
+    candidates.append(str(Path(sys.executable).resolve()))
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            p = Path(candidate).expanduser()
+            if p.exists():
+                return str(p.resolve())
+        except Exception:
+            continue
+    return str(Path(sys.executable).resolve())
+
+
 def _load_state() -> dict:
     try:
         if STATE_PATH.exists():
@@ -398,8 +427,11 @@ def _launch_jarvis(python_exec: str, target_script: Path) -> bool:
                 proc = subprocess.Popen(
                     [python_exec, str(target_script)],
                     cwd=str(BASE_DIR),
+                    stdin=subprocess.DEVNULL,
                     stdout=launch_log,
                     stderr=launch_log,
+                    start_new_session=True,
+                    close_fds=True,
                 )
 
                 _log(f"launch requested (attempt={attempt}, pid={proc.pid}, python_exec={python_exec})")
@@ -512,7 +544,7 @@ def main() -> int:
         interval = max(5, min(int(cfg.get("imessage_monitor_interval_seconds", 15) or 15), 300))
         wake_cooldown = max(15, min(int(cfg.get("imessage_wake_cooldown_seconds", 120) or 120), 3600))
 
-        python_exec = str(cfg.get("imessage_cold_start_python", "") or "").strip() or sys.executable
+        python_exec = _preferred_python_exec(cfg)
         target_raw = str(cfg.get("imessage_cold_start_target", "") or "").strip()
         target_script = Path(target_raw) if target_raw else None
         if target_script is None:

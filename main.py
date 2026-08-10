@@ -1434,6 +1434,15 @@ class JarvisLive:
             stable_exec = str(Path(sys.executable).resolve())
         if not Path(stable_exec).exists():
             stable_exec = str(Path(sys.executable).resolve())
+        for candidate in (
+            BASE_DIR / ".venv-1" / "bin" / "python",
+            BASE_DIR / ".venv" / "bin" / "python",
+            BASE_DIR / ".venv-1" / "bin" / "python3",
+            BASE_DIR / ".venv" / "bin" / "python3",
+        ):
+            if candidate.exists():
+                stable_exec = str(candidate.resolve())
+                break
 
         cfg_changed = False
         if str(cfg.get("jarvis_python_exec", "") or "").strip() != stable_exec:
