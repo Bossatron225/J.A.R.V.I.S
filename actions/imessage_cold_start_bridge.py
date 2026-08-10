@@ -98,16 +98,17 @@ def _read_config() -> dict:
 
 def _preferred_python_exec(cfg: dict | None = None) -> str:
     candidates: list[str] = []
+
+    for rel in (".venv-1/bin/python", ".venv/bin/python", ".venv-1/bin/python3", ".venv/bin/python3"):
+        candidate = str((BASE_DIR / rel).expanduser())
+        if candidate:
+            candidates.append(candidate)
+
     if cfg is not None:
         for key in ("imessage_cold_start_python", "jarvis_python_exec"):
             value = str(cfg.get(key, "") or "").strip()
             if value:
                 candidates.append(value)
-
-    for rel in (".venv-1/bin/python", ".venv/bin/python", ".venv-1/bin/python3", ".venv/bin/python3"):
-        candidate = str((BASE_DIR / rel).expanduser())
-        if candidate not in candidates:
-            candidates.append(candidate)
 
     candidates.append(str(Path(sys.executable).resolve()))
 
