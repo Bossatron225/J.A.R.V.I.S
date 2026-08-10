@@ -86,7 +86,16 @@ def _play_np(samples, sample_rate: int) -> None:
     """Play float32 mono (or stereo) audio via sounddevice.
     Accepts numpy arrays or PyTorch tensors.
     """
-    sd.play(_to_numpy(samples), sample_rate)
+    arr = _to_numpy(samples)
+    if arr.ndim == 2 and arr.shape[1] == 2:
+        arr = arr.mean(axis=1)
+    elif arr.ndim > 1 and arr.shape[-1] == 2:
+        arr = arr.mean(axis=-1)
+
+    # sounddevice expects a 1-D float32 array for PCM playback. Converting to
+    # a plain list avoids the NumPy 2.5 deprecation warning triggered by the
+    # library's internal reshape path.
+    sd.play(arr.astype(np.float32, copy=False).reshape(-1).tolist(), sample_rate)
     sd.wait()
 
 
