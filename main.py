@@ -1366,7 +1366,7 @@ class JarvisLive:
         if not bool(cfg.get("permissions_preflight_on_start", True)):
             return
 
-        self.ui.write_log("SYS: Running macOS permission preflight...")
+        self.ui.write_log("SYS: Checking permissions...")
         caller_exec = str(Path(sys.executable).resolve())
         issues: list[tuple[str, str]] = []
 
@@ -1403,7 +1403,7 @@ class JarvisLive:
                 ))
 
         if not issues:
-            self.ui.write_log("SYS: Permission preflight passed (Automation + Mail/Contacts/Messages checks OK).")
+            self.ui.write_log("SYS: Permissions OK.")
             return
 
         self.ui.write_log("SYS: Permission preflight found issues. Apply this once:")
@@ -1545,7 +1545,7 @@ class JarvisLive:
                 "SYS: Note: running with a different Python binary than the pinned "
                 "launchd interpreter; macOS permissions may differ for this session."
             )
-        self.ui.write_log("SYS: iMessage cold-start bridge is active.")
+        self.ui.write_log("SYS: Wake bridge ready.")
 
     @staticmethod
     def _cold_wake_bridge_health_path() -> Path:
@@ -3118,7 +3118,7 @@ class JarvisLive:
             turns={"parts": [{"text": p1}]},
             turn_complete=True,
         )
-        self.ui.write_log("SYS: Briefing phase 1 (greeting) sent.")
+        self.ui.write_log("SYS: Briefing sent.")
 
         # ── Phase 2: fire as soon as Phase 1 audio is done ───────────────────
         async def _deliver_news():
@@ -3172,7 +3172,7 @@ class JarvisLive:
                     turns={"parts": [{"text": p2}]},
                     turn_complete=True,
                 )
-                self.ui.write_log("SYS: Briefing phase 2 (news) sent.")
+                self.ui.write_log("SYS: News sent.")
             except Exception as e:
                 print(f"[Briefing] Phase 2 error: {e}")
                 self.ui.write_log(f"SYS: Briefing phase 2 failed: {e}")
@@ -3298,18 +3298,9 @@ class JarvisLive:
                 if alerts:
                     protocol_triggered = False
                     for alert in alerts:
-                        self.ui.write_log(
-                            f"SYS: iMessage alert payload: {json.dumps(alert, ensure_ascii=False, default=str)[:1200]}"
-                        )
                         shutdown_handled = await self._maybe_handle_imessage_shutdown_protocol(alert)
                         wake_handled = await self._maybe_handle_imessage_wake_protocol(alert)
                         protocol_triggered = protocol_triggered or wake_handled or shutdown_handled
-
-                    for alert in alerts[-3:]:
-                        sender = alert.get("chat_name") or alert.get("sender") or "Unknown"
-                        text = (alert.get("text") or "").strip()
-                        snippet = text[:160]
-                        self.ui.write_log(f"[iMessage] {sender}: {snippet}")
 
                     if self.session:
                         with self._speaking_lock:
@@ -3706,17 +3697,17 @@ class JarvisLive:
         self._configure_imessage_cold_start_bridge()
         asyncio.create_task(self._run_cold_wake_bridge_health())
         asyncio.create_task(self._run_audio_diagnostics())
-        self.ui.write_log(f"SYS: Audio profile active: {self._audio_profile_name}")
+        self.ui.write_log("SYS: Audio ready.")
 
         if self._wake_protocol_cfg.get("autostart", True):
             interval = int(self._wake_protocol_cfg.get("interval_seconds", 15) or 15)
-            result = await asyncio.to_thread(imessage_monitor_start, interval)
-            self.ui.write_log(f"SYS: {result}")
+            await asyncio.to_thread(imessage_monitor_start, interval)
+            self.ui.write_log("SYS: Monitor ready.")
 
         if self._mail_monitor_cfg.get("autostart", True):
             interval = int(self._mail_monitor_cfg.get("interval_seconds", 30) or 30)
-            result = await asyncio.to_thread(mail_monitor_start, interval)
-            self.ui.write_log(f"SYS: {result}")
+            await asyncio.to_thread(mail_monitor_start, interval)
+            self.ui.write_log("SYS: Monitor ready.")
 
         # Start dashboard (optional — needs: pip install fastapi "uvicorn[standard]" cryptography)
         try:
@@ -3742,7 +3733,7 @@ class JarvisLive:
                     try:
                         self._tts_player = create_tts_player(runtime_cfg)
                         self._use_external_tts = True
-                        self.ui.write_log(f"SYS: Voice output routed through {self._external_tts_label(runtime_cfg)}.")
+                        self.ui.write_log("SYS: Voice ready.")
                     except Exception as e:
                         self.ui.write_log(
                             f"SYS: {self._external_tts_label(runtime_cfg)} unavailable, using Gemini voice. {e}"
@@ -3781,7 +3772,7 @@ class JarvisLive:
 
                             print(f"[JARVIS] Connected on {live_model}.")
                             self.ui.set_state("LISTENING")
-                            self.ui.write_log("SYS: JARVIS online.")
+                            self.ui.write_log("SYS: Online.")
 
                             if self._dashboard:
                                 await self._dashboard.broadcast({"type": "status", "state": "active"})
