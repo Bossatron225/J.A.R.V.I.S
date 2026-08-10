@@ -2010,24 +2010,29 @@ class JarvisLive:
 
         text = str(alert.get("text") or "").strip()
         if not text:
+            self.ui.write_log("SYS: Wake protocol ignored (empty message text).")
             return False
 
         sender = str(alert.get("sender") or "").strip()
         chat_name = str(alert.get("chat_name") or "").strip()
+        self.ui.write_log(f"SYS: Wake protocol candidate sender={sender or 'unknown'} chat={chat_name or 'unknown'} text={text[:160]}")
         if not self._is_authorized_wake_sender(sender=sender, chat_name=chat_name):
+            self.ui.write_log("SYS: Wake protocol rejected (sender not authorized).")
             return False
 
         phrase = str(self._wake_protocol_cfg.get("phrase", "jarvis wake") or "jarvis wake")
         if not self._phrase_in_text(phrase, text):
+            self.ui.write_log(f"SYS: Wake protocol rejected (phrase '{phrase}' not found).")
             return False
 
         rowid = int(alert.get("rowid") or 0)
         cooldown = int(self._wake_protocol_cfg.get("cooldown_seconds", 120) or 120)
         now = time.time()
         if rowid and rowid <= self._last_wake_protocol_rowid:
+            self.ui.write_log(f"SYS: Wake protocol ignored (duplicate rowid {rowid}).")
             return True
         if (now - self._last_wake_protocol_ts) < cooldown:
-            self.ui.write_log("SYS: iMessage wake suppressed (cooldown).")
+            self.ui.write_log(f"SYS: iMessage wake suppressed (cooldown {cooldown}s).")
             if rowid:
                 self._last_wake_protocol_rowid = rowid
             return True
@@ -2037,6 +2042,8 @@ class JarvisLive:
         if secret and secret.lower() not in text_l:
             self.ui.write_log("SYS: iMessage wake command rejected (secret mismatch).")
             return True
+
+        self.ui.write_log("SYS: Wake protocol accepted; sending acknowledgement.")
 
         self._last_wake_protocol_ts = now
         if rowid:
@@ -3266,6 +3273,9 @@ class JarvisLive:
                 if alerts:
                     protocol_triggered = False
                     for alert in alerts:
+                        self.ui.write_log(
+                            f"SYS: iMessage alert payload: {json.dumps(alert, ensure_ascii=False, default=str)[:1200]}"
+                        )
                         shutdown_handled = await self._maybe_handle_imessage_shutdown_protocol(alert)
                         wake_handled = await self._maybe_handle_imessage_wake_protocol(alert)
                         protocol_triggered = protocol_triggered or wake_handled or shutdown_handled
