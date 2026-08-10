@@ -1432,14 +1432,14 @@ class JarvisLive:
             BASE_DIR / ".venv" / "bin" / "python3",
         ):
             if candidate.exists():
-                stable_exec = str(candidate.resolve())
+                stable_exec = str(candidate)
                 break
         else:
             configured_exec = str(cfg.get("imessage_cold_start_python", "") or "").strip()
             remembered_exec = str(cfg.get("jarvis_python_exec", "") or "").strip()
             stable_exec = configured_exec or remembered_exec or str(Path(sys.executable).resolve())
             try:
-                stable_exec = str(Path(stable_exec).expanduser().resolve())
+                stable_exec = str(Path(stable_exec).expanduser())
             except Exception:
                 stable_exec = str(Path(sys.executable).resolve())
             if not Path(stable_exec).exists():
