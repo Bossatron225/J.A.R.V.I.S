@@ -312,10 +312,12 @@ LIMIT 50;
 
 def _sender_matches(expected_sender: str, sender: str, chat_name: str) -> bool:
     expected_sender = (expected_sender or "").strip()
+    if not expected_sender:
+        return True
     expected_variants = _phone_variants(expected_sender)
     expected_norm = _normalize_match_text(expected_sender)
     if not expected_variants and not expected_norm:
-        return False
+        return True
     incoming = [sender, chat_name]
 
     # Primary matching for phone-number based sender IDs.
@@ -400,35 +402,26 @@ def _launch_jarvis(python_exec: str, target_script: Path) -> bool:
                     stderr=launch_log,
                 )
 
-                _log(f"launch requested (attempt={attempt}, pid={proc.pid})")
+                _log(f"launch requested (attempt={attempt}, pid={proc.pid}, python_exec={python_exec})")
 
-                # Give process a moment to initialize; detect immediate crash.
                 time.sleep(2)
                 if _is_jarvis_running(target_script):
-                    _log(f"launch confirmed (attempt={attempt})")
+                    _log(f"launch confirmed (attempt={attempt}, pid={proc.pid})")
                     try:
-                        # Bring app to front so cold-start is visibly obvious to user.
                         _run_applescript = [
                             "-e",
                             f'tell application "System Events" to set frontmost of first process whose unix id is {proc.pid} to true'
                         ]
                         subprocess.run(["osascript", *_run_applescript], capture_output=True, text=True, timeout=5)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        _log(f"frontmost activation failed: {e}")
                     return True
 
-                # Fallback: use LaunchServices to start Python.app in the active user session.
                 py_app_bin = _python_app_binary_from_exec(python_exec)
                 if py_app_bin:
                     _log(f"direct launch not running; trying LaunchServices fallback (attempt={attempt})")
                     subprocess.Popen(
-                        [
-                            "open",
-                            "-a",
-                            py_app_bin,
-                            "--args",
-                            str(target_script),
-                        ],
+                        ["open", "-a", py_app_bin, "--args", str(target_script)],
                         cwd=str(BASE_DIR),
                         stdout=launch_log,
                         stderr=launch_log,
