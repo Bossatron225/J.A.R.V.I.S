@@ -1301,11 +1301,56 @@ class ManageProfilesOverlay(QWidget):
         self._setup_status.setWordWrap(True)
         lay.addWidget(self._setup_status)
 
+        self._preview_frame = QFrame()
+        self._preview_frame.setFixedHeight(140)
+        self._preview_frame.setStyleSheet(f"""
+            QFrame {{
+                background: {C.PANEL}; border: 1px solid {C.BORDER}; border-radius: 6px;
+            }}
+        """)
+        preview_layout = QVBoxLayout(self._preview_frame)
+        preview_layout.setContentsMargins(8, 8, 8, 8)
+        preview_layout.setSpacing(4)
+
+        preview_title = QLabel("◉ LIVE CAMERA PREVIEW")
+        preview_title.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+        preview_title.setStyleSheet(f"color: {C.PRI}; background: transparent;")
+        preview_layout.addWidget(preview_title)
+
+        self._preview_placeholder = QLabel("Camera preview will appear here while the baseline is being captured.")
+        self._preview_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._preview_placeholder.setWordWrap(True)
+        self._preview_placeholder.setFont(QFont("Courier New", 7))
+        self._preview_placeholder.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        preview_layout.addWidget(self._preview_placeholder, stretch=1)
+
+        self._speak_indicator = QLabel("● WAITING")
+        self._speak_indicator.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        self._speak_indicator.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._speak_indicator.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
+        preview_layout.addWidget(self._speak_indicator)
+        lay.addWidget(self._preview_frame)
+
         self._setup_countdown_label = QLabel("")
         self._setup_countdown_label.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         self._setup_countdown_label.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
         self._setup_countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(self._setup_countdown_label)
+
+        self._confirm_btn = QPushButton("CONFIRM BASELINE")
+        self._confirm_btn.setFixedHeight(34)
+        self._confirm_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        self._confirm_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._confirm_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.PANEL2}; color: {C.GREEN};
+                border: 1px solid {C.GREEN_D}; border-radius: 4px;
+            }}
+            QPushButton:hover {{ background: #001a0f; }}
+        """)
+        self._confirm_btn.clicked.connect(self._confirm_baseline)
+        self._confirm_btn.hide()
+        lay.addWidget(self._confirm_btn)
 
         setup_btn = QPushButton("ESTABLISH LIVE BASELINE")
         setup_btn.setFixedHeight(34)
@@ -1406,26 +1451,62 @@ class ManageProfilesOverlay(QWidget):
         self._visual_input.clear()
         self._load_profiles()
 
+    def _set_capture_state(self, state: str) -> None:
+        if state == "recording":
+            self._speak_indicator.setText("● SPEAK NOW")
+            self._speak_indicator.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
+            self._preview_placeholder.setText("Camera preview active. Keep your face centered while speaking.")
+            self._preview_placeholder.setStyleSheet(f"color: {C.TEXT}; background: transparent;")
+        elif state == "ready":
+            self._speak_indicator.setText("● READY")
+            self._speak_indicator.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+            self._preview_placeholder.setText("Capture complete. Review the baseline and confirm if it looks right.")
+            self._preview_placeholder.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+        else:
+            self._speak_indicator.setText("● WAITING")
+            self._speak_indicator.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
+            self._preview_placeholder.setText("Camera preview will appear here while the baseline is being captured.")
+            self._preview_placeholder.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+
+    def _show_capture_confirmation(self, message: str) -> None:
+        self._setup_status.setText(message)
+        self._setup_status.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+        self._setup_countdown_label.setText("Baseline captured")
+        self._set_capture_state("ready")
+        self._confirm_btn.setText("CONFIRM BASELINE")
+        self._confirm_btn.show()
+
+    def _confirm_baseline(self) -> None:
+        self._confirm_btn.hide()
+        self._set_capture_state("idle")
+        self._setup_status.setText("Baseline confirmed. Your profile is now ready.")
+        self._setup_status.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+        self._setup_countdown_label.setText("")
+        self._load_profiles()
+
     def _establish_baseline(self):
         name = self._new_name_input.text().strip() or get_authorized_profiles().get("primary", {}).get("name") or "James Lumsden"
         self._setup_status.setText("Prepare to record your voice and face. Please keep still and speak clearly for 3 seconds.")
         self._setup_status.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
         self._setup_countdown_label.setText("Starting in 3...")
+        self._confirm_btn.hide()
+        self._set_capture_state("idle")
         self._setup_timer = 3
         self._setup_name = name
         QTimer.singleShot(1000, self._countdown_baseline_step)
 
     def _countdown_baseline_step(self):
         if getattr(self, "_setup_timer", 0) <= 1:
+            self._set_capture_state("recording")
             self._setup_countdown_label.setText("Capturing...")
             ok, message = establish_biometric_baseline(name=self._setup_name)
-            self._setup_status.setText(message)
-            self._setup_status.setStyleSheet(
-                f"color: {C.GREEN if ok else C.RED}; background: transparent;"
-            )
-            self._setup_countdown_label.setText("" if ok else "Capture failed")
             if ok:
-                self._load_profiles()
+                self._show_capture_confirmation(message)
+            else:
+                self._setup_status.setText(message)
+                self._setup_status.setStyleSheet(f"color: {C.RED}; background: transparent;")
+                self._setup_countdown_label.setText("Capture failed")
+                self._set_capture_state("idle")
             return
         self._setup_timer -= 1
         self._setup_countdown_label.setText(f"{self._setup_timer}...")
