@@ -1301,6 +1301,12 @@ class ManageProfilesOverlay(QWidget):
         self._setup_status.setWordWrap(True)
         lay.addWidget(self._setup_status)
 
+        self._setup_countdown_label = QLabel("")
+        self._setup_countdown_label.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        self._setup_countdown_label.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
+        self._setup_countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(self._setup_countdown_label)
+
         setup_btn = QPushButton("ESTABLISH LIVE BASELINE")
         setup_btn.setFixedHeight(34)
         setup_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
@@ -1402,13 +1408,28 @@ class ManageProfilesOverlay(QWidget):
 
     def _establish_baseline(self):
         name = self._new_name_input.text().strip() or get_authorized_profiles().get("primary", {}).get("name") or "James Lumsden"
-        ok, message = establish_biometric_baseline(name=name)
-        self._setup_status.setText(message)
-        self._setup_status.setStyleSheet(
-            f"color: {C.GREEN if ok else C.RED}; background: transparent;"
-        )
-        if ok:
-            self._load_profiles()
+        self._setup_status.setText("Prepare to record your voice and face. Please keep still and speak clearly for 3 seconds.")
+        self._setup_status.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
+        self._setup_countdown_label.setText("Starting in 3...")
+        self._setup_timer = 3
+        self._setup_name = name
+        QTimer.singleShot(1000, self._countdown_baseline_step)
+
+    def _countdown_baseline_step(self):
+        if getattr(self, "_setup_timer", 0) <= 1:
+            self._setup_countdown_label.setText("Capturing...")
+            ok, message = establish_biometric_baseline(name=self._setup_name)
+            self._setup_status.setText(message)
+            self._setup_status.setStyleSheet(
+                f"color: {C.GREEN if ok else C.RED}; background: transparent;"
+            )
+            self._setup_countdown_label.setText("" if ok else "Capture failed")
+            if ok:
+                self._load_profiles()
+            return
+        self._setup_timer -= 1
+        self._setup_countdown_label.setText(f"{self._setup_timer}...")
+        QTimer.singleShot(1000, self._countdown_baseline_step)
 
 
 class BiometricLockOverlay(QWidget):
