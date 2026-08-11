@@ -123,6 +123,8 @@ def test_manage_profiles_overlay_supports_capture_confirmation(monkeypatch, tmp_
     monkeypatch.setattr("ui.PROFILES_FILE", tmp_path / "authorized_profiles.json")
     monkeypatch.setattr("ui.CONFIG_DIR", tmp_path)
 
+    monkeypatch.setattr("ui.evaluate_live_biometric_security", lambda identity: (True, {"voice_detected": True, "visual_detected": True}))
+
     overlay = ManageProfilesOverlay(parent=None)
     overlay._set_capture_state("recording")
     assert "SPEAK NOW" in overlay._capture_state_text
@@ -130,3 +132,4 @@ def test_manage_profiles_overlay_supports_capture_confirmation(monkeypatch, tmp_
     overlay._show_capture_confirmation("Baseline ready")
     assert overlay._confirm_btn is not None
     assert overlay._capture_state_text == "● READY"
+    assert "verified" in overlay._setup_status.text().lower()
