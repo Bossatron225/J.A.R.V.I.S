@@ -166,7 +166,11 @@ def current_palette() -> dict[str, str]:
 def _ensure_qapplication() -> QApplication | None:
     app = QApplication.instance()
     if app is None:
-        if os.environ.get("QT_QPA_PLATFORM") is None and os.environ.get("DISPLAY") is None and platform.system() != "Windows":
+        if (
+            os.environ.get("QT_QPA_PLATFORM") is None
+            and os.environ.get("DISPLAY") is None
+            and platform.system() == "Linux"
+        ):
             os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         try:
             app = QApplication([])
