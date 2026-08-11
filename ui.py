@@ -1418,7 +1418,10 @@ class ManageProfilesOverlay(QWidget):
             cap.release()
             return
         self._camera_cap = cap
-        self._preview_timer.start()
+        try:
+            self._preview_timer.start()
+        except RuntimeError:
+            self._stop_camera_preview()
 
     def _refresh_camera_preview(self) -> None:
         if self._camera_cap is None:
