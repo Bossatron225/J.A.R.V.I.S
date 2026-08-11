@@ -144,6 +144,38 @@ def test_live_biometric_helper_accepts_live_capture_for_matching_identity(monkey
     assert details["visual_detected"] is True
 
 
+def test_record_voice_sample_uses_speech_recognition_fallback(monkeypatch) -> None:
+    class FakeAudioData:
+        def get_raw_data(self, convert_rate=16000, convert_width=2):
+            return b"\x00\x00\x00\x00"
+
+    class FakeRecognizer:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def listen(self, mic, timeout=None, phrase_time_limit=None):
+            return FakeAudioData()
+
+    class FakeMicrophone:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeSpeechModule:
+        Recognizer = FakeRecognizer
+        Microphone = FakeMicrophone
+
+    monkeypatch.setattr(file_controller_module, "sd", None)
+    monkeypatch.setattr(file_controller_module, "sr", FakeSpeechModule())
+
+    audio_bytes, rms = file_controller_module._record_voice_sample(duration_seconds=1.2)
+
+    assert audio_bytes == b"\x00\x00\x00\x00"
+    assert rms >= 0.0
+
+
 def test_manage_profiles_overlay_supports_capture_confirmation(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr("ui.PROFILES_FILE", tmp_path / "authorized_profiles.json")
     monkeypatch.setattr("ui.CONFIG_DIR", tmp_path)
