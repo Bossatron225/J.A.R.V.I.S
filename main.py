@@ -65,6 +65,12 @@ from memory.obsidian_memory import (
     build_personal_memory_context,
     recall_personal_memory,
 )
+from memory.document_ingestion import (
+    ingest_document,
+    index_codebase,
+    recall_document_details,
+    search_document_index,
+)
 
 from actions.file_processor import file_processor
 from actions.flight_finder     import flight_finder
@@ -1159,6 +1165,24 @@ TOOL_DECLARATIONS = [
                 "query": {"type": "STRING", "description": "Short phrase or topic to search for in personal memory"}
             },
             "required": ["query"]
+        }
+    },
+    {
+        "name": "document_memory",
+        "description": (
+            "Indexes local PDFs, markdown notes, and codebases for later recall. "
+            "Use this to read, summarize, and search local knowledge stores when the user references files or asks for details from them."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "ingest_file | ingest_codebase | search | recall"},
+                "path": {"type": "STRING", "description": "File or directory to index"},
+                "query": {"type": "STRING", "description": "Search term or question to match against the index"},
+                "source_name": {"type": "STRING", "description": "Optional label for the source document"},
+                "limit": {"type": "INTEGER", "description": "How many matches to return for search/recall"},
+            },
+            "required": []
         }
     },
     {
@@ -2548,6 +2572,41 @@ class JarvisLive:
         if name == "personal_memory":
             query = str(args.get("query", "") or "").strip()
             result = recall_personal_memory(query) if query else "No query provided."
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": result, "silent": True}
+            )
+
+        if name == "document_memory":
+            action = str(args.get("action", "") or "").strip().lower()
+            path = str(args.get("path", "") or "").strip()
+            query = str(args.get("query", "") or "").strip()
+            source_name = str(args.get("source_name", "") or "").strip()
+            limit = int(args.get("limit", 3) or 3)
+
+            if action == "ingest_file":
+                if not path:
+                    result = "No file path provided."
+                else:
+                    result = ingest_document(path, source_name=source_name or None)
+            elif action == "ingest_codebase":
+                if not path:
+                    result = "No directory path provided."
+                else:
+                    result = index_codebase(path, source_name=source_name or None)
+            elif action == "search":
+                if not query:
+                    result = "No query provided."
+                else:
+                    result = search_document_index(query, limit=limit)
+            elif action == "recall":
+                if not query:
+                    result = "No query provided."
+                else:
+                    result = recall_document_details(query, limit=limit)
+            else:
+                result = "Use action: ingest_file | ingest_codebase | search | recall."
+
             return types.FunctionResponse(
                 id=fc.id, name=name,
                 response={"result": result, "silent": True}
