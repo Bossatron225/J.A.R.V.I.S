@@ -58,6 +58,7 @@ from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
     save_session_summary, get_recent_sessions,
 )
+from memory.obsidian_memory import remember_user_fact, recall_user_profile
 
 from actions.file_processor import file_processor
 from actions.flight_finder     import flight_finder
@@ -1117,6 +1118,22 @@ TOOL_DECLARATIONS = [
                 "value": {"type": "STRING", "description": "Concise value in English (e.g. Fatih, pizza, older sister)"},
             },
             "required": ["category", "key", "value"]
+        }
+    },
+    {
+        "name": "obsidian_memory",
+        "description": (
+            "Appends or reads a permanent local memory note in the user's Obsidian vault on macOS. "
+            "Use this to store durable facts about the user or recall them later."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "save | recall"},
+                "category": {"type": "STRING", "description": "Fact category such as Preferences, Projects, or Notes"},
+                "fact": {"type": "STRING", "description": "Fact to store in the Obsidian memory vault"},
+            },
+            "required": []
         }
     },
 ]
@@ -2310,6 +2327,7 @@ class JarvisLive:
 
         memory     = load_memory()
         mem_str    = format_memory_for_prompt(memory)
+        obsidian_mem = recall_user_profile()
         sys_prompt = _load_system_prompt()
 
         now      = datetime.now()
@@ -2337,6 +2355,8 @@ class JarvisLive:
         parts = [time_ctx, identity_ctx]
         if mem_str:
             parts.append(mem_str)
+        if obsidian_mem and obsidian_mem.strip() and "No permanent long-term profile data" not in obsidian_mem:
+            parts.append("[LOCAL OBSIDIAN MEMORY]\n" + obsidian_mem.strip())
         parts.append(sys_prompt)
 
         cfg_kwargs: dict = dict(
@@ -2412,6 +2432,19 @@ class JarvisLive:
             return types.FunctionResponse(
                 id=fc.id, name=name,
                 response={"result": "ok", "silent": True}
+            )
+
+        if name == "obsidian_memory":
+            action = str(args.get("action", "") or "").strip().lower()
+            if action == "save":
+                category = str(args.get("category", "Notes") or "Notes").strip()
+                fact = str(args.get("fact", "") or "").strip()
+                result = remember_user_fact(category, fact) if fact else "No fact provided."
+            else:
+                result = recall_user_profile()
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": result, "silent": True}
             )
 
         loop   = asyncio.get_event_loop()
