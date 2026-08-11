@@ -18,6 +18,8 @@ _TEXT_EXTENSIONS = {
     ".r", ".m", ".mm", ".xml", ".svg"
 }
 
+_POWERPOINT_EXTENSIONS = {".ppt", ".pptx"}
+
 
 def _safe_read_text(path: Path) -> str:
     try:
@@ -93,6 +95,28 @@ def _extract_pdf_text(path: Path) -> str:
         return ""
 
 
+def _extract_ppt_text(path: Path) -> str:
+    try:
+        from pptx import Presentation
+    except Exception:
+        return ""
+
+    try:
+        presentation = Presentation(path)
+        slides: list[str] = []
+        for index, slide in enumerate(presentation.slides, 1):
+            parts = [f"--- Slide {index} ---"]
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text and shape.text.strip():
+                    parts.append(shape.text.strip())
+            slide_text = "\n".join(parts)
+            if slide_text.strip():
+                slides.append(slide_text)
+        return "\n\n".join(slides)
+    except Exception:
+        return _safe_read_text(path)
+
+
 def _extract_document_text(path: Path) -> str:
     suffix = path.suffix.lower()
     if suffix == ".pdf":
@@ -105,6 +129,8 @@ def _extract_document_text(path: Path) -> str:
             return "\n".join(paragraphs)
         except Exception:
             return _safe_read_text(path)
+    if suffix in _POWERPOINT_EXTENSIONS:
+        return _extract_ppt_text(path)
     return _safe_read_text(path)
 
 
@@ -166,7 +192,7 @@ def index_codebase(root_path: str, source_name: str | None = None) -> dict:
         if file_path.is_dir():
             continue
         suffix = file_path.suffix.lower()
-        if suffix in _TEXT_EXTENSIONS or suffix == ".pdf":
+        if suffix in _TEXT_EXTENSIONS or suffix == ".pdf" or suffix in _POWERPOINT_EXTENSIONS:
             candidates.append(file_path)
 
     index = _load_index()
