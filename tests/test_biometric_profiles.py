@@ -1,4 +1,7 @@
+from types import SimpleNamespace
+
 from actions import file_controller as file_controller_module
+import main as main_module
 import ui as ui_module
 from ui import ManageProfilesOverlay
 
@@ -133,3 +136,33 @@ def test_manage_profiles_overlay_supports_capture_confirmation(monkeypatch, tmp_
     assert overlay._confirm_btn is not None
     assert overlay._capture_state_text == "● READY"
     assert overlay._capture_state_text == "● READY"
+
+
+def test_jarvis_live_blocks_text_commands_during_biometric_lock(monkeypatch) -> None:
+    class DummyUI:
+        def __init__(self) -> None:
+            self.muted = False
+            self._biometric_lock_active = True
+
+        def set_state(self, *_args, **_kwargs) -> None:
+            return None
+
+        def write_log(self, *_args, **_kwargs) -> None:
+            return None
+
+        def is_biometric_lock_active(self) -> bool:
+            return self._biometric_lock_active
+
+    ui = DummyUI()
+    live = main_module.JarvisLive(ui)
+    live._predictive_daemon = SimpleNamespace(record_text_command=lambda *_args, **_kwargs: None)
+    live._loop = object()
+    live.session = object()
+    sent = []
+
+    monkeypatch.setattr(main_module.asyncio, "run_coroutine_threadsafe", lambda *args, **kwargs: sent.append((args, kwargs)))
+    monkeypatch.setattr(live, "_maybe_handle_remote_url_request", lambda *_args, **_kwargs: False)
+
+    live._on_text_command("hello")
+
+    assert sent == []
