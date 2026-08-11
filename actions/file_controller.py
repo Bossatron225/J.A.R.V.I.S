@@ -18,6 +18,11 @@ except ImportError:  # pragma: no cover - optional runtime dependency
     sd = None
 
 try:
+    import speech_recognition as sr
+except ImportError:  # pragma: no cover - optional runtime dependency
+    sr = None
+
+try:
     import cv2
 except ImportError:  # pragma: no cover - optional runtime dependency
     cv2 = None
@@ -162,21 +167,36 @@ def _pcm_to_wav(audio_bytes: bytes, sample_rate: int = 16_000) -> bytes:
 
 
 def _record_voice_sample(duration_seconds: float = 1.2, sample_rate: int = 16_000) -> tuple[bytes, float]:
-    if sd is None:
-        return b"", 0.0
-    try:
-        stderr_buffer = io.StringIO()
-        with redirect_stderr(stderr_buffer):
-            frames = sd.rec(int(sample_rate * duration_seconds), samplerate=sample_rate, channels=1, dtype="int16")
-            sd.wait()
-        audio_bytes = frames.tobytes()
-        if not audio_bytes:
-            return b"", 0.0
-        samples = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
-        rms = float(np.sqrt(np.mean(np.square(samples)))) / 32768.0 if samples.size else 0.0
-        return audio_bytes, rms
-    except Exception:
-        return b"", 0.0
+    if sd is not None:
+        try:
+            stderr_buffer = io.StringIO()
+            with redirect_stderr(stderr_buffer):
+                frames = sd.rec(int(sample_rate * duration_seconds), samplerate=sample_rate, channels=1, dtype="int16")
+                sd.wait()
+            audio_bytes = frames.tobytes()
+            if audio_bytes:
+                samples = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
+                rms = float(np.sqrt(np.mean(np.square(samples)))) / 32768.0 if samples.size else 0.0
+                return audio_bytes, rms
+        except Exception:
+            pass
+
+    if sr is not None:
+        try:
+            recognizer = sr.Recognizer()
+            recognizer.energy_threshold = 400
+            recognizer.dynamic_energy_threshold = True
+            with sr.Microphone() as microphone:
+                audio = recognizer.listen(microphone, timeout=2, phrase_time_limit=max(1, int(duration_seconds)))
+            audio_bytes = audio.get_raw_data(convert_rate=sample_rate, convert_width=2)
+            if audio_bytes:
+                samples = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
+                rms = float(np.sqrt(np.mean(np.square(samples)))) / 32768.0 if samples.size else 0.0
+                return audio_bytes, rms
+        except Exception:
+            pass
+
+    return b"", 0.0
 
 
 def _capture_live_visual_frame() -> tuple[bytes | None, bool]:
@@ -368,7 +388,7 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
             visual_detected = _visual_matches_baseline(image_bytes or b"", baseline_image)
 
     live_signal_detected = bool(voice_detected or visual_detected)
-    granted = bool(identity_match and live_signal_detected)
+    granted = bool(identity_match and (voice_detected or visual_detected))
     return granted, {
         "voice_detected": voice_detected,
         "visual_detected": visual_detected,
