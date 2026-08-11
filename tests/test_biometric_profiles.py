@@ -123,6 +123,27 @@ def test_live_biometric_helper_requires_audio_and_face(monkeypatch) -> None:
     assert details["visual_detected"] is False
 
 
+def test_live_biometric_helper_accepts_live_capture_for_matching_identity(monkeypatch) -> None:
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PROFILES", {
+        "primary": {
+            "name": "James Lumsden",
+            "voice_prints": ["james lumsden"],
+            "visual_signatures": ["james lumsden"],
+            "clearance_level": "omega",
+        },
+        "authorized": {},
+    })
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", {"james", "james lumsden"})
+    monkeypatch.setattr(file_controller_module, "_record_voice_sample", lambda *args, **kwargs: (b"audio-sample", 0.001))
+    monkeypatch.setattr(file_controller_module, "_capture_live_visual_frame", lambda *args, **kwargs: (b"frame", False))
+
+    granted, details = file_controller_module.evaluate_live_biometric_security("James Lumsden")
+
+    assert granted is True
+    assert details["voice_detected"] is True
+    assert details["visual_detected"] is True
+
+
 def test_manage_profiles_overlay_supports_capture_confirmation(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr("ui.PROFILES_FILE", tmp_path / "authorized_profiles.json")
     monkeypatch.setattr("ui.CONFIG_DIR", tmp_path)
