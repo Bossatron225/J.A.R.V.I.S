@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -131,7 +131,7 @@ def _index_document_entry(path: Path, source_name: str | None = None) -> dict:
         "path": str(path),
         "source_name": source_name or path.stem,
         "kind": path.suffix.lower() or "file",
-        "added_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "added_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "chunks": chunks,
     }
 
