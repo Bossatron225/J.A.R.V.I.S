@@ -386,7 +386,7 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
             except Exception:
                 baseline_image = b""
             visual_detected = _visual_matches_baseline(image_bytes or b"", baseline_image)
-        else:
+        elif voice_detected:
             visual_detected = bool(image_bytes or face_detected)
 
     live_signal_detected = bool(voice_detected and visual_detected)
