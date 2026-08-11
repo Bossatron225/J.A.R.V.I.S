@@ -238,8 +238,10 @@ class _SysMetrics:
         self._last_net = psutil.net_io_counters()
         self._last_net_t = time.time()
         self._running = True
-        t = threading.Thread(target=self._loop, daemon=True)
-        t.start()
+        self._thread = None
+        if os.environ.get("PYTEST_CURRENT_TEST") is None:
+            self._thread = threading.Thread(target=self._loop, daemon=True)
+            self._thread.start()
 
     def _loop(self):
         while self._running:
