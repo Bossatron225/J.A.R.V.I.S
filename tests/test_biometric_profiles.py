@@ -116,8 +116,7 @@ def test_manage_profiles_overlay_supports_capture_confirmation(monkeypatch, tmp_
     monkeypatch.setattr("ui.PROFILES_FILE", tmp_path / "authorized_profiles.json")
     monkeypatch.setattr("ui.CONFIG_DIR", tmp_path)
 
-    parent = ui_module.QWidget()
-    overlay = ManageProfilesOverlay(parent=parent)
+    overlay = ManageProfilesOverlay(parent=None)
     overlay._set_capture_state("recording")
     assert "SPEAK NOW" in overlay._capture_state_text
 
