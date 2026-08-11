@@ -219,6 +219,8 @@ HIGH_RISK_TOOL_NAMES = {
     "reminder",
     "system_monitor",
 }
+FACE_AUTH_MAX_ATTEMPTS = 3
+FACE_AUTH_RETRY_DELAY_SECONDS = 0.35
 
 
 def _resolve_face_auth_reference() -> Path:
@@ -226,6 +228,19 @@ def _resolve_face_auth_reference() -> Path:
     if override:
         return Path(override).expanduser()
     return BASE_DIR / "auth_reference.jpg"
+
+
+def _verify_face_with_retries(reference_path: Path, attempts: int = FACE_AUTH_MAX_ATTEMPTS) -> tuple[bool, str]:
+    last_reason = "Face authentication failed."
+    total = max(1, int(attempts))
+    for attempt in range(1, total + 1):
+        ok, reason = verify_face(str(reference_path))
+        if ok:
+            return True, reason
+        last_reason = reason or last_reason
+        if attempt < total:
+            time.sleep(FACE_AUTH_RETRY_DELAY_SECONDS)
+    return False, f"{last_reason} (after {total} attempt(s))"
 
 
 @lru_cache(maxsize=4)
@@ -2564,7 +2579,8 @@ class JarvisLive:
                     response={"result": f"Face authentication required before {name}. Place your reference image at {auth_reference}."},
                 )
             else:
-                ok, reason = verify_face(str(auth_reference))
+                self.ui.write_log(f"SYS: Face auth check started before {name}.")
+                ok, reason = _verify_face_with_retries(auth_reference)
                 if not ok:
                     self.ui.write_log(f"SYS: Face auth failed before {name}: {reason}")
                     return types.FunctionResponse(
