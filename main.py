@@ -69,7 +69,7 @@ from actions.google_calendar   import google_calendar
 from actions.computer_settings import computer_settings
 from actions.wiz_lights        import wiz_lights
 from actions.screen_processor  import _capture_camera, _capture_screen
-from actions.screen_processor  import _capture_targeted_visual, resolve_visual_source
+from actions.screen_processor  import _capture_targeted_visual
 from actions.youtube_video     import youtube_video
 from actions.desktop           import desktop_control
 from actions.browser_control   import browser_control
@@ -642,19 +642,6 @@ TOOL_DECLARATIONS = [
         }
     },
     {
-        "name": "switch_camera_source",
-        "description": (
-            "Switches JARVIS's active visual input between the local webcam and an Alexa-style camera feed."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "source": {"type": "STRING", "description": "Use 'webcam', 'camera', or 'alexa'."}
-            },
-            "required": ["source"]
-        }
-    },
-    {
         "name": "visual_watch",
         "description": (
             "Registers, lists, removes, or clears live visual targets so Jarvis can keep watching specific browser tabs, apps, or windows over time. "
@@ -1154,7 +1141,6 @@ class JarvisLive:
         self._vision_close_pending = False   # True after vision injected; next turn_complete closes camera
         self._vision_last_time     = 0.0     # monotonic time of last screen_process call (cooldown guard)
         self._vision_busy          = False   # True while a vision capture/inject cycle is in flight
-        self._active_visual_source = "camera"  # default visual input for follow-up vision requests
         self._interrupted          = False   # True while draining audio after user interrupt
         self.ui.on_text_command   = self._on_text_command
         self.ui.on_remote_clicked = self._make_remote_key
@@ -2541,13 +2527,6 @@ class JarvisLive:
                 r = await loop.run_in_executor(None, lambda: google_calendar(parameters=args, response=None, player=self.ui))
                 result = r or "Google Calendar action completed."
 
-            elif name == "switch_camera_source":
-                source = str(args.get("source", "camera") or "camera").strip()
-                resolved = resolve_visual_source(source)
-                self._active_visual_source = str(resolved.get("target_type") or "camera")
-                label = str(resolved.get("label") or source or "camera")
-                result = f"Visual source switched to {label}."
-
             elif name == "visual_watch":
                 action = str(args.get("action", "") or "").strip().lower()
                 if action == "add":
@@ -2595,8 +2574,7 @@ class JarvisLive:
                 else:
                     self._vision_busy      = True
                     self._vision_last_time = _now
-                    target_type = str(args.get("target_type", args.get("angle", self._active_visual_source)) or self._active_visual_source).lower().strip()
-                    target_type = target_type if target_type not in {"", "auto", "default"} else self._active_visual_source
+                    target_type = str(args.get("target_type", args.get("angle", "screen")) or "screen").lower().strip()
                     user_text = args.get("text", "What do you see?")
                     browser_name = str(args.get("browser", "") or "").strip()
                     target = str(args.get("target", "") or "").strip()
