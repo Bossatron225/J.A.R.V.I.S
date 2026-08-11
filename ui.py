@@ -17,7 +17,11 @@ import functools
 
 import psutil
 
-if os.environ.get("QT_QPA_PLATFORM") is None and os.environ.get("DISPLAY") is None and platform.system() != "Windows":
+if (
+    os.environ.get("QT_QPA_PLATFORM") is None
+    and os.environ.get("DISPLAY") is None
+    and platform.system() == "Linux"
+):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
