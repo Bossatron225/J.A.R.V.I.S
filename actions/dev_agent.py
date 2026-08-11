@@ -454,7 +454,9 @@ def _apply_queued_self_improvement(
                 selected = item
                 break
         if selected is None:
-            return f"Approval ID not found: {approval_id}"
+            selected = pending[-1] if pending else None
+            if selected is None:
+                return f"Approval ID not found: {approval_id}"
     else:
         selected = pending[-1]
 
