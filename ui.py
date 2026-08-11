@@ -1579,9 +1579,17 @@ class ManageProfilesOverlay(QWidget):
             self._stop_camera_preview()
 
     def _show_capture_confirmation(self, message: str) -> None:
-        self._safe_set_widget_text(self._setup_status, message)
-        self._safe_set_widget_stylesheet(self._setup_status, f"color: {C.GREEN}; background: transparent;")
-        self._safe_set_widget_text(self._setup_countdown_label, "Baseline captured")
+        identity = self._setup_name or get_authorized_profiles().get("primary", {}).get("name") or "James Lumsden"
+        granted, details = evaluate_live_biometric_security(identity)
+        summary = message
+        if granted:
+            summary = f"{message}\nLive baseline verified against the stored profile."
+        else:
+            summary = f"{message}\nLive verification incomplete; camera or microphone access may need to be allowed."
+
+        self._safe_set_widget_text(self._setup_status, summary)
+        self._safe_set_widget_stylesheet(self._setup_status, f"color: {C.GREEN if granted else C.ACC2}; background: transparent;")
+        self._safe_set_widget_text(self._setup_countdown_label, "Baseline captured" if granted else "Verification pending")
         self._set_capture_state("ready")
         try:
             self._confirm_btn.setText("CONFIRM BASELINE")
