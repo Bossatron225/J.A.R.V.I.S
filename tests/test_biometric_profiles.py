@@ -1,4 +1,5 @@
 from actions import file_controller as file_controller_module
+from ui import ManageProfilesOverlay
 
 
 def test_enroll_biometric_profile_stores_voice_and_visual_signatures(monkeypatch) -> None:
