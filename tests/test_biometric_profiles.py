@@ -56,3 +56,36 @@ def test_manage_profiles_overlay_uses_profile_file_defaults(monkeypatch, tmp_pat
 
     assert profiles[0]["name"] == "James Lumsden"
     assert profiles[0]["id"] == "JAMES-001"
+
+
+def test_biometric_lock_overlay_does_not_clear_on_failed_verification(monkeypatch) -> None:
+    monkeypatch.setattr(file_controller_module, "_SECURITY_ENABLED", True)
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PROFILES", {
+        "primary": {
+            "name": "James Lumsden",
+            "voice_prints": ["james lumsden"],
+            "visual_signatures": ["james lumsden"],
+            "clearance_level": "omega",
+        },
+        "authorized": {},
+    })
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", {"james", "james lumsden"})
+    file_controller_module.verify_biometric_security.cache_clear()
+
+    overlay = ui_module.BiometricLockOverlay(parent=None)
+    if not getattr(overlay, "_qt_ready", False):
+        return
+
+    overlay._status_lbl.setText("STATUS: READY")
+    overlay._voice_chk.setText("🎙️ Voice Recognition: PENDING")
+    overlay._visual_chk.setText("👁️ Visual Person Detection: PENDING")
+
+    calls = []
+    overlay.verified.connect(lambda: calls.append(True))
+    monkeypatch.setattr(ui_module.QTimer, "singleShot", lambda delay, func: func())
+    monkeypatch.setattr(ui_module, "verify_biometric_security", lambda voice, visual: False)
+    overlay._run_scan()
+
+    assert overlay._status_lbl.text().startswith("STATUS: PROFILE NOT VERIFIED")
+    assert "PROFILE NOT FOUND" in overlay._voice_chk.text() or "PROFILE NOT FOUND" in overlay._visual_chk.text()
+    assert calls == []
