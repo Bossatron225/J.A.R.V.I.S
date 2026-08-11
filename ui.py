@@ -1326,6 +1326,7 @@ class ManageProfilesOverlay(QWidget):
 
         self._camera_cap = None
         self._preview_timer = None
+        self._capture_state_text = "WAITING"
 
         self._speak_indicator = QLabel("● WAITING")
         self._speak_indicator.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
@@ -1552,19 +1553,22 @@ class ManageProfilesOverlay(QWidget):
 
     def _set_capture_state(self, state: str) -> None:
         if state == "recording":
-            self._safe_set_widget_text(self._speak_indicator, "● SPEAK NOW")
+            self._capture_state_text = "● SPEAK NOW"
+            self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
             self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.ACC2}; background: transparent;")
             self._safe_set_widget_text(self._preview_placeholder, "Camera preview active. Keep your face centered while speaking.")
             self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.TEXT}; background: transparent;")
             self._start_camera_preview()
         elif state == "ready":
-            self._safe_set_widget_text(self._speak_indicator, "● READY")
+            self._capture_state_text = "● READY"
+            self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
             self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.GREEN}; background: transparent;")
             self._safe_set_widget_text(self._preview_placeholder, "Capture complete. Review the baseline and confirm if it looks right.")
             self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.GREEN}; background: transparent;")
             self._stop_camera_preview()
         else:
-            self._safe_set_widget_text(self._speak_indicator, "● WAITING")
+            self._capture_state_text = "● WAITING"
+            self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
             self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.TEXT_MED}; background: transparent;")
             self._safe_set_widget_text(self._preview_placeholder, "Camera preview will appear here while the baseline is being captured.")
             self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.TEXT_DIM}; background: transparent;")
