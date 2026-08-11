@@ -51,21 +51,63 @@ def add_authorized_profile(profile_id: str, name: str, voice_print: str, visual_
     profile_key = profile_id.strip().lower()
     if profile_key in _AUTHORIZED_PROFILES["authorized"] or profile_key == "primary":
         return f"Profile registry error: Profile '{profile_id}' already exists."
-    
+
+    normalized_voice = voice_print.strip().lower()
+    normalized_visual = visual_signature.strip().lower()
+
     _AUTHORIZED_PROFILES["authorized"][profile_key] = {
         "name": name,
-        "voice_prints": [voice_print.strip().lower()],
-        "visual_signatures": [visual_signature.strip().lower()],
-        "clearance_level": clearance_level
+        "voice_prints": [normalized_voice] if normalized_voice else [],
+        "visual_signatures": [normalized_visual] if normalized_visual else [],
+        "clearance_level": clearance_level,
     }
-    
-    # Also update global flat set for legacy fast-path compatibility
+
     _AUTHORIZED_PERSONNEL.add(name.lower())
-    _AUTHORIZED_PERSONNEL.add(voice_print.lower())
-    _AUTHORIZED_PERSONNEL.add(visual_signature.lower())
-    
+    if normalized_voice:
+        _AUTHORIZED_PERSONNEL.add(normalized_voice)
+    if normalized_visual:
+        _AUTHORIZED_PERSONNEL.add(normalized_visual)
+
     verify_biometric_security.cache_clear()
     return f"BiometricLock_Protocol: Successfully added authorized profile for '{name}' with ID '{profile_id}'."
+
+
+def enroll_biometric_profile(
+    profile_id: str,
+    name: str,
+    voice_print: str,
+    visual_signature: str,
+    clearance_level: str = "omega",
+    make_primary: bool = False,
+) -> str:
+    """Enrolls a biometric profile with stored voice and visual signature hints for later verification."""
+    global _AUTHORIZED_PROFILES
+
+    profile_key = (profile_id or name).strip().lower().replace(" ", "_")
+    normalized_name = (name or "James Lumsden").strip()
+    normalized_voice = (voice_print or normalized_name).strip().lower()
+    normalized_visual = (visual_signature or normalized_name).strip().lower()
+
+    entry = {
+        "name": normalized_name,
+        "voice_prints": [normalized_voice] if normalized_voice else [],
+        "visual_signatures": [normalized_visual] if normalized_visual else [],
+        "clearance_level": clearance_level,
+    }
+
+    if make_primary:
+        _AUTHORIZED_PROFILES["primary"] = entry
+    else:
+        _AUTHORIZED_PROFILES["authorized"][profile_key] = entry
+
+    _AUTHORIZED_PERSONNEL.add(normalized_name.lower())
+    if normalized_voice:
+        _AUTHORIZED_PERSONNEL.add(normalized_voice)
+    if normalized_visual:
+        _AUTHORIZED_PERSONNEL.add(normalized_visual)
+
+    verify_biometric_security.cache_clear()
+    return f"Enrolled biometric profile for {normalized_name} with voice and visual signatures."
 
 def remove_authorized_profile(profile_id: str) -> str:
     """Removes an authorized profile from the BiometricLock_Protocol registry."""
