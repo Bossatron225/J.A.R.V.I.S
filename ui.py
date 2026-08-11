@@ -1325,9 +1325,7 @@ class ManageProfilesOverlay(QWidget):
         preview_layout.addWidget(self._preview_placeholder, stretch=1)
 
         self._camera_cap = None
-        self._preview_timer = QTimer(self)
-        self._preview_timer.timeout.connect(self._refresh_camera_preview)
-        self._preview_timer.setInterval(180)
+        self._preview_timer = None
 
         self._speak_indicator = QLabel("● WAITING")
         self._speak_indicator.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
