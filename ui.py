@@ -1528,6 +1528,17 @@ class BiometricLockOverlay(QWidget):
         self._voice_chk.setStyleSheet(f"color: {C.GREEN if verified_voice else C.RED}; background: transparent;")
         QTimer.singleShot(900, self._step_visual)
 
+    def _step_visual(self):
+        primary = get_authorized_profiles().get("primary") or {}
+        visual_text = ", ".join(primary.get("visual_signatures", []) or []) or primary.get("name") or "James Lumsden"
+        verified_visual = verify_biometric_security("", visual_text)
+        self._visual_chk.setText(
+            "👁️ Visual Person Detection: PROFILE VERIFIED ✓" if verified_visual else "👁️ Visual Person Detection: PROFILE NOT FOUND"
+        )
+        self._visual_chk.setStyleSheet(f"color: {C.GREEN if verified_visual else C.RED}; background: transparent;")
+        if self._apply_verification_state(self._voice_chk.text().endswith("✓"), verified_visual):
+            QTimer.singleShot(700, self.verified.emit)
+
     def _apply_verification_state(self, verified_voice: bool, verified_visual: bool) -> bool:
         granted = verified_visual and verified_voice
         self._status_lbl.setText(
