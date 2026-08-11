@@ -157,6 +157,15 @@ def current_palette() -> dict[str, str]:
     return {k: getattr(C, k) for k in _HUE_LINKED}
 
 
+def _ensure_qapplication() -> QApplication:
+    app = QApplication.instance()
+    if app is None:
+        if os.environ.get("QT_QPA_PLATFORM") is None and os.environ.get("DISPLAY") is None and platform.system() != "Windows":
+            os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        app = QApplication([sys.argv[0]])
+    return app
+
+
 def retheme_all_widgets(old: dict[str, str], new: dict[str, str]) -> None:
     mapping = {old[k].lower(): new[k].lower()
                for k in old if old[k].lower() != new.get(k, old[k]).lower()}
@@ -4044,7 +4053,7 @@ class _RootShim:
 
 class JarvisUI:
     def __init__(self, face_path: str, size=None):
-        self._app = QApplication.instance() or QApplication(sys.argv)
+        self._app = _ensure_qapplication()
         self._app.setStyle("Fusion")
         self._win = MainWindow(face_path)
         self._window_alive = True
