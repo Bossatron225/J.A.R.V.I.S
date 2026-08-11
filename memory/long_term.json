@@ -64,17 +64,17 @@
   "sessions": [
     {
       "date": "2026-08-11",
-      "summary": "The user worked with JARVIS to review daily news and attempted to update the system's biometric security profile from Tony Stark to James Lumsden, though the configuration encountered persistent authorization constraints.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-11",
       "summary": "The user initiated a security profile update, which encountered biometric verification failures and authorization constraints that kept Tony Stark as the primary profile, while JARVIS successfully fetched current world news and reported a t",
       "language": "English"
     },
     {
       "date": "2026-08-11",
       "summary": "The user successfully provided verbal confirmation to initiate and complete voice calibration, resolving previous authorization constraints and fully updating their biometric security profile with JARVIS.",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-11",
+      "summary": "The user greeted and tested the system multiple times while checking in after completing a voice calibration and reviewing news headlines, including a major earthquake in Colombia.",
       "language": "English"
     }
   ],
