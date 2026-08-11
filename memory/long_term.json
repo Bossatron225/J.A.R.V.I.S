@@ -64,11 +64,6 @@
   "sessions": [
     {
       "date": "2026-08-10",
-      "summary": "James discussed system optimizations, reviewed Glencore financials, and addressed a critical macOS biometric security vulnerability by outlining mitigation steps and preparing a security enhancement proposal.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-10",
       "summary": "The user reviewed system diagnostics and optimizations with JARVIS, including a successful Wake Protocol Patch, before entering an evening standby state.",
       "language": "English"
     },
@@ -80,6 +75,11 @@
     {
       "date": "2026-08-11",
       "summary": "James reviewed headlines regarding extreme heat, opened and minimized Safari, and scheduled a reminder for August 12th.",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-11",
+      "summary": "James reviewed current news headlines—including updates on Meta AI, extreme heat, and an earthquake in Colombia—and received a notification about an Amazon sign-in email.",
       "language": "English"
     }
   ],
