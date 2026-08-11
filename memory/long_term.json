@@ -64,22 +64,17 @@
   "sessions": [
     {
       "date": "2026-08-11",
-      "summary": "James reviewed daily news headlines, received a promotional email, and discussed pending self-improvement proposals for upgrading JARVIS's security and system performance.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-11",
-      "summary": "James reviewed news updates, approved multiple self-improvement proposals to enhance security protocols and system performance, and initiated a new biometric lock protocol.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-11",
       "summary": "James reviewed earthquake news and successfully activated enhanced security by calibrating his voice and facial biometric sensors.",
       "language": "English"
     },
     {
       "date": "2026-08-11",
       "summary": "James reviewed today's news and experienced a biometric protocol failure, prompting JARVIS to perform a recalibration and initiate a self-improvement proposal for an enhanced security system.",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-11",
+      "summary": "The user worked with JARVIS to review daily news and attempted to update the system's biometric security profile from Tony Stark to James Lumsden, though the configuration encountered persistent authorization constraints.",
       "language": "English"
     }
   ],
