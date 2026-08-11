@@ -5,6 +5,7 @@ import os
 import platform
 import shutil
 import wave
+from contextlib import redirect_stderr
 from pathlib import Path
 from datetime import datetime
 from functools import lru_cache
@@ -164,8 +165,10 @@ def _record_voice_sample(duration_seconds: float = 1.2, sample_rate: int = 16_00
     if sd is None:
         return b"", 0.0
     try:
-        frames = sd.rec(int(sample_rate * duration_seconds), samplerate=sample_rate, channels=1, dtype="int16")
-        sd.wait()
+        stderr_buffer = io.StringIO()
+        with redirect_stderr(stderr_buffer):
+            frames = sd.rec(int(sample_rate * duration_seconds), samplerate=sample_rate, channels=1, dtype="int16")
+            sd.wait()
         audio_bytes = frames.tobytes()
         if not audio_bytes:
             return b"", 0.0

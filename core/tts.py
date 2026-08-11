@@ -12,10 +12,11 @@ import io
 import json
 import os
 import queue as _queue
-import sys
 import subprocess
+import sys
 import threading
 import wave
+from contextlib import redirect_stderr
 from typing import Callable, Optional
 
 import numpy as np
@@ -85,9 +86,20 @@ def _compress_silence(
 def reset_audio_output() -> None:
     """Reset any stuck sounddevice stream before new playback starts."""
     try:
-        sd.stop()
+        with redirect_stderr(io.StringIO()):
+            sd.stop()
     except Exception:
         pass
+
+
+def _run_sounddevice_call(func: Callable[..., object], *args, **kwargs) -> object | None:
+    stderr_capture = io.StringIO()
+    try:
+        with redirect_stderr(stderr_capture):
+            return func(*args, **kwargs)
+    except Exception as exc:
+        print(f"[TTS] Audio playback failed: {exc}")
+        return None
 
 
 def _play_np(samples, sample_rate: int) -> None:
@@ -105,8 +117,8 @@ def _play_np(samples, sample_rate: int) -> None:
         # sounddevice expects a 1-D float32 array for PCM playback. Converting to
         # a plain list avoids the NumPy 2.5 deprecation warning triggered by the
         # library's internal reshape path.
-        sd.play(arr.astype(np.float32, copy=False).reshape(-1).tolist(), sample_rate)
-        sd.wait()
+        _run_sounddevice_call(sd.play, arr.astype(np.float32, copy=False).reshape(-1).tolist(), sample_rate)
+        _run_sounddevice_call(sd.wait)
     except Exception as exc:
         print(f"[TTS] Audio playback failed: {exc}")
 
@@ -136,8 +148,8 @@ def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> Non
             samples = samples.mean(axis=-1)
 
         flat_samples = samples.astype(np.float32, copy=False).reshape(-1)
-        sd.play(flat_samples.tolist(), decoded.sample_rate)
-        sd.wait()
+        _run_sounddevice_call(sd.play, flat_samples.tolist(), decoded.sample_rate)
+        _run_sounddevice_call(sd.wait)
         return
     except Exception as _e:
         print(f"[TTS] miniaudio decode/play failed: {_e}")
@@ -160,8 +172,8 @@ def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> Non
             arr = arr.reshape(-1, ch).mean(axis=1)
 
         arr = arr.astype(np.float32, copy=False).reshape(-1)
-        sd.play(arr.tolist(), sr)
-        sd.wait()
+        _run_sounddevice_call(sd.play, arr.tolist(), sr)
+        _run_sounddevice_call(sd.wait)
         return
 
     # Raw PCM fallback: treat the bytes as 16-bit mono PCM when no WAV header is present.
@@ -177,8 +189,8 @@ def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> Non
 
     arr = arr.astype(np.float32, copy=False).reshape(-1)
     try:
-        sd.play(arr.tolist(), sample_rate)
-        sd.wait()
+        _run_sounddevice_call(sd.play, arr.tolist(), sample_rate)
+        _run_sounddevice_call(sd.wait)
     except Exception as exc:
         print(f"[TTS] Audio playback failed: {exc}")
 
