@@ -1555,7 +1555,7 @@ def dev_agent(
             player=player,
         )
 
-    if is_self_improve and approval_action in {"status", "clear", "apply"}:
+    if approval_action in {"status", "clear", "apply"}:
         if approval_action == "status":
             return _approval_status()
         if approval_action == "clear":
