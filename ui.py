@@ -1527,6 +1527,16 @@ class BiometricLockOverlay(QWidget):
         self._voice_chk.setStyleSheet(f"color: {C.GREEN if verified_voice else C.RED}; background: transparent;")
         QTimer.singleShot(900, self._step_visual)
 
+    def _apply_verification_state(self, verified_voice: bool, verified_visual: bool) -> bool:
+        granted = verified_visual and verified_voice
+        self._status_lbl.setText(
+            "STATUS: PROFILE CLEARANCE GRANTED" if granted else "STATUS: PROFILE NOT VERIFIED"
+        )
+        self._status_lbl.setStyleSheet(f"color: {C.GREEN if granted else C.RED}; background: transparent;")
+        self._scan_btn.setEnabled(not granted)
+        self._scan_btn.setText("ACCESS GRANTED" if granted else "RETRY BIOMETRIC SCAN")
+        return granted
+
     def _step_visual(self):
         primary = get_authorized_profiles().get("primary") or {}
         visual_text = ", ".join(primary.get("visual_signatures", []) or []) or primary.get("name") or "James Lumsden"
@@ -1535,17 +1545,9 @@ class BiometricLockOverlay(QWidget):
             "👁️ Visual Person Detection: PROFILE VERIFIED ✓" if verified_visual else "👁️ Visual Person Detection: PROFILE NOT FOUND"
         )
         self._visual_chk.setStyleSheet(f"color: {C.GREEN if verified_visual else C.RED}; background: transparent;")
-        if verified_visual and self._voice_chk.text().endswith("✓"):
-            self._status_lbl.setText("STATUS: PROFILE CLEARANCE GRANTED")
-            self._status_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
-            self._scan_btn.setText("ACCESS GRANTED")
+        verified_voice = self._voice_chk.text().endswith("✓")
+        if self._apply_verification_state(verified_voice, verified_visual):
             QTimer.singleShot(700, self.verified.emit)
-            return
-
-        self._status_lbl.setText("STATUS: PROFILE NOT VERIFIED")
-        self._status_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
-        self._scan_btn.setEnabled(True)
-        self._scan_btn.setText("RETRY BIOMETRIC SCAN")
 
 
 class HueWheel(QWidget):

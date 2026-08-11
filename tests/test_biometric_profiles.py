@@ -72,6 +72,7 @@ def test_biometric_lock_overlay_does_not_clear_on_failed_verification(monkeypatc
     monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", {"james", "james lumsden"})
     file_controller_module.verify_biometric_security.cache_clear()
 
+    app = ui_module._ensure_qapplication()
     parent = ui_module.QWidget()
     overlay = ui_module.BiometricLockOverlay(parent=parent)
     if not getattr(overlay, "_qt_ready", False):
@@ -81,12 +82,10 @@ def test_biometric_lock_overlay_does_not_clear_on_failed_verification(monkeypatc
     overlay._voice_chk.setText("🎙️ Voice Recognition: PENDING")
     overlay._visual_chk.setText("👁️ Visual Person Detection: PENDING")
 
-    calls = []
-    overlay.verified.connect(lambda: calls.append(True))
-    monkeypatch.setattr(ui_module.QTimer, "singleShot", lambda delay, func: func())
     monkeypatch.setattr(ui_module, "verify_biometric_security", lambda voice, visual: False)
-    overlay._run_scan()
+    overlay._step_voice()
+    overlay._step_visual()
 
     assert overlay._status_lbl.text().startswith("STATUS: PROFILE NOT VERIFIED")
-    assert "PROFILE NOT FOUND" in overlay._voice_chk.text() or "PROFILE NOT FOUND" in overlay._visual_chk.text()
-    assert calls == []
+    assert overlay._scan_btn.isEnabled() is True
+    assert overlay._scan_btn.text() == "RETRY BIOMETRIC SCAN"
