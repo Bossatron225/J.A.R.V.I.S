@@ -2042,7 +2042,21 @@ class JarvisLive:
             import os as _os
             _os._exit(0)
 
-        asyncio.create_task(_do_shutdown())
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is not None and loop.is_running():
+            loop.create_task(_do_shutdown())
+        else:
+            def _run_shutdown_loop():
+                try:
+                    asyncio.run(_do_shutdown())
+                except Exception as exc:
+                    self.ui.write_log(f"SYS: Shutdown startup failed: {exc}")
+
+            threading.Thread(target=_run_shutdown_loop, daemon=True).start()
         return True
 
     def _schedule_reboot(self, reason: str) -> bool:
