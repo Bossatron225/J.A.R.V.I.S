@@ -389,8 +389,8 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
         else:
             visual_detected = bool(image_bytes or face_detected)
 
-    live_signal_detected = bool(voice_detected or visual_detected)
-    granted = bool(identity_match and (voice_detected or visual_detected))
+    live_signal_detected = bool(voice_detected and visual_detected)
+    granted = bool(identity_match and live_signal_detected)
     return granted, {
         "voice_detected": voice_detected,
         "visual_detected": visual_detected,
