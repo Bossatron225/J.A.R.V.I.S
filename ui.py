@@ -43,6 +43,7 @@ from PyQt6.QtWidgets import (
 
 from actions.file_controller import (
     enroll_biometric_profile,
+    evaluate_live_biometric_security,
     get_authorized_profiles,
     verify_biometric_security,
 )
@@ -1509,13 +1510,13 @@ class BiometricLockOverlay(QWidget):
         self._scan_btn.setEnabled(False)
         self._scan_btn.setText("SCANNING...")
         self._refresh_profile_label()
-        self._status_lbl.setText("STATUS: SCANNING PROFILE BIOMETRICS...")
+        self._status_lbl.setText("STATUS: SCANNING LIVE BIOMETRICS...")
         self._status_lbl.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
-        self._voice_chk.setText("🎙️ Voice Recognition: PENDING")
+        self._voice_chk.setText("🎙️ Voice Recognition: LISTENING...")
         self._voice_chk.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
-        self._visual_chk.setText("👁️ Visual Person Detection: PENDING")
+        self._visual_chk.setText("👁️ Visual Person Detection: WATCHING...")
         self._visual_chk.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
-        QTimer.singleShot(1000, self._step_voice)
+        QTimer.singleShot(1200, self._step_live_scan)
 
     def _step_voice(self):
         primary = get_authorized_profiles().get("primary") or {}
@@ -1537,16 +1538,19 @@ class BiometricLockOverlay(QWidget):
         self._scan_btn.setText("ACCESS GRANTED" if granted else "RETRY BIOMETRIC SCAN")
         return granted
 
-    def _step_visual(self):
+    def _step_live_scan(self):
         primary = get_authorized_profiles().get("primary") or {}
-        visual_text = ", ".join(primary.get("visual_signatures", []) or []) or primary.get("name") or "James Lumsden"
-        verified_visual = verify_biometric_security("", visual_text)
-        self._visual_chk.setText(
-            "👁️ Visual Person Detection: PROFILE VERIFIED ✓" if verified_visual else "👁️ Visual Person Detection: PROFILE NOT FOUND"
+        identity = primary.get("name") or "James Lumsden"
+        granted, details = evaluate_live_biometric_security(identity)
+        self._voice_chk.setText(
+            "🎙️ Voice Recognition: PROFILE VERIFIED ✓" if details.get("voice_detected") else "🎙️ Voice Recognition: PROFILE NOT FOUND"
         )
-        self._visual_chk.setStyleSheet(f"color: {C.GREEN if verified_visual else C.RED}; background: transparent;")
-        verified_voice = self._voice_chk.text().endswith("✓")
-        if self._apply_verification_state(verified_voice, verified_visual):
+        self._voice_chk.setStyleSheet(f"color: {C.GREEN if details.get('voice_detected') else C.RED}; background: transparent;")
+        self._visual_chk.setText(
+            "👁️ Visual Person Detection: PROFILE VERIFIED ✓" if details.get("visual_detected") else "👁️ Visual Person Detection: PROFILE NOT FOUND"
+        )
+        self._visual_chk.setStyleSheet(f"color: {C.GREEN if details.get('visual_detected') else C.RED}; background: transparent;")
+        if self._apply_verification_state(details.get("voice_detected", False), details.get("visual_detected", False)):
             QTimer.singleShot(700, self.verified.emit)
 
 
