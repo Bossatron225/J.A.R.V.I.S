@@ -601,66 +601,6 @@
       }
     },
     {
-      "approval_id": "96a1b6a94d",
-      "created_at": "2026-08-10T15:59:27.968115Z",
-      "description": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.",
-      "target_files": [
-        "main.py",
-        "ui.py",
-        "actions/dev_agent.py",
-        "actions/code_helper.py",
-        "core/llm_client.py",
-        "actions/file_controller.py",
-        "actions/web_search.py",
-        "actions/flight_finder.py",
-        "actions/computer_control.py"
-      ],
-      "plan": {
-        "improvements": [
-          {
-            "file": "main.py",
-            "change": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.",
-            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
-          },
-          {
-            "file": "ui.py",
-            "change": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.",
-            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
-          },
-          {
-            "file": "actions/dev_agent.py",
-            "change": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.",
-            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
-          },
-          {
-            "file": "actions/code_helper.py",
-            "change": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.",
-            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
-          },
-          {
-            "file": "core/llm_client.py",
-            "change": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.",
-            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
-          },
-          {
-            "file": "actions/file_controller.py",
-            "change": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.",
-            "reason": "Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint"
-          }
-        ],
-        "feature_suggestions": [
-          {
-            "name": "Predictive Holographic Resource Pre-rendering",
-            "description": "Anticipates user workflow patterns using lightweight local ML models to pre-load and cache HUD assets before explicit voice commands are issued."
-          },
-          {
-            "name": "Autonomous Diagnostics & Self-Healing Watchdog",
-            "description": "A low-level background daemon that monitors kernel-level thread locks and automatically rolls back corrupted module states without requiring a full system reboot."
-          }
-        ]
-      }
-    },
-    {
       "approval_id": "d72b2759e2",
       "created_at": "2026-08-11T10:16:49.637435Z",
       "description": "Upgrade JARVIS security protocols to include biometric voice recognition and visual person detection for enhanced security and personalization. Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.",
