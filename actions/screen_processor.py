@@ -429,14 +429,61 @@ def _capture_macos_browser_tab(browser: str, target: str = "", index: int | None
             pass
 
 
+def resolve_visual_source(source: str | None, *, fallback: str = "camera") -> dict[str, object]:
+    """Normalize spoken or typed visual source requests into a capture target."""
+    raw = (source or "").strip().lower()
+    if not raw:
+        raw = (fallback or "camera").strip().lower()
+
+    aliases = {
+        "camera": "camera",
+        "webcam": "camera",
+        "local camera": "camera",
+        "local webcam": "camera",
+        "desktop webcam": "camera",
+        "alexa": "alexa",
+        "alexa camera": "alexa",
+        "alexa stream": "alexa",
+        "security": "alexa",
+        "security camera": "alexa",
+        "security stream": "alexa",
+        "screen": "screen",
+        "display": "screen",
+        "full": "screen",
+        "window": "window",
+        "app": "app",
+        "application": "app",
+    }
+    normalized = aliases.get(raw, raw)
+
+    if normalized == "alexa":
+        return {"target_type": "window", "window_title": "Alexa", "app_name": "", "label": "Alexa camera"}
+    if normalized == "camera":
+        return {"target_type": "camera", "label": "camera"}
+    if normalized == "screen":
+        return {"target_type": "screen", "label": "screen"}
+    return {"target_type": normalized or "camera", "label": normalized or "camera"}
+
+
 def _capture_targeted_visual(target_type: str = "screen", *, browser: str = "", target: str = "", index: int | None = None, window_title: str = "", app_name: str = "") -> tuple[bytes, str, str]:
     source = (target_type or "screen").strip().lower()
-    if source in {"screen", "display", "full"}:
+    resolved = resolve_visual_source(source)
+    source_kind = str(resolved.get("target_type") or "screen")
+
+    if source_kind == "screen":
         data, mime = _capture_screen()
         return data, mime, "screen"
-    if source in {"camera", "webcam"}:
+    if source_kind == "camera":
         data, mime = _capture_camera()
         return data, mime, "camera"
+    if source_kind == "window":
+        title = str(resolved.get("window_title") or window_title or target or "Alexa").strip()
+        data, mime = _capture_macos_window(window_title=title, app_name=str(resolved.get("app_name") or app_name or ""))
+        return data, mime, f"window:{title or 'frontmost'}"
+    if source_kind == "app":
+        app = str(resolved.get("app_name") or app_name or target or "").strip()
+        data, mime = _capture_macos_window(window_title="", app_name=app)
+        return data, mime, f"app:{app or 'frontmost'}"
     if source in {"tab", "browser", "browser_tab", "browser-tab"}:
         if _get_os() == "mac":
             b = (browser or "").strip().lower()
