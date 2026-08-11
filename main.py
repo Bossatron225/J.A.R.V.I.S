@@ -1170,7 +1170,7 @@ TOOL_DECLARATIONS = [
                 },
                 "target_identity": {
                     "type": "STRING",
-                    "description": "Expected identity to match (e.g. 'Tony Stark', 'Authorized User')"
+                    "description": "Expected identity to match (e.g. 'James Lumsden', 'Authorized User')"
                 }
             },
             "required": ["action"]
