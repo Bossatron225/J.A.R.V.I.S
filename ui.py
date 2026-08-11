@@ -4339,6 +4339,9 @@ class MainWindow(QMainWindow):
         self._biometric_overlay = ov
         self._log.append_log("SYS: BiometricLock_Protocol initiated. Profile voice and visual verification pending.")
 
+    def is_biometric_lock_active(self) -> bool:
+        return self._biometric_overlay is not None and self._biometric_overlay.isVisible()
+
     def _on_biometric_done(self, ov: BiometricLockOverlay):
         ov.hide()
         self._biometric_overlay = None
