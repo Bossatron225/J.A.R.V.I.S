@@ -43,3 +43,11 @@ def test_index_codebase_recovers_relevant_file_text(tmp_path):
     matches = search_document_index("launch_on_startup")
     assert matches
     assert any("launch_on_startup" in item["content"] for item in matches)
+
+
+def test_index_pptx_file(tmp_path):
+    pptx_path = tmp_path / "deck.pptx"
+    pptx_path.write_bytes(b"not a real pptx file")
+
+    result = ingest_document(str(pptx_path), source_name="deck")
+    assert result["status"] in {"indexed", "empty", "missing"}
