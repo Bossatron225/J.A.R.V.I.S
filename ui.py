@@ -1176,6 +1176,7 @@ class ManageProfilesOverlay(QWidget):
     Allows viewing, adding, and removing authorized profiles (voice & visual signatures).
     """
     def __init__(self, parent=None):
+        _ensure_qapplication()
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"""
@@ -1369,6 +1370,7 @@ class BiometricLockOverlay(QWidget):
     manage_requested = pyqtSignal()
 
     def __init__(self, parent=None):
+        _ensure_qapplication()
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"""
