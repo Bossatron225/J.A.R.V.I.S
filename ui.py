@@ -248,9 +248,21 @@ class _SysMetrics:
         self._last_net_t = time.time()
         self._running = True
         self._thread = None
-        if os.environ.get("PYTEST_CURRENT_TEST") is None:
+        if self._should_start_thread():
             self._thread = threading.Thread(target=self._loop, daemon=True)
             self._thread.start()
+
+    def _should_start_thread(self) -> bool:
+        if os.environ.get("PYTEST_CURRENT_TEST") is not None:
+            return False
+        if os.environ.get("JARVIS_HEADLESS") is not None:
+            return False
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            return False
+        if platform.system() != "Windows":
+            if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+                return False
+        return True
 
     def _loop(self):
         while self._running:
