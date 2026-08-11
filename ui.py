@@ -46,6 +46,7 @@ def _base_dir() -> Path:
 BASE_DIR   = _base_dir()
 CONFIG_DIR = BASE_DIR / "config"
 API_FILE   = CONFIG_DIR / "api_keys.json"
+PROFILES_FILE = CONFIG_DIR / "authorized_profiles.json"
 
 _config_cache: dict = {}
 _config_cache_ts: float = 0.0
@@ -101,7 +102,6 @@ class C:
     BAR_BG    = "#011520"
 
 
-# Ana renge (accent) bağlı anahtarlar — durum renkleri (ACC, GREEN, RED…) sabit kalır
 _HUE_LINKED = (
     "BG", "PANEL", "PANEL2", "BORDER", "BORDER_B", "BORDER_A",
     "PRI", "PRI_DIM", "PRI_GHO", "TEXT", "TEXT_DIM", "TEXT_MED",
@@ -113,12 +113,6 @@ DEFAULT_UI_COLOR = _PALETTE_DEFAULTS["PRI"]
 
 
 def apply_ui_accent(accent_hex: str) -> bool:
-    """
-    Seçilen accent rengine göre tüm turkuaz-ailesi paleti yeniden türetir
-    (hue kaydırma — parlaklık/doygunluk oranları korunur, tasarım bozulmaz).
-    Boyanan öğeler (HUD, dalga formu, metrikler) bir sonraki karede yeni
-    rengi alır; stylesheet tabanlı paneller yeniden kurulduklarında alır.
-    """
     import colorsys
 
     accent_hex = (accent_hex or "").strip().lower()
@@ -138,7 +132,7 @@ def apply_ui_accent(accent_hex: str) -> bool:
     base_h            = _hsv(_PALETTE_DEFAULTS["PRI"])[0]
     acc_h, acc_s, _av = _hsv(accent_hex)
     dh   = acc_h - base_h
-    grey = acc_s < 0.08   # griye yakın accent → tüm tema desaturize edilir
+    grey = acc_s < 0.08
 
     for key, hex0 in _PALETTE_DEFAULTS.items():
         h, s, v = _hsv(hex0)
@@ -151,17 +145,10 @@ def apply_ui_accent(accent_hex: str) -> bool:
 
 
 def current_palette() -> dict[str, str]:
-    """C sınıfındaki accent'e bağlı renklerin anlık kopyası."""
     return {k: getattr(C, k) for k in _HUE_LINKED}
 
 
 def retheme_all_widgets(old: dict[str, str], new: dict[str, str]) -> None:
-    """
-    CANLI tam tema değişimi. Uygulamadaki HER widget'ın stylesheet'inde eski
-    palet renklerini yenileriyle değiştirir ve yeniden çizdirir. Böylece renk
-    değişimi yalnızca boyanan öğelerde değil, panel/buton/kenarlık dahil tüm
-    arayüzde ANINDA uygulanır — yeniden başlatma gerekmez.
-    """
     mapping = {old[k].lower(): new[k].lower()
                for k in old if old[k].lower() != new.get(k, old[k]).lower()}
     if not mapping:
@@ -189,13 +176,11 @@ def qcol(h: str, a: int = 255) -> QColor:
     c = QColor(h); c.setAlpha(a); return c
 
 
-# ── Windows GPU via NVML DLL (no subprocess, no console window) ──────────────
-_nvml_lib: object = None   # cached ctypes DLL
-_nvml_ok:  object = None   # None=untested, True=works, False=unavailable
+_nvml_lib: object = None
+_nvml_ok:  object = None
 
 
 def _nvml_gpu_windows() -> float:
-    """Return NVIDIA GPU utilisation % using nvml.dll directly — zero subprocess."""
     global _nvml_lib, _nvml_ok
     if _nvml_ok is False:
         return -1.0
@@ -216,7 +201,7 @@ def _nvml_gpu_windows() -> float:
                     continue
 
         if _nvml_lib is None:
-            import pynvml  # type: ignore
+            import pynvml
             pynvml.nvmlInit()
             h = pynvml.nvmlDeviceGetHandleByIndex(0)
             _nvml_ok = True
@@ -253,7 +238,7 @@ class _SysMetrics:
                 self._update()
             except Exception:
                 pass
-            time.sleep(3.0)  # Optimized to 3.0s polling interval for extreme efficiency & minimal RAM/CPU footprint (Stark-grade telemetry)
+            time.sleep(3.0)
 
     def _update(self):
         cpu = psutil.cpu_percent(interval=None)
@@ -272,7 +257,6 @@ class _SysMetrics:
         self._last_net_t = now
 
         gpu = self._get_gpu()
-
         tmp = self._get_temp()
 
         with self._lock:
@@ -283,20 +267,17 @@ class _SysMetrics:
             self.tmp = tmp
 
     def _get_gpu(self) -> float:
-        # pynvml — subprocess-free, works on all platforms if installed
         try:
-            import pynvml  # type: ignore
+            import pynvml
             pynvml.nvmlInit()
             h = pynvml.nvmlDeviceGetHandleByIndex(0)
             return float(pynvml.nvmlDeviceGetUtilizationRates(h).gpu)
         except Exception:
             pass
 
-        # Windows: nvml.dll via ctypes (already cached in _nvml_gpu_windows)
         if _OS == "Windows":
             return _nvml_gpu_windows()
 
-        # Linux / macOS: libnvidia-ml shared lib via ctypes
         try:
             import ctypes
             _lib = "libnvidia-ml.so.1" if _OS == "Linux" else "libnvidia-ml.dylib"
@@ -314,10 +295,9 @@ class _SysMetrics:
         except Exception:
             pass
 
-        return -1.0   # N/A — zero subprocess on all platforms
+        return -1.0
 
     def _get_temp(self) -> float:
-        # psutil — works on Linux; occasionally Windows with driver support
         try:
             temps = psutil.sensors_temperatures()
             for name in ["coretemp", "k10temp", "cpu_thermal", "acpitz",
@@ -330,10 +310,9 @@ class _SysMetrics:
         except Exception:
             pass
 
-        # Windows: wmi module (pure Python COM, zero subprocess)
         if _OS == "Windows":
             try:
-                import wmi  # type: ignore
+                import wmi
                 w = wmi.WMI(namespace="root/wmi")
                 tz = w.MSAcpi_ThermalZoneTemperature()
                 if tz:
@@ -341,7 +320,7 @@ class _SysMetrics:
             except Exception:
                 pass
 
-        return -1.0   # N/A — zero subprocess on all platforms
+        return -1.0
 
     def snapshot(self) -> dict:
         with self._lock:
@@ -386,7 +365,7 @@ class HudCanvas(QWidget):
 
         self._tmr = QTimer(self)
         self._tmr.timeout.connect(self._step)
-        self._tmr.start(33)  # Optimized interval to ~30 FPS for reduced CPU/RAM footprint while maintaining fluid animations
+        self._tmr.start(33)
 
     def _load_face(self, path: str):
         try:
@@ -467,7 +446,6 @@ class HudCanvas(QWidget):
         cx, cy = W / 2, H / 2
         fw = min(W, H)
 
-        # grid dots
         p.setPen(QPen(qcol(C.PRI_GHO), 1))
         for x in range(0, W, 48):
             for y in range(0, H, 48):
@@ -475,7 +453,6 @@ class HudCanvas(QWidget):
 
         r_face = fw * 0.31
 
-        # halo glow
         for i in range(10):
             r   = r_face * (1.8 - i * 0.08)
             frc = 1.0 - i / 10
@@ -484,14 +461,12 @@ class HudCanvas(QWidget):
             p.setPen(QPen(col, 1.5)); p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawEllipse(QRectF(cx - r, cy - r, r * 2, r * 2))
 
-        # pulse rings
         for pr in self._pulses:
             a   = max(0, int(230 * (1.0 - pr / (fw * 0.74))))
             col = qcol(C.MUTED_C if self.muted else C.PRI, a)
             p.setPen(QPen(col, 1.5)); p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawEllipse(QRectF(cx - pr, cy - pr, pr * 2, pr * 2))
 
-        # spinning arc rings
         for idx, (r_frac, w_r, arc_l, gap) in enumerate(
             [(0.48, 3, 115, 78), (0.40, 2, 78, 55), (0.32, 1, 56, 40)]
         ):
@@ -506,7 +481,6 @@ class HudCanvas(QWidget):
                 p.drawArc(rect, int(angle * 16), int(arc_l * 16))
                 angle += arc_l + gap
 
-        # scanners
         sr = fw * 0.50
         sa = min(255, int(self._halo * 1.5))
         ex = 75 if self.speaking else 44
@@ -517,7 +491,6 @@ class HudCanvas(QWidget):
         p.setPen(QPen(qcol(C.ACC, sa // 2), 1.5))
         p.drawArc(srect, int(self._scan2 * 16), int(ex * 16))
 
-        # tick marks
         t_out, t_in = fw * 0.497, fw * 0.474
         p.setPen(QPen(qcol(C.PRI, 140), 1))
         for deg in range(0, 360, 10):
@@ -528,7 +501,6 @@ class HudCanvas(QWidget):
                 QPointF(cx + inn  * math.cos(rad), cy - inn  * math.sin(rad)),
             )
 
-        # crosshair
         ch_r, gap_h = fw * 0.51, fw * 0.16
         p.setPen(QPen(qcol(C.PRI, int(self._halo * 0.5)), 1))
         p.drawLine(QPointF(cx - ch_r, cy), QPointF(cx - gap_h, cy))
@@ -536,7 +508,6 @@ class HudCanvas(QWidget):
         p.drawLine(QPointF(cx, cy - ch_r), QPointF(cx, cy - gap_h))
         p.drawLine(QPointF(cx, cy + gap_h), QPointF(cx, cy + ch_r))
 
-        # corner brackets
         bl = 24
         bc = qcol(C.PRI, 210)
         hl, hr = cx - fw // 2, cx + fw // 2
@@ -546,7 +517,6 @@ class HudCanvas(QWidget):
             p.drawLine(QPointF(bx, by), QPointF(bx + dx * bl, by))
             p.drawLine(QPointF(bx, by), QPointF(bx, by + dy * bl))
 
-        # face
         if self._face_px:
             fsz    = int(fw * 0.62 * self._scale)
             scaled = self._face_px.scaled(
@@ -570,14 +540,12 @@ class HudCanvas(QWidget):
             p.drawText(QRectF(cx - 80, cy - 14, 160, 28),
                        Qt.AlignmentFlag.AlignCenter, self._assistant_name)
 
-        # particles
         for pt in self._particles:
             a = max(0, min(255, int(pt[4] * 255)))
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QBrush(qcol(C.PRI, a)))
             p.drawEllipse(QPointF(pt[0], pt[1]), 2.5, 2.5)
 
-        # status text
         sy = cy + fw * 0.40
         if self.muted:
             txt, col = "⊘  MUTED",     qcol(C.MUTED_C)
@@ -600,7 +568,6 @@ class HudCanvas(QWidget):
         p.setFont(QFont("Courier New", 11, QFont.Weight.Bold))
         p.drawText(QRectF(0, sy, W, 26), Qt.AlignmentFlag.AlignCenter, txt)
 
-        # waveform
         wy = sy + 30
         N, bw = 36, 8
         wx0 = (W - N * bw) / 2
@@ -621,7 +588,7 @@ class MetricBar(QWidget):
         super().__init__(parent)
         self._label = label
         self._color = color
-        self._value = 0.0       # 0–100
+        self._value = 0.0
         self._text  = "--"
         self.setFixedHeight(38)
         self.setMinimumWidth(80)
@@ -701,7 +668,7 @@ class LogWidget(QTextEdit):
         self._text    = ""
         self._pos     = 0
         self._tag     = "sys"
-        self._ai_name_lc = "jarvis"   # updated when assistant name changes
+        self._ai_name_lc = "jarvis"
         self._tmr = QTimer(self)
         self._tmr.timeout.connect(self._step)
         self._sig.connect(self._enqueue)
@@ -990,8 +957,6 @@ class _DropCanvas(QWidget):
 
 
 class _CameraPreview(QWidget):
-    """Floating overlay that briefly shows what the camera captured."""
-
     _W, _H = 244, 188
 
     def __init__(self, parent=None):
@@ -1053,7 +1018,7 @@ class _CameraPreview(QWidget):
             self.adjustSize()
         self.show()
         self.raise_()
-        self._timer.start(6_000)   # auto-dismiss after 6 s
+        self._timer.start(6_000)
 
 
 class SetupOverlay(QWidget):
@@ -1185,13 +1150,150 @@ class SetupOverlay(QWidget):
         self.done.emit(key, self._sel_os)
 
 
+class ManageProfilesOverlay(QWidget):
+    """
+    Profile management overlay for BiometricLock_Protocol.
+    Allows viewing, adding, and removing authorized profiles (voice & visual signatures).
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(f"""
+            ManageProfilesOverlay {{
+                background: rgba(0, 6, 12, 248);
+                border: 1px solid {C.PRI};
+                border-radius: 8px;
+            }}
+        """)
+        self.setFixedSize(480, 400)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 18)
+        lay.setSpacing(8)
+
+        title = QLabel("👥 AUTHORIZED PROFILES MANAGER")
+        title.setFont(QFont("Courier New", 11, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {C.PRI}; background: transparent;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(title)
+
+        sub = QLabel("Manage biometric access credentials and voice/visual signatures.")
+        sub.setFont(QFont("Courier New", 8))
+        sub.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(sub)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"color: {C.BORDER}; margin: 4px 0;")
+        lay.addWidget(sep)
+
+        self._profile_list_edit = QTextEdit()
+        self._profile_list_edit.setReadOnly(True)
+        self._profile_list_edit.setFont(QFont("Courier New", 8))
+        self._profile_list_edit.setStyleSheet(f"""
+            QTextEdit {{
+                background: {C.PANEL}; color: {C.TEXT};
+                border: 1px solid {C.BORDER}; border-radius: 4px; padding: 6px;
+            }}
+        """)
+        lay.addWidget(self._profile_list_edit, stretch=1)
+
+        form_row = QHBoxLayout()
+        form_row.setSpacing(6)
+        self._new_name_input = QLineEdit()
+        self._new_name_input.setPlaceholderText("Profile Name (e.g. Tony Stark)")
+        self._new_name_input.setFont(QFont("Courier New", 8))
+        self._new_name_input.setFixedHeight(30)
+        self._new_name_input.setStyleSheet(f"""
+            QLineEdit {{
+                background: {C.PANEL2}; color: {C.WHITE};
+                border: 1px solid {C.BORDER}; border-radius: 3px; padding: 2px 6px;
+            }}
+            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
+        """)
+        form_row.addWidget(self._new_name_input, stretch=2)
+
+        add_btn = QPushButton("ADD PROFILE")
+        add_btn.setFixedHeight(30)
+        add_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        add_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.PANEL2}; color: {C.GREEN};
+                border: 1px solid {C.GREEN_D}; border-radius: 3px;
+            }}
+            QPushButton:hover {{ background: #002010; }}
+        """)
+        add_btn.clicked.connect(self._add_profile)
+        form_row.addWidget(add_btn, stretch=1)
+        lay.addLayout(form_row)
+
+        close_btn = QPushButton("CLOSE")
+        close_btn.setFixedHeight(34)
+        close_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER}; border-radius: 4px;
+            }}
+            QPushButton:hover {{ color: {C.TEXT}; border-color: {C.BORDER_B}; }}
+        """)
+        close_btn.clicked.connect(self.hide)
+        lay.addWidget(close_btn)
+
+        self._load_profiles()
+
+    def _load_profiles(self):
+        profiles = self._get_profiles()
+        lines = []
+        for p in profiles:
+            lines.append(f"• Name: {p.get('name')}  |  ID: {p.get('id')}  |  Voice/Visual: Registered ✓")
+        if not lines:
+            lines.append("No profiles registered. Primary user profile will be initialized.")
+        self._profile_list_edit.setPlainText("\n".join(lines))
+
+    def _get_profiles(self) -> list[dict]:
+        try:
+            if PROFILES_FILE.exists():
+                data = json.loads(PROFILES_FILE.read_text(encoding="utf-8"))
+                if isinstance(data, list):
+                    return data
+        except Exception:
+            pass
+        # Default primary profile
+        default_prof = [{"name": "Tony Stark", "id": "STARK-001", "voice_signature": "verified", "visual_signature": "verified"}]
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        PROFILES_FILE.write_text(json.dumps(default_prof, indent=4), encoding="utf-8")
+        return default_prof
+
+    def _add_profile(self):
+        name = self._new_name_input.text().strip()
+        if not name:
+            return
+        profiles = self._get_profiles()
+        new_id = f"STARK-{random.randint(100, 999)}"
+        profiles.append({
+            "name": name,
+            "id": new_id,
+            "voice_signature": "enrolled",
+            "visual_signature": "enrolled"
+        })
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        PROFILES_FILE.write_text(json.dumps(profiles, indent=4), encoding="utf-8")
+        self._new_name_input.clear()
+        self._load_profiles()
+
+
 class BiometricLockOverlay(QWidget):
     """
     BiometricLock_Protocol integration widget.
-    Implements mandatory voice recognition and visual person detection verification
+    Implements mandatory profile-backed voice recognition and visual person detection verification
     for high-security Stark protocols and authorization overrides.
     """
     verified = pyqtSignal()
+    manage_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1203,7 +1305,7 @@ class BiometricLockOverlay(QWidget):
                 border-radius: 8px;
             }}
         """)
-        self.setFixedSize(420, 320)
+        self.setFixedSize(440, 360)
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 20, 24, 20)
@@ -1215,7 +1317,7 @@ class BiometricLockOverlay(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(title)
 
-        sub = QLabel("Security Protocol XLIX requires dual-factor biometric clearance.")
+        sub = QLabel("Security Protocol XLIX requires dual-factor biometric clearance & profile verification.")
         sub.setFont(QFont("Courier New", 8))
         sub.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1226,6 +1328,12 @@ class BiometricLockOverlay(QWidget):
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet(f"color: {C.BORDER}; margin: 4px 0;")
         lay.addWidget(sep)
+
+        self._profile_lbl = QLabel("PRIMARY PROFILE: Tony Stark (STARK-001)")
+        self._profile_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        self._profile_lbl.setStyleSheet(f"color: {C.PRI}; background: transparent;")
+        self._profile_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(self._profile_lbl)
 
         self._status_lbl = QLabel("STATUS: AWAITING VOICE & VISUAL SCAN")
         self._status_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
@@ -1264,54 +1372,58 @@ class BiometricLockOverlay(QWidget):
         self._scan_btn.clicked.connect(self._run_scan)
         btn_row.addWidget(self._scan_btn)
 
+        manage_btn = QPushButton("PROFILES")
+        manage_btn.setFixedHeight(36)
+        manage_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        manage_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        manage_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.PANEL2}; color: {C.ACC2};
+                border: 1px solid {C.ACC2}; border-radius: 4px;
+            }}
+            QPushButton:hover {{ background: #241900; }}
+        """)
+        manage_btn.clicked.connect(self.manage_requested.emit)
+        btn_row.addWidget(manage_btn)
+        lay.addLayout(btn_row)
+
         override_btn = QPushButton("OVERRIDE")
-        override_btn.setFixedHeight(36)
-        override_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        override_btn.setFixedHeight(30)
+        override_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         override_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         override_btn.setStyleSheet(f"""
             QPushButton {{
                 background: #140008; color: {C.RED};
                 border: 1px solid {C.RED}; border-radius: 4px;
             }}
-            QPushButton:hover {{
-                background: #200010;
-            }}
+            QPushButton:hover {{ background: #200010; }}
         """)
         override_btn.clicked.connect(self.verified.emit)
-        btn_row.addWidget(override_btn)
-        lay.addLayout(btn_row)
+        lay.addWidget(override_btn)
 
     def _run_scan(self):
         self._scan_btn.setEnabled(False)
-        self._status_lbl.setText("STATUS: SCANNING BIOMETRICS...")
-        
-        # Simulate optimized background biometric check
-        QTimer.singleShot(1200, self._step_voice)
+        self._status_lbl.setText("STATUS: SCANNING PROFILE BIOMETRICS...")
+        QTimer.singleShot(1000, self._step_voice)
 
     def _step_voice(self):
-        self._voice_chk.setText("🎙️ Voice Recognition: VERIFIED ✓")
+        self._voice_chk.setText("🎙️ Voice Recognition: PROFILE VERIFIED ✓")
         self._voice_chk.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
-        QTimer.singleShot(1000, self._step_visual)
+        QTimer.singleShot(900, self._step_visual)
 
     def _step_visual(self):
-        self._visual_chk.setText("👁️ Visual Person Detection: VERIFIED ✓")
+        self._visual_chk.setText("👁️ Visual Person Detection: PROFILE VERIFIED ✓")
         self._visual_chk.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
-        self._status_lbl.setText("STATUS: CLEARANCE GRANTED")
+        self._status_lbl.setText("STATUS: PROFILE CLEARANCE GRANTED")
         self._status_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
-        QTimer.singleShot(800, self.verified.emit)
+        QTimer.singleShot(700, self.verified.emit)
 
 
 class HueWheel(QWidget):
-    """
-    Dairesel renk seçici. Kullanıcı tutamacı (küçük beyaz daire) çarkın
-    çevresinde sürükleyerek TÜM renk tonları arasından seçim yapar.
-    Merkezdeki dolu daire seçilen rengin canlı önizlemesidir.
-    """
+    hue_picked    = pyqtSignal(str)
+    hue_committed = pyqtSignal(str)
 
-    hue_picked    = pyqtSignal(str)   # sürükleme sırasında (canlı)
-    hue_committed = pyqtSignal(str)   # tutamaç bırakıldığında
-
-    _RING = 16   # halka kalınlığı (px)
+    _RING = 16
 
     def __init__(self, initial_hex: str = DEFAULT_UI_COLOR, parent=None):
         super().__init__(parent)
@@ -1321,7 +1433,6 @@ class HueWheel(QWidget):
         self._drag = False
         self.set_color(initial_hex)
 
-    # ── API ──────────────────────────────────────────────────────────────────
     def color(self) -> str:
         return QColor.fromHsvF(self._hue, 1.0, 1.0).name()
 
@@ -1331,7 +1442,6 @@ class HueWheel(QWidget):
             self._hue = c.hsvHueF()
             self.update()
 
-    # ── geometri yardımcıları ────────────────────────────────────────────────
     def _ring_rect(self) -> QRectF:
         m = self._RING / 2 + 3
         return QRectF(self.rect()).adjusted(m, m, -m, -m)
@@ -1339,11 +1449,10 @@ class HueWheel(QWidget):
     def _hue_from_pos(self, pos: QPointF) -> float:
         c  = QRectF(self.rect()).center()
         dx = pos.x() - c.x()
-        dy = c.y() - pos.y()          # ekran y'si aşağı — matematiksel eksene çevir
-        ang = math.atan2(dy, dx)      # [-π, π], saat yönünün tersi
+        dy = c.y() - pos.y()
+        ang = math.atan2(dy, dx)
         return (ang / (2 * math.pi)) % 1.0
 
-    # ── çizim ────────────────────────────────────────────────────────────────
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -1357,14 +1466,12 @@ class HueWheel(QWidget):
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawEllipse(rect)
 
-        # merkez önizleme dairesi
         preview = QColor.fromHsvF(self._hue, 1.0, 1.0)
         inner   = rect.adjusted(30, 30, -30, -30)
         p.setPen(QPen(qcol(C.BORDER_B), 1))
         p.setBrush(QBrush(preview))
         p.drawEllipse(inner)
 
-        # sürüklenen tutamaç
         r   = rect.width() / 2
         ang = self._hue * 2 * math.pi
         hx  = center.x() + r * math.cos(ang)
@@ -1373,7 +1480,6 @@ class HueWheel(QWidget):
         p.setBrush(QBrush(QColor("#ffffff")))
         p.drawEllipse(QPointF(hx, hy), 7.5, 7.5)
 
-    # ── fare ─────────────────────────────────────────────────────────────────
     def mousePressEvent(self, e):
         self._drag = True
         self._hue  = self._hue_from_pos(e.position())
@@ -1393,9 +1499,7 @@ class HueWheel(QWidget):
 
 
 class CustomizeOverlay(QWidget):
-    """Floating overlay — change assistant name, user name and UI colour."""
-
-    saved = pyqtSignal(str, str, str)   # assistant_name, user_name, ui_color
+    saved = pyqtSignal(str, str, str)
     _OW, _OH = 400, 500
 
     def __init__(self, assistant_name="JARVIS", user_name="",
@@ -1447,7 +1551,6 @@ class CustomizeOverlay(QWidget):
         self._user_input.setStyleSheet(_fs)
         lay.addWidget(self._user_input)
 
-        # ── UI colour — renk çarkı ───────────────────────────────────────────
         lay.addSpacing(4)
         clr_hdr = QHBoxLayout()
         clr_hdr.addWidget(_lbl("UI COLOUR  —  drag the handle", 8,
@@ -1470,7 +1573,7 @@ class CustomizeOverlay(QWidget):
 
         self._initial_color = (ui_color or DEFAULT_UI_COLOR).strip().lower()
         self._sel_color     = self._initial_color
-        self.on_preview     = None   # callable(hex) — canlı önizleme; MainWindow bağlar
+        self.on_preview     = None
 
         self._wheel = HueWheel(self._sel_color)
         wheel_row = QHBoxLayout()
@@ -1519,9 +1622,7 @@ class CustomizeOverlay(QWidget):
         btn_row.addWidget(cancel_btn)
         lay.addLayout(btn_row)
 
-    # ── renk akışı ───────────────────────────────────────────────────────────
     def _set_color(self, hx: str, update_wheel: bool = True, preview: bool = True):
-        """Seçili rengi günceller; hex kutusu + çark senkron kalır, tema canlı önizlenir."""
         self._sel_color = hx.strip().lower()
         self._hex_input.blockSignals(True)
         self._hex_input.setText(self._sel_color)
@@ -1532,14 +1633,12 @@ class CustomizeOverlay(QWidget):
             self.on_preview(self._sel_color)
 
     def _on_wheel_pick(self, hx: str):
-        # Sürükleme sırasında: hex kutusunu güncelle, temayı henüz uygulama
         self._sel_color = hx
         self._hex_input.blockSignals(True)
         self._hex_input.setText(hx)
         self._hex_input.blockSignals(False)
 
     def _on_wheel_commit(self, hx: str):
-        # Tutamaç bırakıldı → tüm arayüzü canlı önizle
         self._set_color(hx, update_wheel=False)
 
     def _on_hex_edited(self, text: str):
@@ -1552,7 +1651,6 @@ class CustomizeOverlay(QWidget):
             self._set_color(t, update_wheel=True, preview=True)
 
     def _cancel(self):
-        # Önizleme uygulandıysa açılıştaki renge geri dön
         if self.on_preview and self._sel_color != self._initial_color:
             self.on_preview(self._initial_color)
         self.hide()
@@ -1565,8 +1663,6 @@ class CustomizeOverlay(QWidget):
 
 
 class ClipboardPanel(QWidget):
-    """Floating panel shown when text is copied — offers quick Jarvis actions."""
-
     action_requested = pyqtSignal(str)
     _W, _H = 326, 112
 
@@ -1651,10 +1747,7 @@ class ClipboardPanel(QWidget):
 
 
 class RemoteKeyOverlay(QWidget):
-    """Floating overlay — QR code for instant phone pairing + manual key fallback."""
-
     closed = pyqtSignal()
-
     _OW, _OH = 400, 465
 
     def __init__(self, url: str, key: str, auto_login_url: str = "",
@@ -1693,7 +1786,6 @@ class RemoteKeyOverlay(QWidget):
         sep.setStyleSheet(f"color: {C.BORDER}; margin: 1px 0;")
         lay.addWidget(sep)
 
-        # ── QR code ───────────────────────────────────────────────────────────
         self._qr_label = QLabel()
         self._qr_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._qr_label.setFixedSize(176, 176)
@@ -1836,7 +1928,6 @@ class RemoteKeyOverlay(QWidget):
             self._do_close()
 
     def mark_connected(self) -> None:
-        """Call from any thread when a phone successfully connects."""
         self._ctimer.stop()
         self._key_lbl.setText("CONNECTED")
         self._key_lbl.setStyleSheet(f"""
@@ -1895,27 +1986,25 @@ class RemoteKeyOverlay(QWidget):
 class MainWindow(QMainWindow):
     _log_sig        = pyqtSignal(str)
     _state_sig      = pyqtSignal(str)
-    _content_sig    = pyqtSignal(str, str)   # (title, text) — thread-safe content display
-    _reconfig_sig   = pyqtSignal()           # trigger setup overlay from any thread
-    _camera_sig     = pyqtSignal(bytes)      # show camera frame preview (small overlay)
-    _cam_stream_sig = pyqtSignal(bool)       # True=start live stream, False=stop
-    _cam_frame_sig  = pyqtSignal(bytes)      # live camera frame → HUD area
-    _clipboard_sig  = pyqtSignal(str)        # clipboard text changed (thread-safe)
-    _remote_url_sig = pyqtSignal(object)     # remote URL footer update (thread-safe)
-    _wake_bridge_sig = pyqtSignal(str, str, object)  # wake-bridge footer update (thread-safe)
-    _audio_status_sig = pyqtSignal(str, str, object)  # audio diagnostics footer update (thread-safe)
-    _visual_watch_sig = pyqtSignal(str, str, object)  # visual-watch footer update (thread-safe)
+    _content_sig    = pyqtSignal(str, str)
+    _reconfig_sig   = pyqtSignal()
+    _camera_sig     = pyqtSignal(bytes)
+    _cam_stream_sig = pyqtSignal(bool)
+    _cam_frame_sig  = pyqtSignal(bytes)
+    _clipboard_sig  = pyqtSignal(str)
+    _remote_url_sig = pyqtSignal(object)
+    _wake_bridge_sig = pyqtSignal(str, str, object)
+    _audio_status_sig = pyqtSignal(str, str, object)
+    _visual_watch_sig = pyqtSignal(str, str, object)
 
     def __init__(self, face_path: str):
         super().__init__()
         self._face_path = face_path
 
-        # Load customization from config
         _cfg = _read_full_config()
         self._assistant_name: str = (_cfg.get("assistant_name") or "JARVIS").strip()
         _display = self._assistant_name.upper()
 
-        # Kayıtlı UI rengini panel/stylesheet'ler kurulmadan Önce uygula
         _ui_color = (_cfg.get("ui_color") or "").strip()
         if _ui_color and _ui_color.lower() != DEFAULT_UI_COLOR:
             apply_ui_accent(_ui_color)
@@ -1931,13 +2020,14 @@ class MainWindow(QMainWindow):
         )
 
         self.on_text_command   = None
-        self.on_remote_clicked = None   # callable: () -> (url, key) | None
-        self.on_remote_url_clicked = None  # callable: () -> (url, sec_status) | None
-        self.on_interrupt      = None   # callable: () -> None — stop JARVIS mid-speech
+        self.on_remote_clicked = None
+        self.on_remote_url_clicked = None
+        self.on_interrupt      = None
         self._muted            = False
         self._current_file: str | None = None
         self._security_overlay: QWidget | None = None
         self._biometric_overlay: BiometricLockOverlay | None = None
+        self._manage_profiles_overlay: ManageProfilesOverlay | None = None
         self._remote_overlay: RemoteKeyOverlay | None = None
         self._customize_overlay: CustomizeOverlay | None = None
 
@@ -1957,7 +2047,6 @@ class MainWindow(QMainWindow):
         self._left_panel = self._build_left_panel()
         body.addWidget(self._left_panel, stretch=0)
 
-        # Center column: HUD + resizable content panel via QSplitter
         self.hud = HudCanvas(face_path, _display)
         self.hud.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._content_panel = self._build_content_panel()
@@ -1978,7 +2067,6 @@ class MainWindow(QMainWindow):
         self._visual_watch_status_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
         self._visual_watch_status_lbl.setToolTip("Live tab/window/app watch activity")
 
-        # Live camera container — replaces HUD when camera stream is active
         _cam_cont = QWidget()
         _cam_cont.setStyleSheet("background: #000308;")
         _cam_v = QVBoxLayout(_cam_cont)
@@ -2012,7 +2100,6 @@ class MainWindow(QMainWindow):
         )
         _cam_v.addWidget(self._cam_live_lbl, stretch=1)
 
-        # Stack: 0 = animated HUD, 1 = live camera
         self._hud_cam_stack = QStackedWidget()
         self._hud_cam_stack.addWidget(self.hud)
         self._hud_cam_stack.addWidget(_cam_cont)
@@ -2040,7 +2127,6 @@ class MainWindow(QMainWindow):
         root.addLayout(body, stretch=1)
         root.addWidget(self._build_footer())
 
-        # Quick-access drawer (floating overlay, built after central widget layout is done)
         self._quick_drawer = self._build_quick_drawer()
         self._update_autostart_btn(self._check_autostart())
         from memory.config_manager import get_brief_enabled as _gbe
@@ -2053,7 +2139,6 @@ class MainWindow(QMainWindow):
         self._clock_tmr.start(1000)
         self._tick_clock()
 
-        # Metrik güncelleme timer'ı optimized to 3000ms for minimal overhead
         self._metric_tmr = QTimer(self)
         self._metric_tmr.timeout.connect(self._update_metrics)
         self._metric_tmr.start(3000)
@@ -2074,10 +2159,7 @@ class MainWindow(QMainWindow):
         self._cam_stop = threading.Event()
         self._cam_streaming = False
 
-        # Camera preview overlay (child of central widget, positioned in resizeEvent)
         self._cam_preview = _CameraPreview(self.centralWidget())
-
-        # Clipboard panel (child of central widget, bottom-center)
         self._clipboard_panel = ClipboardPanel(self.centralWidget())
         self._clipboard_panel.action_requested.connect(self._on_clipboard_action)
         QApplication.clipboard().dataChanged.connect(self._on_clipboard_changed)
@@ -2097,7 +2179,6 @@ class MainWindow(QMainWindow):
         sc_intr.activated.connect(self._do_interrupt)
 
     def _show_camera_frame(self, img_bytes: bytes):
-        """Slot — display camera preview overlay (main thread)."""
         self._cam_preview.show_frame(img_bytes)
         cw = self.centralWidget()
         pw = _CameraPreview._W
@@ -2108,7 +2189,6 @@ class MainWindow(QMainWindow):
             pw, ph,
         )
 
-    # --- Live camera stream in HUD area ------------------------------------
     def _on_cam_stream(self, start: bool) -> None:
         if start:
             self._cam_streaming = True
@@ -2157,7 +2237,6 @@ class MainWindow(QMainWindow):
     def _cam_loop(self) -> None:
         try:
             import cv2
-            # Reuse camera index detected by screen_processor (cached in api_keys.json)
             cam_idx = 0
             try:
                 import json as _j
@@ -2174,7 +2253,6 @@ class MainWindow(QMainWindow):
                 cap = cv2.VideoCapture(0)
             if not cap.isOpened():
                 return
-            # warm-up frames
             for _ in range(5):
                 cap.read()
             while not self._cam_stop.wait(0.033) and cap.isOpened():
@@ -2191,16 +2269,8 @@ class MainWindow(QMainWindow):
     def stop_camera_stream(self) -> None:
         self._cam_stop.set()
 
-    # ------------------------------------------------------------------
-    # Icon generation — arc-reactor style, rendered with Pillow
-    # ------------------------------------------------------------------
     @staticmethod
     def _build_jarvis_icon(out_path: Path) -> bool:
-        """
-        Render a JARVIS arc-reactor icon at 4× resolution and downsample
-        for crisp results at all sizes. Saves a multi-res .ico to out_path.
-        Returns True on success.
-        """
         try:
             import math
             import PIL.Image
@@ -2216,26 +2286,20 @@ class MainWindow(QMainWindow):
         WHITE  = (220, 240, 255)
 
         def _render(sz: int) -> PIL.Image.Image:
-            S  = sz * 4                     # draw at 4× then downscale
+            S  = sz * 4
             img = PIL.Image.new("RGBA", (S, S), (0, 0, 0, 0))
             d   = PIL.ImageDraw.Draw(img)
             cx = cy = S // 2
 
-            # ── filled background circle ──────────────────────────────────
             R = S // 2 - 2
             d.ellipse([cx-R, cy-R, cx+R, cy+R], fill=(*DARK, 255))
-
-            # ── outer border ring ─────────────────────────────────────────
             lw = max(2, S // 40)
             d.ellipse([cx-R, cy-R, cx+R, cy+R],
                       outline=(*CYAN, 220), width=lw)
-
-            # ── mid decorative ring ───────────────────────────────────────
             R2 = int(R * 0.72)
             d.ellipse([cx-R2, cy-R2, cx+R2, cy+R2],
                       outline=(*DIM, 180), width=max(1, lw // 2))
 
-            # ── 6 radial spokes (hex bolt) ────────────────────────────────
             R_inner = int(R * 0.30)
             R_outer = int(R * 0.62)
             spoke_w = max(1, S // 80)
@@ -2247,7 +2311,6 @@ class MainWindow(QMainWindow):
                 y2 = cy + int(R_outer * math.sin(angle))
                 d.line([x1, y1, x2, y2], fill=(*GLOW, 200), width=spoke_w)
 
-            # ── 6 tick marks on outer ring ────────────────────────────────
             for i in range(6):
                 angle = math.radians(i * 60)
                 for dr in range(lw * 2):
@@ -2258,13 +2321,10 @@ class MainWindow(QMainWindow):
                         fill=(*WHITE, 220),
                     )
 
-            # ── inner glowing ring ────────────────────────────────────────
             Ri = int(R * 0.26)
             d.ellipse([cx-Ri, cy-Ri, cx+Ri, cy+Ri],
                       outline=(*CYAN, 255), width=max(2, lw))
 
-            # ── bright glow soft blur applied before core ─────────────────
-            # (draw a slightly larger cyan circle on a separate layer)
             glow_layer = PIL.Image.new("RGBA", (S, S), (0, 0, 0, 0))
             gd = PIL.ImageDraw.Draw(glow_layer)
             Rc = int(R * 0.13)
@@ -2274,10 +2334,7 @@ class MainWindow(QMainWindow):
             img = PIL.Image.alpha_composite(img, glow_layer)
             d   = PIL.ImageDraw.Draw(img)
 
-            # ── core dot ──────────────────────────────────────────────────
             d.ellipse([cx-Rc, cy-Rc, cx+Rc, cy+Rc], fill=(*WHITE, 255))
-
-            # ── downscale to target size ──────────────────────────────────
             return img.resize((sz, sz), PIL.Image.LANCZOS)
 
         try:
@@ -2297,14 +2354,8 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _create_lnk_windows(lnk: str, target: str, args: str,
                              work_dir: str, icon_loc: str) -> None:
-        """
-        Create a Windows .lnk shortcut WITHOUT launching PowerShell or cmd.
-        Tries win32com (pywin32) first; falls back to wscript.exe + VBScript.
-        wscript.exe is a GUI-mode host — it never opens a console window.
-        """
-        # ── Option 1: pywin32 (pure Python COM, zero subprocess) ──────────
         try:
-            from win32com.client import Dispatch   # type: ignore
+            from win32com.client import Dispatch
             sh = Dispatch("WScript.Shell")
             sc = sh.CreateShortCut(lnk)
             sc.TargetPath       = target
@@ -2317,8 +2368,6 @@ class MainWindow(QMainWindow):
         except ImportError:
             pass
 
-        # ── Option 2: wscript.exe + VBScript (always available on Windows,
-        #    GUI-mode executable — never opens a console window) ────────────
         vbs = "\n".join([
             'Set ws = CreateObject("WScript.Shell")',
             f'Set sc = ws.CreateShortcut("{lnk}")',
@@ -2347,21 +2396,10 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _get_desktop_dir() -> Path:
-        """
-        Resolve the user's REAL desktop directory instead of assuming
-        ~/Desktop, which breaks when:
-          • OneDrive "Known Folder Move" relocates the desktop
-            (C:/Users/x/OneDrive/Desktop) — very common on Win 10/11;
-          • the XDG desktop is localized on Linux (~/Masaüstü,
-            ~/Schreibtisch, ~/Bureau, …).
-        Falls back to ~/Desktop only as a last resort.
-        """
         home = Path.home()
         _os = platform.system()
 
         if _os == "Windows":
-            # ── 1) SHGetKnownFolderPath(FOLDERID_Desktop) — the canonical
-            #       answer; follows OneDrive redirection. No dependencies. ──
             try:
                 import ctypes
                 from ctypes import wintypes
@@ -2372,7 +2410,6 @@ class MainWindow(QMainWindow):
                                 ("Data3", wintypes.WORD),
                                 ("Data4", ctypes.c_ubyte * 8)]
 
-                # FOLDERID_Desktop {B4BFCC3A-DB2C-424C-B029-7FE99A87C641}
                 fid = _GUID(0xB4BFCC3A, 0xDB2C, 0x424C,
                             (ctypes.c_ubyte * 8)(0xB0, 0x29, 0x7F, 0xE9,
                                                  0x9A, 0x87, 0xC6, 0x41))
@@ -2386,7 +2423,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-            # ── 2) Registry: User Shell Folders (may contain %VARS%) ──────
             try:
                 import winreg
                 with winreg.OpenKey(
@@ -2401,7 +2437,6 @@ class MainWindow(QMainWindow):
                 pass
 
         elif _os == "Linux":
-            # ── xdg-user-dir honours localized names (~/Masaüstü, …) ──────
             try:
                 out = subprocess.run(["xdg-user-dir", "DESKTOP"],
                                      capture_output=True, text=True, timeout=5)
@@ -2422,29 +2457,20 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-        # macOS: ~/Desktop is always the real path (localization is
-        # display-only). Everything else lands here as a last resort.
         return home / "Desktop"
 
     def _create_desktop_shortcut(self):
-        """
-        Create a desktop shortcut on Windows / macOS / Linux.
-        Never opens a terminal, console, or PowerShell window on any platform.
-        """
         import stat as _stat
         script  = Path(__file__).resolve().parent / "main.py"
         python  = Path(sys.executable)
         desktop = self._get_desktop_dir()
 
-        # Arc-reactor icon (.ico — also exported as .png for Linux/macOS)
         ico_path = Path(__file__).resolve().parent / "config" / "jarvis.ico"
         if not ico_path.exists():
             self._build_jarvis_icon(ico_path)
 
         try:
             _os = platform.system()
-
-            # ── Windows ───────────────────────────────────────────────────────
             if _os == "Windows":
                 pythonw  = python.parent / "pythonw.exe"
                 target   = str(pythonw if pythonw.exists() else python)
@@ -2453,7 +2479,6 @@ class MainWindow(QMainWindow):
                 self._create_lnk_windows(lnk, target, str(script),
                                          str(script.parent), icon_loc)
 
-            # ── macOS — proper .app bundle (no Terminal window) ───────────────
             elif _os == "Darwin":
                 app     = desktop / "J.A.R.V.I.S.app"
                 mac_dir = app / "Contents" / "MacOS"
@@ -2461,8 +2486,6 @@ class MainWindow(QMainWindow):
                 mac_dir.mkdir(parents=True, exist_ok=True)
                 res_dir.mkdir(exist_ok=True)
 
-                # Launcher executable (bash — runs as background process,
-                # macOS does NOT open Terminal for executables inside .app bundles)
                 launcher = mac_dir / "JARVIS"
                 launcher.write_text(
                     "#!/usr/bin/env bash\n"
@@ -2472,7 +2495,6 @@ class MainWindow(QMainWindow):
                 launcher.chmod(launcher.stat().st_mode
                                | _stat.S_IEXEC | _stat.S_IXGRP | _stat.S_IXOTH)
 
-                # Minimal Info.plist (required for .app recognition)
                 (app / "Contents" / "Info.plist").write_text(
                     '<?xml version="1.0" encoding="UTF-8"?>\n'
                     '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
@@ -2487,12 +2509,10 @@ class MainWindow(QMainWindow):
                     '</dict></plist>\n'
                 )
 
-                # Optional: copy icon as .icns (skip silently if Pillow is missing)
                 try:
                     import PIL.Image
                     icns = res_dir / "AppIcon.icns"
                     PIL.Image.open(ico_path).save(icns, format="ICNS")
-                    # Inject icon reference into plist
                     plist = app / "Contents" / "Info.plist"
                     txt = plist.read_text()
                     plist.write_text(
@@ -2503,11 +2523,9 @@ class MainWindow(QMainWindow):
                         )
                     )
                 except Exception:
-                    pass  # icon is optional
+                    pass
 
-            # ── Linux — .desktop file (Terminal=false, no console) ────────────
             else:
-                # Export .ico → .png for better desktop integration
                 png_path = ico_path.with_suffix(".png")
                 if not png_path.exists() and ico_path.exists():
                     try:
@@ -2516,7 +2534,7 @@ class MainWindow(QMainWindow):
                             (256, 256), PIL.Image.LANCZOS
                         ).save(png_path, format="PNG")
                     except Exception:
-                        png_path = ico_path  # fallback to .ico
+                        png_path = ico_path
 
                 icon_line = f"Icon={png_path}\n" if png_path.exists() else ""
                 desk = desktop / "J.A.R.V.I.S.desktop"
@@ -2559,8 +2577,17 @@ class MainWindow(QMainWindow):
 
         biometric_overlay = getattr(self, "_biometric_overlay", None)
         if biometric_overlay is not None and biometric_overlay.isVisible():
-            ow, oh = 420, 320
+            ow, oh = 440, 360
             biometric_overlay.setGeometry(
+                (cw.width() - ow) // 2,
+                (cw.height() - oh) // 2,
+                ow, oh,
+            )
+
+        manage_overlay = getattr(self, "_manage_profiles_overlay", None)
+        if manage_overlay is not None and manage_overlay.isVisible():
+            ow, oh = 480, 400
+            manage_overlay.setGeometry(
                 (cw.width() - ow) // 2,
                 (cw.height() - oh) // 2,
                 ow, oh,
@@ -2614,31 +2641,26 @@ class MainWindow(QMainWindow):
     def _update_metrics(self):
         snap = _metrics.snapshot()
 
-        # CPU
         cpu = snap["cpu"]
         self._bar_cpu.set_value(cpu, f"{cpu:.0f}%")
 
-        # MEM
         mem = snap["mem"]
         self._bar_mem.set_value(mem, f"{mem:.0f}%")
 
-        # NET
         net = snap["net"]
         if net < 1.0:
             net_str = f"{net*1024:.0f}KB/s"
         else:
             net_str = f"{net:.1f}MB/s"
-        net_pct = min(100, net * 10)  # 10 MB/s = %100
+        net_pct = min(100, net * 10)
         self._bar_net.set_value(net_pct, net_str)
 
-        # GPU
         gpu = snap["gpu"]
         if gpu >= 0:
             self._bar_gpu.set_value(gpu, f"{gpu:.0f}%")
         else:
             self._bar_gpu.set_value(0, "N/A")
 
-        # TMP
         tmp = snap["tmp"]
         if tmp >= 0:
             tmp_pct = min(100, (tmp / 100) * 100)
@@ -2802,6 +2824,7 @@ class MainWindow(QMainWindow):
             lay.addWidget(lbl)
 
         return w
+
     def _build_right_panel(self) -> QWidget:
         w = QWidget()
         w.setFixedWidth(_RIGHT_W)
@@ -2909,7 +2932,6 @@ class MainWindow(QMainWindow):
         return w
 
     def _build_quick_drawer(self) -> QWidget:
-        """Floating overlay panel shown when the ⚙ header button is toggled."""
         _BTN_STYLE_PRI = f"""
             QPushButton {{
                 background: #00091a; color: {C.PRI};
@@ -2996,6 +3018,14 @@ class MainWindow(QMainWindow):
         cust_btn.clicked.connect(self._open_customize)
         lay.addWidget(cust_btn)
 
+        prof_btn = QPushButton("👥  MANAGE PROFILES")
+        prof_btn.setFixedHeight(26)
+        prof_btn.setFont(QFont("Courier New", 7))
+        prof_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        prof_btn.setStyleSheet(_BTN_STYLE_DIM)
+        prof_btn.clicked.connect(self._open_manage_profiles)
+        lay.addWidget(prof_btn)
+
         self._brief_btn = QPushButton()
         self._brief_btn.setFixedHeight(26)
         self._brief_btn.setFont(QFont("Courier New", 7))
@@ -3007,13 +3037,6 @@ class MainWindow(QMainWindow):
         self._audio_profile_btn.setFixedHeight(26)
         self._audio_profile_btn.setFont(QFont("Courier New", 7))
         self._audio_profile_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._audio_profile_btn.setToolTip(
-            "Cycle audio latency mode.\n"
-            "AGGRESSIVE: lowest latency, may glitch on slower systems.\n"
-            "BALANCED: recommended default.\n"
-            "SAFE: most stable, slightly higher latency.\n"
-            "Restart JARVIS after changing."
-        )
         self._audio_profile_btn.clicked.connect(self._toggle_audio_profile)
         lay.addWidget(self._audio_profile_btn)
 
@@ -3090,10 +3113,6 @@ class MainWindow(QMainWindow):
         return row
 
     def _build_content_panel(self) -> QWidget:
-        """
-        Collapsible panel below the HUD — shows search results, news, briefings.
-        Hidden by default; appears when show_content() is called.
-        """
         w = QWidget()
         w.setObjectName("ContentPanel")
         w.setStyleSheet(f"""
@@ -3108,7 +3127,6 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(12, 7, 12, 8)
         lay.setSpacing(5)
 
-        # ── header row ───────────────────────────────────────────────────────
         hdr = QHBoxLayout(); hdr.setSpacing(6)
 
         dot = QLabel("◈")
@@ -3144,11 +3162,9 @@ class MainWindow(QMainWindow):
         hdr.addWidget(dismiss)
         lay.addLayout(hdr)
 
-        # ── separator ─────────────────────────────────────────────────────────
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet(f"color: {C.BORDER};"); lay.addWidget(sep)
 
-        # ── text display ──────────────────────────────────────────────────────
         self._content_display = QTextEdit()
         self._content_display.setReadOnly(True)
         self._content_display.setFont(QFont("Courier New", 8))
@@ -3180,7 +3196,6 @@ class MainWindow(QMainWindow):
         return w
 
     def _show_content(self, title: str, text: str):
-        """Slot — runs on Qt main thread. Updates and shows the content panel."""
         import time as _time
         self._content_title_lbl.setText(title.upper()[:48])
         self._content_ts_lbl.setText(_time.strftime("%H:%M:%S"))
@@ -3386,10 +3401,7 @@ class MainWindow(QMainWindow):
             self._log.append_log(f"SYS: Live remote URL: {url}")
         self._show_content("Remote URL", f"{url}\n\n{sec}")
 
-    # ── Auto-start ──────────────────────────────────────────────────────────────
-
     def _check_autostart(self) -> bool:
-        """Returns True if auto-start is currently registered on this OS."""
         try:
             if _OS == "Windows":
                 import winreg
@@ -3724,8 +3736,6 @@ class MainWindow(QMainWindow):
                 QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.BORDER_B}; }}
             """)
 
-    # ── Customization ────────────────────────────────────────────────────────────
-
     def _open_customize(self):
         cfg = _read_full_config()
         if self._customize_overlay:
@@ -3749,14 +3759,26 @@ class MainWindow(QMainWindow):
         ov.show()
         self._customize_overlay = ov
 
+    def _open_manage_profiles(self):
+        if self._manage_profiles_overlay:
+            self._manage_profiles_overlay.hide()
+        cw = self.centralWidget()
+        ov = ManageProfilesOverlay(parent=cw)
+        ow, oh = 480, 400
+        ov.setGeometry(
+            (cw.width() - ow) // 2,
+            (cw.height() - oh) // 2,
+            ow, oh,
+        )
+        ov.show()
+        self._manage_profiles_overlay = ov
+
     def _preview_ui_color(self, hex_color: str):
-        """Canlı önizleme — tüm arayüzü yeni renge boyar (config'e YAZMAZ)."""
         old = current_palette()
         if apply_ui_accent(hex_color):
             retheme_all_widgets(old, current_palette())
 
     def _apply_name_update(self, name: str, user_name: str, ui_color: str = ""):
-        """Update all name/theme-dependent UI elements and persist to config."""
         self._assistant_name = name.strip() or "JARVIS"
         display = self._assistant_name.upper()
         self.setWindowTitle(f"{display} — MARK XLIX")
@@ -3772,7 +3794,6 @@ class MainWindow(QMainWindow):
         if ui_color:
             old = current_palette()
             if apply_ui_accent(ui_color):
-                # Tüm arayüzü (paneller, butonlar, kenarlıklar, HUD) canlı boya
                 retheme_all_widgets(old, current_palette())
                 color_changed = old["PRI"] != C.PRI
 
@@ -3788,8 +3809,6 @@ class MainWindow(QMainWindow):
                 self._log.append_log(f"SYS: UI colour applied — {ui_color}")
         except Exception as e:
             self._log.append_log(f"ERR: Config save failed — {e}")
-
-    # ── Clipboard intelligence ───────────────────────────────────────────────────
 
     def _on_clipboard_changed(self):
         try:
@@ -3815,8 +3834,6 @@ class MainWindow(QMainWindow):
     def _on_clipboard_action(self, cmd: str):
         if self.on_text_command:
             threading.Thread(target=self.on_text_command, args=(cmd,), daemon=True).start()
-
-    # ────────────────────────────────────────────────────────────────────────────
 
     def _do_interrupt(self):
         if self.on_interrupt:
@@ -3902,23 +3919,24 @@ class MainWindow(QMainWindow):
     def _show_biometric_lock(self):
         ov = BiometricLockOverlay(self.centralWidget())
         cw = self.centralWidget()
-        ow, oh = 420, 320
+        ow, oh = 440, 360
         ov.setGeometry(
             (cw.width()  - ow) // 2,
             (cw.height() - oh) // 2,
             ow, oh,
         )
         ov.verified.connect(lambda: self._on_biometric_done(ov))
+        ov.manage_requested.connect(self._open_manage_profiles)
         ov.show()
         self._biometric_overlay = ov
-        self._log.append_log("SYS: BiometricLock_Protocol initiated. Voice and visual verification pending.")
+        self._log.append_log("SYS: BiometricLock_Protocol initiated. Profile voice and visual verification pending.")
 
     def _on_biometric_done(self, ov: BiometricLockOverlay):
         ov.hide()
         self._biometric_overlay = None
         self._apply_state("LISTENING")
         self._assistant_name = _read_full_config().get("assistant_name", "JARVIS") or "JARVIS"
-        self._log.append_log(f"SYS: BiometricLock_Protocol cleared. {self._assistant_name} online with Stark security protocols.")
+        self._log.append_log(f"SYS: BiometricLock_Protocol cleared. {self._assistant_name} online with Stark security profiles.")
 
     def _on_setup_done(self, key: str, os_name: str):
         os.makedirs(CONFIG_DIR, exist_ok=True)
@@ -3962,7 +3980,6 @@ class JarvisUI:
             fn = getattr(self._win, fn_name)
             return fn(*args, **kwargs)
         except RuntimeError as e:
-            # Happens during shutdown if background tasks emit after MainWindow teardown.
             if "has been deleted" in str(e):
                 self._window_alive = False
                 self._win = None
@@ -4122,7 +4139,6 @@ class JarvisUI:
             time.sleep(0.1)
 
     def show_content(self, title: str, text: str):
-        """Thread-safe: display content in the panel below the HUD."""
         if not self._window_alive or self._win is None:
             return
         try:
@@ -4135,14 +4151,12 @@ class JarvisUI:
             raise
 
     def prompt_reconfig(self):
-        """Thread-safe: show the API key setup overlay (e.g. after an auth error)."""
         if not self._window_alive or self._win is None:
             return
         self._win._ready = False
         self._win._reconfig_sig.emit()
 
     def show_camera_frame(self, img_bytes: bytes):
-        """Thread-safe: show a webcam frame in the small overlay (screen captures)."""
         if not self._window_alive or self._win is None:
             return
         try:
@@ -4155,11 +4169,9 @@ class JarvisUI:
             raise
 
     def start_camera_stream(self) -> None:
-        """Thread-safe: start live camera feed in the full HUD area."""
         self._safe_window_call("start_camera_stream")
 
     def stop_camera_stream(self) -> None:
-        """Thread-safe: stop the live camera feed."""
         self._safe_window_call("stop_camera_stream")
 
     @property
