@@ -89,3 +89,24 @@ def test_biometric_lock_overlay_does_not_clear_on_failed_verification(monkeypatc
     assert overlay._status_lbl.text().startswith("STATUS: PROFILE NOT VERIFIED")
     assert overlay._scan_btn.isEnabled() is True
     assert overlay._scan_btn.text() == "RETRY BIOMETRIC SCAN"
+
+
+def test_live_biometric_helper_requires_audio_and_face(monkeypatch) -> None:
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PROFILES", {
+        "primary": {
+            "name": "James Lumsden",
+            "voice_prints": ["james lumsden"],
+            "visual_signatures": ["james lumsden"],
+            "clearance_level": "omega",
+        },
+        "authorized": {},
+    })
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", {"james", "james lumsden"})
+    monkeypatch.setattr(file_controller_module, "_record_voice_sample", lambda *args, **kwargs: (b"\x00", 0.0))
+    monkeypatch.setattr(file_controller_module, "_capture_live_visual_frame", lambda *args, **kwargs: (b"frame", False))
+
+    granted, details = file_controller_module.evaluate_live_biometric_security("James Lumsden")
+
+    assert granted is False
+    assert details["voice_detected"] is False
+    assert details["visual_detected"] is False
