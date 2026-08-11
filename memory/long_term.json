@@ -64,17 +64,17 @@
   "sessions": [
     {
       "date": "2026-08-11",
-      "summary": "The user successfully provided verbal confirmation to initiate and complete voice calibration, resolving previous authorization constraints and fully updating their biometric security profile with JARVIS.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-11",
       "summary": "The user greeted and tested the system multiple times while checking in after completing a voice calibration and reviewing news headlines, including a major earthquake in Colombia.",
       "language": "English"
     },
     {
       "date": "2026-08-11",
       "summary": "James Lumsden completed a voice calibration to update his security profile, and JARVIS then presented him with the day's top headlines—including Meta's AI plans—and a new email notification.",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-11",
+      "summary": "James Lumsden reviewed daily headlines and recent news while attempting to access his system's camera, but the actions were repeatedly blocked due to failed biometric authentication and security protocol errors.",
       "language": "English"
     }
   ],
