@@ -1649,6 +1649,7 @@ class BiometricLockOverlay(QWidget):
     for high-security Stark protocols and authorization overrides.
     """
     verified = pyqtSignal()
+    failed = pyqtSignal()
     manage_requested = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -1809,6 +1810,8 @@ class BiometricLockOverlay(QWidget):
         self._status_lbl.setStyleSheet(f"color: {C.GREEN if granted else C.RED}; background: transparent;")
         self._scan_btn.setEnabled(not granted)
         self._scan_btn.setText("ACCESS GRANTED" if granted else "RETRY BIOMETRIC SCAN")
+        if not granted:
+            self.failed.emit()
         return granted
 
     def _step_live_scan(self):
@@ -2431,6 +2434,7 @@ class MainWindow(QMainWindow):
         self.on_remote_clicked = None
         self.on_remote_url_clicked = None
         self.on_interrupt      = None
+        self.on_biometric_failure = None
         self._muted            = False
         self._current_file: str | None = None
         self._security_overlay: QWidget | None = None
@@ -4334,6 +4338,7 @@ class MainWindow(QMainWindow):
             ow, oh,
         )
         ov.verified.connect(lambda: self._on_biometric_done(ov))
+        ov.failed.connect(self._handle_biometric_failure)
         ov.manage_requested.connect(self._open_manage_profiles)
         ov.show()
         self._biometric_overlay = ov
@@ -4341,6 +4346,12 @@ class MainWindow(QMainWindow):
 
     def is_biometric_lock_active(self) -> bool:
         return self._biometric_overlay is not None and self._biometric_overlay.isVisible()
+
+    def _handle_biometric_failure(self):
+        self._log.append_log("SYS: BiometricLock_Protocol failed. Security shutdown initiated.")
+        self._apply_state("LOCKED")
+        if self.on_biometric_failure:
+            self.on_biometric_failure()
 
     def _on_biometric_done(self, ov: BiometricLockOverlay):
         ov.hide()
@@ -4473,6 +4484,18 @@ class JarvisUI:
         if not self._window_alive or self._win is None:
             return
         self._win.on_interrupt = cb
+
+    @property
+    def on_biometric_failure(self):
+        if not self._window_alive or self._win is None:
+            return None
+        return self._win.on_biometric_failure
+
+    @on_biometric_failure.setter
+    def on_biometric_failure(self, cb):
+        if not self._window_alive or self._win is None:
+            return
+        self._win.on_biometric_failure = cb
 
     def notify_phone_connected(self) -> None:
         self._safe_window_call("notify_phone_connected")
