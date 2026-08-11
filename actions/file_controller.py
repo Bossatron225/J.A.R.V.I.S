@@ -43,22 +43,9 @@ _AUTHORIZED_PROFILES = {
         "name": "James Lumsden",
         "voice_prints": ["james lumsden", "james", "james l"],
         "visual_signatures": ["james lumsden", "james", "james l"],
-        "clearance_level": "omega"
+        "clearance_level": "omega",
     },
-    "authorized": {
-        "pepper potts": {
-            "name": "Pepper Potts",
-            "voice_prints": ["pepper potts", "pepper"],
-            "visual_signatures": ["pepper potts", "pepper"],
-            "clearance_level": "alpha"
-        },
-        "jarvis": {
-            "name": "JARVIS",
-            "voice_prints": ["jarvis"],
-            "visual_signatures": ["jarvis", "ai interface"],
-            "clearance_level": "omega"
-        }
-    }
+    "authorized": {},
 }
 
 def add_authorized_profile(profile_id: str, name: str, voice_print: str, visual_signature: str, clearance_level: str = "beta") -> str:
@@ -240,6 +227,76 @@ def _verify_live_voice_with_gemini(audio_bytes: bytes, target_identity: str) -> 
         return False
 
 
+def _decode_voice_bytes(audio_bytes: bytes) -> np.ndarray:
+    if not audio_bytes:
+        return np.array([], dtype=np.float32)
+    try:
+        payload = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
+        if payload.size == 0:
+            return np.array([], dtype=np.float32)
+        return payload / 32768.0
+    except Exception:
+        return np.array([], dtype=np.float32)
+
+
+def _voice_matches_baseline(live_audio_bytes: bytes, baseline_audio_bytes: bytes) -> bool:
+    if not live_audio_bytes or not baseline_audio_bytes:
+        return False
+
+    live_samples = _decode_voice_bytes(live_audio_bytes)
+    baseline_samples = _decode_voice_bytes(baseline_audio_bytes)
+    if live_samples.size == 0 or baseline_samples.size == 0:
+        return False
+
+    target_len = min(live_samples.size, baseline_samples.size)
+    if target_len < 64:
+        return False
+
+    live_slice = live_samples[:target_len]
+    baseline_slice = baseline_samples[:target_len]
+    live_rms = float(np.sqrt(np.mean(np.square(live_slice))))
+    baseline_rms = float(np.sqrt(np.mean(np.square(baseline_slice))))
+    if live_rms <= 0.0 or baseline_rms <= 0.0:
+        return False
+
+    ratio = max(live_rms / baseline_rms, baseline_rms / live_rms)
+    if ratio > 6.0:
+        return False
+
+    corr = float(np.corrcoef(live_slice, baseline_slice)[0, 1]) if live_slice.size == baseline_slice.size else 0.0
+    if np.isnan(corr):
+        corr = 0.0
+    return corr > 0.12 and ratio < 4.0
+
+
+def _visual_matches_baseline(live_image_bytes: bytes, baseline_image_bytes: bytes) -> bool:
+    if not live_image_bytes or not baseline_image_bytes:
+        return False
+    if cv2 is None:
+        return True
+    try:
+        live_arr = np.frombuffer(live_image_bytes, dtype=np.uint8)
+        baseline_arr = np.frombuffer(baseline_image_bytes, dtype=np.uint8)
+        live_frame = cv2.imdecode(live_arr, cv2.IMREAD_COLOR)
+        baseline_frame = cv2.imdecode(baseline_arr, cv2.IMREAD_COLOR)
+        if live_frame is None or baseline_frame is None:
+            return False
+
+        live_gray = cv2.cvtColor(live_frame, cv2.COLOR_BGR2GRAY)
+        baseline_gray = cv2.cvtColor(baseline_frame, cv2.COLOR_BGR2GRAY)
+        if live_gray.shape != baseline_gray.shape:
+            baseline_gray = cv2.resize(baseline_gray, (live_gray.shape[1], live_gray.shape[0]))
+
+        hist_live = cv2.calcHist([live_gray], [0], None, [32], [0, 256])
+        hist_base = cv2.calcHist([baseline_gray], [0], None, [32], [0, 256])
+        cv2.normalize(hist_live, hist_live)
+        cv2.normalize(hist_base, hist_base)
+        similarity = cv2.compareHist(hist_live, hist_base, cv2.HISTCMP_CORREL)
+        return float(similarity) > 0.2
+    except Exception:
+        return False
+
+
 def _verify_live_face_with_gemini(image_bytes: bytes, target_identity: str) -> bool:
     if not image_bytes:
         return False
@@ -279,8 +336,30 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
     audio_bytes, voice_energy = _record_voice_sample()
     image_bytes, face_detected = _capture_live_visual_frame()
 
-    voice_detected = bool(audio_bytes and (voice_energy >= 0.01 or _verify_live_voice_with_gemini(audio_bytes, identity_name)))
-    visual_detected = bool(face_detected or (image_bytes and _verify_live_face_with_gemini(image_bytes, identity_name)))
+    stored_voice_sample = primary.get("voice_sample")
+    stored_visual_sample = primary.get("visual_sample")
+    voice_detected = False
+    visual_detected = False
+
+    if audio_bytes:
+        if voice_energy >= 0.01 or _verify_live_voice_with_gemini(audio_bytes, identity_name):
+            voice_detected = True
+        elif stored_voice_sample:
+            try:
+                baseline_audio = base64.b64decode(str(stored_voice_sample))
+            except Exception:
+                baseline_audio = b""
+            voice_detected = _voice_matches_baseline(audio_bytes, baseline_audio)
+
+    if face_detected or image_bytes:
+        if face_detected or _verify_live_face_with_gemini(image_bytes, identity_name):
+            visual_detected = True
+        elif stored_visual_sample:
+            try:
+                baseline_image = base64.b64decode(str(stored_visual_sample))
+            except Exception:
+                baseline_image = b""
+            visual_detected = _visual_matches_baseline(image_bytes or b"", baseline_image)
 
     granted = bool(voice_detected and visual_detected and identity_match)
     return granted, {
