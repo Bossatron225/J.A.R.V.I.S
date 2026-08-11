@@ -1588,9 +1588,9 @@ class ManageProfilesOverlay(QWidget):
             granted, _ = evaluate_live_biometric_security(identity)
             summary = message
             if granted:
-                summary = f"{message}\nLive baseline verified against the stored profile."
+                summary = f"{message}\nBaseline captured and verified against the stored profile."
             else:
-                summary = f"{message}\nLive verification incomplete; camera or microphone access may need to be allowed."
+                summary = f"{message}\nBaseline capture completed, but verification is still pending."
 
             self._safe_set_widget_text(self._setup_status, summary)
             self._safe_set_widget_stylesheet(self._setup_status, f"color: {C.GREEN if granted else C.ACC2}; background: transparent;")
@@ -1614,7 +1614,7 @@ class ManageProfilesOverlay(QWidget):
 
     def _establish_baseline(self):
         name = self._new_name_input.text().strip() or get_authorized_profiles().get("primary", {}).get("name") or "James Lumsden"
-        self._setup_status.setText("Prepare to record your voice and face. Please keep still and speak clearly for 3 seconds.")
+        self._setup_status.setText("Preparing live baseline capture. Keep still, face the camera, and speak clearly.")
         self._setup_status.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
         self._setup_countdown_label.setText("Starting in 3...")
         self._confirm_btn.hide()
@@ -1626,7 +1626,8 @@ class ManageProfilesOverlay(QWidget):
     def _countdown_baseline_step(self):
         if getattr(self, "_setup_timer", 0) <= 1:
             self._set_capture_state("recording")
-            self._setup_countdown_label.setText("Capturing...")
+            self._setup_countdown_label.setText("Capturing baseline...")
+            self._setup_status.setText("Capturing your live voice and face baseline now.")
             ok, message = establish_biometric_baseline(name=self._setup_name)
             if ok:
                 self._show_capture_confirmation(message)
