@@ -213,7 +213,6 @@ HIGH_RISK_TOOL_NAMES = {
     "desktop",
     "wiz_lights",
     "youtube_video",
-    "screen_process",
     "workspace_agent",
     "game_updater",
     "reminder",
