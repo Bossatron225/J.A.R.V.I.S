@@ -156,7 +156,7 @@ def _load_biometric_store() -> dict:
             "voice_print_signature": "james_prime_voice_signature",
             "visual_signature": "james_prime_visual_signature",
             "clearance_level": 10,
-            "created_at": datetime.utcnow().isoformat() + "Z"
+            "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         },
         "authorized_profiles": []
     }
