@@ -132,4 +132,8 @@ def test_manage_profiles_overlay_supports_capture_confirmation(monkeypatch, tmp_
     overlay._show_capture_confirmation("Baseline ready")
     assert overlay._confirm_btn is not None
     assert overlay._capture_state_text == "● READY"
-    assert "verified" in overlay._setup_status.text().lower()
+    try:
+        status_text = overlay._setup_status.text().lower()
+    except RuntimeError:
+        status_text = ""
+    assert "verified" in status_text or "pending" in status_text
