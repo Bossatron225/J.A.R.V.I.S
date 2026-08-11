@@ -116,3 +116,10 @@ def test_play_audio_bytes_handles_raw_pcm_bytes(monkeypatch):
 
     assert captured["sample_rate"] == 16000
     np.testing.assert_allclose(captured["data"], [0.0, 0.5, -0.5, 0.0], atol=1e-6)
+
+
+def test_play_audio_bytes_ignores_sounddevice_errors(monkeypatch):
+    monkeypatch.setattr(tts.sd, "play", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("AUHAL")))
+    monkeypatch.setattr(tts.sd, "wait", lambda: (_ for _ in ()).throw(RuntimeError("AUHAL")))
+
+    tts._play_audio_bytes(b"abc", sample_rate=16000)
