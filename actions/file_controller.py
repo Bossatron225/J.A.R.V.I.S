@@ -141,16 +141,16 @@ def verify_biometric_security(voice_print: str = "", visual_signature: str = "")
 
     # Check primary profile
     primary = _AUTHORIZED_PROFILES["primary"]
-    if clean_voice and any(vp in clean_voice for vp in primary["voice_prints"]):
+    if clean_voice and any(vp in clean_voice for vp in primary.get("voice_prints", [])):
         return True
-    if clean_visual and any(vs in clean_visual for vs in primary["visual_signatures"]):
+    if clean_visual and any(vs in clean_visual for vs in primary.get("visual_signatures", [])):
         return True
 
     # Check additional authorized profiles
     for prof in _AUTHORIZED_PROFILES["authorized"].values():
-        if clean_voice and any(vp in clean_voice for vp in prof["voice_prints"]):
+        if clean_voice and any(vp in clean_voice for vp in prof.get("voice_prints", [])):
             return True
-        if clean_visual and any(vs in clean_visual for vs in prof["visual_signatures"]):
+        if clean_visual and any(vs in clean_visual for vs in prof.get("visual_signatures", [])):
             return True
 
     # Fallback to legacy flat set check
@@ -158,7 +158,6 @@ def verify_biometric_security(voice_print: str = "", visual_signature: str = "")
         return True
     if clean_visual and any(auth in clean_visual for auth in _AUTHORIZED_PERSONNEL):
         return True
-
     # If both verification vectors are missing or unmatched, fail securely
     if not voice_print and not visual_signature:
         return False
