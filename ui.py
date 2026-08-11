@@ -1404,6 +1404,8 @@ class ManageProfilesOverlay(QWidget):
     def _start_camera_preview(self) -> None:
         if self._camera_cap is not None:
             return
+        if not self.isVisible():
+            return
         try:
             import cv2
         except ImportError:
