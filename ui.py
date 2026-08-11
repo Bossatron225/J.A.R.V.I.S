@@ -1307,7 +1307,7 @@ class ManageProfilesOverlay(QWidget):
         if primary.get("name"):
             result.append({
                 "name": primary.get("name"),
-                "id": primary.get("id", "PRIMARY"),
+                "id": primary.get("id", "JAMES-001"),
                 "voice_signature": "verified" if primary.get("voice_prints") else "enrolled",
                 "visual_signature": "verified" if primary.get("visual_signatures") else "enrolled",
             })
