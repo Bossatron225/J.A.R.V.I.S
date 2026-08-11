@@ -187,3 +187,31 @@ def test_jarvis_live_handles_biometric_failure(monkeypatch) -> None:
     live._handle_biometric_failure()
 
     assert shutdown_reasons == ["biometric verification failed"]
+
+
+def test_schedule_shutdown_without_running_loop(monkeypatch) -> None:
+    class DummyUI:
+        def __init__(self) -> None:
+            self.muted = False
+            self.logs = []
+
+        def set_state(self, *_args, **_kwargs) -> None:
+            return None
+
+        def write_log(self, message: str, *_args, **_kwargs) -> None:
+            self.logs.append(message)
+
+    ui = DummyUI()
+    live = main_module.JarvisLive(ui)
+    called = []
+
+    def fake_run(coro):
+        called.append(coro)
+        return None
+
+    monkeypatch.setattr(main_module.asyncio, "run", fake_run)
+
+    result = live._schedule_shutdown("test reason")
+
+    assert result is True
+    assert called
