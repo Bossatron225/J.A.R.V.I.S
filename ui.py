@@ -1466,20 +1466,20 @@ class ManageProfilesOverlay(QWidget):
             self._stop_camera_preview()
 
     def _stop_camera_preview(self) -> None:
-        if self._preview_timer is not None:
-            try:
+        try:
+            if self._preview_timer is not None:
                 self._preview_timer.stop()
-            except RuntimeError:
-                pass
-        if self._camera_cap is not None:
-            try:
+        except Exception:
+            pass
+        try:
+            if self._camera_cap is not None:
                 self._camera_cap.release()
-            except Exception:
-                pass
-            self._camera_cap = None
+        except Exception:
+            pass
+        self._camera_cap = None
         try:
             self._preview_placeholder.setPixmap(QPixmap())
-        except RuntimeError:
+        except Exception:
             pass
 
     def _load_profiles(self):
