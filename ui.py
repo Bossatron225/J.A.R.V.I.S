@@ -1562,14 +1562,14 @@ class ManageProfilesOverlay(QWidget):
                 self._capture_state_text = "● SPEAK NOW"
                 self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
                 self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.ACC2}; background: transparent;")
-                self._safe_set_widget_text(self._preview_placeholder, "Camera preview active. Keep your face centered while speaking.")
+                self._safe_set_widget_text(self._preview_placeholder, "Camera preview active. Baseline capture in progress — keep your face centered and speak clearly.")
                 self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.TEXT}; background: transparent;")
                 self._start_camera_preview()
             elif state == "ready":
                 self._capture_state_text = "● READY"
                 self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
                 self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.GREEN}; background: transparent;")
-                self._safe_set_widget_text(self._preview_placeholder, "Capture complete. Review the baseline and confirm if it looks right.")
+                self._safe_set_widget_text(self._preview_placeholder, "Baseline captured. Review the result and confirm if it looks right.")
                 self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.GREEN}; background: transparent;")
                 self._stop_camera_preview()
             else:
