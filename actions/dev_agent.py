@@ -151,10 +151,10 @@ def _load_biometric_store() -> dict:
         pass
     return {
         "primary_profile": {
-            "name": "Tony Stark",
+            "name": "James Lumsden",
             "role": "Primary Authority",
-            "voice_print_signature": "stark_prime_voice_signature",
-            "visual_signature": "stark_prime_visual_signature",
+            "voice_print_signature": "james_prime_voice_signature",
+            "visual_signature": "james_prime_visual_signature",
             "clearance_level": 10,
             "created_at": datetime.utcnow().isoformat() + "Z"
         },
@@ -185,7 +185,7 @@ def _manage_biometric_profile(action: str, name: str, role: str, clearance: int,
 
     if action == "set_primary":
         store["primary_profile"] = {
-            "name": name or "Tony Stark",
+            "name": name or "James Lumsden",
             "role": role or "Primary Authority",
             "voice_print_signature": voice_sig or "custom_prime_voice",
             "visual_signature": visual_sig or "custom_prime_visual",
@@ -193,7 +193,7 @@ def _manage_biometric_profile(action: str, name: str, role: str, clearance: int,
             "updated_at": datetime.utcnow().isoformat() + "Z"
         }
         _save_biometric_store(store)
-        return f"Primary biometric profile successfully updated to: {name or 'Tony Stark'}."
+        return f"Primary biometric profile successfully updated to: {name or 'James Lumsden'}."
 
     if action == "add":
         if not name:
