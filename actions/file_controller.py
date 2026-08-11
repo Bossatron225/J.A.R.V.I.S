@@ -5,7 +5,7 @@ import os
 import platform
 import shutil
 import wave
-from contextlib import redirect_stderr
+from contextlib import contextmanager, redirect_stderr
 from pathlib import Path
 from datetime import datetime
 from functools import lru_cache
@@ -35,6 +35,7 @@ except ImportError:
 
 _OS = platform.system()  # "Windows" | "Darwin" | "Linux"
 _USE_SOUNDDEVICE_CAPTURE = os.environ.get("JARVIS_USE_SOUNDDEVICE_CAPTURE", "0") == "1"
+_BIOMETRIC_DEBUG = os.environ.get("JARVIS_BIOMETRIC_DEBUG", "0") == "1"
 
 _SAFE_ROOTS: tuple[Path, ...] = (
     Path.home(),
@@ -167,13 +168,44 @@ def _pcm_to_wav(audio_bytes: bytes, sample_rate: int = 16_000) -> bytes:
         return buf.getvalue()
 
 
+@contextmanager
+def _suppress_stderr_fd():
+    """Temporarily redirect process stderr at fd-level to suppress native backend noise."""
+    try:
+        devnull = open(os.devnull, "w")
+        stderr_fd = sys.stderr.fileno()
+        saved_fd = os.dup(stderr_fd)
+        os.dup2(devnull.fileno(), stderr_fd)
+    except Exception:
+        devnull = None
+        saved_fd = None
+        stderr_fd = None
+    try:
+        yield
+    finally:
+        if saved_fd is not None and stderr_fd is not None:
+            try:
+                os.dup2(saved_fd, stderr_fd)
+            except Exception:
+                pass
+            try:
+                os.close(saved_fd)
+            except Exception:
+                pass
+        if devnull is not None:
+            try:
+                devnull.close()
+            except Exception:
+                pass
+
+
 def _record_voice_sample(duration_seconds: float = 1.2, sample_rate: int = 16_000) -> tuple[bytes, float]:
     # macOS PortAudio/AUHAL can be noisy/unreliable in this project context.
     # Default to SpeechRecognition capture unless explicitly overridden.
     if sd is not None and (_OS != "Darwin" or _USE_SOUNDDEVICE_CAPTURE):
         try:
             stderr_buffer = io.StringIO()
-            with redirect_stderr(stderr_buffer):
+            with _suppress_stderr_fd(), redirect_stderr(stderr_buffer):
                 frames = sd.rec(int(sample_rate * duration_seconds), samplerate=sample_rate, channels=1, dtype="int16")
                 sd.wait()
             audio_bytes = frames.tobytes()
@@ -189,8 +221,10 @@ def _record_voice_sample(duration_seconds: float = 1.2, sample_rate: int = 16_00
             recognizer = sr.Recognizer()
             recognizer.energy_threshold = 400
             recognizer.dynamic_energy_threshold = True
-            with sr.Microphone() as microphone:
-                audio = recognizer.listen(microphone, timeout=2, phrase_time_limit=max(1, int(duration_seconds)))
+            stderr_buffer = io.StringIO()
+            with _suppress_stderr_fd(), redirect_stderr(stderr_buffer):
+                with sr.Microphone() as microphone:
+                    audio = recognizer.listen(microphone, timeout=2, phrase_time_limit=max(1, int(duration_seconds)))
             audio_bytes = audio.get_raw_data(convert_rate=sample_rate, convert_width=2)
             if audio_bytes:
                 samples = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
@@ -236,17 +270,17 @@ def _resolve_face_auth_reference() -> Path:
     return Path(__file__).resolve().parent.parent / "auth_reference.jpg"
 
 
-def _verify_reference_face_match() -> bool:
+def _verify_reference_face_match() -> tuple[bool, str]:
     ref_path = _resolve_face_auth_reference()
     if not ref_path.exists():
-        return False
+        return False, f"reference-missing:{ref_path}"
     try:
         from auth import verify_face
 
-        ok, _reason = verify_face(str(ref_path))
-        return bool(ok)
-    except Exception:
-        return False
+        ok, reason = verify_face(str(ref_path))
+        return bool(ok), str(reason or "")
+    except Exception as exc:
+        return False, f"verify-error:{exc}"
 
 
 def _verify_live_voice_with_gemini(audio_bytes: bytes, target_identity: str) -> bool:
@@ -402,7 +436,10 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
                 baseline_audio = b""
             voice_detected = _voice_matches_baseline(audio_bytes, baseline_audio)
 
-    reference_face_match = _verify_reference_face_match() if voice_detected else False
+    reference_face_match = False
+    reference_face_reason = "voice-not-detected"
+    if voice_detected:
+        reference_face_match, reference_face_reason = _verify_reference_face_match()
 
     # Prefer live face detector when available; allow strong reference-photo match fallback for OpenCV builds
     # that do not expose reliable cascade detection on this platform.
@@ -424,10 +461,12 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
         "voice_detected": voice_detected,
         "visual_detected": visual_detected,
         "reference_face_match": reference_face_match,
+        "reference_face_reason": reference_face_reason,
         "identity_match": identity_match,
         "voice_energy": voice_energy,
         "face_detected": face_detected,
         "profile_name": primary.get("name") or identity_name,
+        "biometric_debug": _BIOMETRIC_DEBUG,
     }
 
 
