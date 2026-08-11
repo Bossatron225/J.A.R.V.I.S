@@ -1477,10 +1477,6 @@ class ManageProfilesOverlay(QWidget):
         except Exception:
             pass
         self._camera_cap = None
-        try:
-            self._preview_placeholder.setPixmap(QPixmap())
-        except Exception:
-            pass
 
     def _load_profiles(self):
         profiles_data = get_authorized_profiles()
