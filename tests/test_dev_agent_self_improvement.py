@@ -95,3 +95,12 @@ def test_apply_queued_self_improvement_uses_single_pending_plan_for_unknown_id(m
     assert calls["generate"] is True
     assert calls["sandbox"] is True
     assert "Applied approved self-improvement plan" in result
+
+
+def test_default_biometric_profile_uses_james_lumsden(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(dev_agent_module, "BIOMETRIC_PROFILE_PATH", tmp_path / "biometric_profiles.json")
+
+    result = dev_agent_module._manage_biometric_profile("status", "", "", 0, "", "")
+
+    assert "James Lumsden" in result
+    assert "Tony Stark" not in result
