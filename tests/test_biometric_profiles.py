@@ -166,3 +166,24 @@ def test_jarvis_live_blocks_text_commands_during_biometric_lock(monkeypatch) -> 
     live._on_text_command("hello")
 
     assert sent == []
+
+
+def test_jarvis_live_handles_biometric_failure(monkeypatch) -> None:
+    class DummyUI:
+        def __init__(self) -> None:
+            self.muted = False
+
+        def set_state(self, *_args, **_kwargs) -> None:
+            return None
+
+        def write_log(self, *_args, **_kwargs) -> None:
+            return None
+
+    ui = DummyUI()
+    live = main_module.JarvisLive(ui)
+    shutdown_reasons = []
+    monkeypatch.setattr(live, "_schedule_shutdown", lambda reason: shutdown_reasons.append(reason) or True)
+
+    live._handle_biometric_failure()
+
+    assert shutdown_reasons == ["biometric verification failed"]
