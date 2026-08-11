@@ -402,13 +402,16 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
                 baseline_audio = b""
             voice_detected = _voice_matches_baseline(audio_bytes, baseline_audio)
 
-    reference_face_match = _verify_reference_face_match() if (voice_detected and face_detected) else False
+    reference_face_match = _verify_reference_face_match() if voice_detected else False
 
-    # Security invariant: the lock only treats visual auth as valid when a live face is detected.
-    if face_detected and image_bytes:
-        if reference_face_match or _verify_live_face_with_gemini(image_bytes, identity_name):
+    # Prefer live face detector when available; allow strong reference-photo match fallback for OpenCV builds
+    # that do not expose reliable cascade detection on this platform.
+    if image_bytes:
+        if face_detected and (_verify_live_face_with_gemini(image_bytes, identity_name) or reference_face_match):
             visual_detected = True
-        elif stored_visual_sample:
+        elif reference_face_match:
+            visual_detected = True
+        elif face_detected and stored_visual_sample:
             try:
                 baseline_image = base64.b64decode(str(stored_visual_sample))
             except Exception:

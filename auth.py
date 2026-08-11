@@ -67,10 +67,10 @@ def _similarity_metrics(reference_face, live_face):
 
 
 def _is_face_match(corr: float, mse: float) -> bool:
-    # Two gates: one for strongly correlated frames, one for lower-contrast but close-looking frames.
-    strong_match = corr >= 0.45 and mse <= 0.18
-    soft_match = corr >= 0.14 and mse <= 0.15
-    return bool(strong_match or soft_match)
+    # Calibrated gates: reject low-correlation accidental matches while allowing lighting variance.
+    strong_match = corr >= 0.36 and mse <= 0.17
+    balanced_match = corr >= 0.24 and mse <= 0.13
+    return bool(strong_match or balanced_match)
 
 
 def verify_face(reference_image: str | os.PathLike[str] | None = None, camera_index: int = 0) -> Tuple[bool, str]:
