@@ -1232,6 +1232,7 @@ class JarvisLive:
         self.ui.on_remote_clicked = self._make_remote_key
         self.ui.on_remote_url_clicked = self._get_live_remote_url
         self.ui.on_interrupt      = self.interrupt
+        self.ui.on_biometric_failure = self._handle_biometric_failure
         self._turn_done_event: asyncio.Event | None = None
         self._dashboard     = None
         self._briefing_sent    = False          # morning briefing fires once per process
@@ -2390,6 +2391,10 @@ class JarvisLive:
         short = str(error)[:120]
         self.ui.write_log(f"ERR: {tool_name} — {short}")
         self.speak(f"Sir, {tool_name} encountered an error. {short}")
+
+    def _handle_biometric_failure(self) -> None:
+        self.ui.write_log("SYS: Biometric verification failed — initiating fail-closed shutdown.")
+        self._schedule_shutdown("biometric verification failed")
 
     def _build_config(self) -> types.LiveConnectConfig:
         from datetime import datetime
