@@ -386,7 +386,6 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
 
     audio_bytes, voice_energy = _record_voice_sample()
     image_bytes, face_detected = _capture_live_visual_frame()
-    reference_face_match = _verify_reference_face_match()
 
     stored_voice_sample = primary.get("voice_sample")
     stored_visual_sample = primary.get("visual_sample")
@@ -402,6 +401,8 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
             except Exception:
                 baseline_audio = b""
             voice_detected = _voice_matches_baseline(audio_bytes, baseline_audio)
+
+    reference_face_match = _verify_reference_face_match() if voice_detected else False
 
     if face_detected or image_bytes:
         if reference_face_match or face_detected or _verify_live_face_with_gemini(image_bytes, identity_name):
