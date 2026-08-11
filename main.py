@@ -51,6 +51,7 @@ from pathlib import Path
 from functools import lru_cache
 
 import sounddevice as sd
+import speech_recognition as sr
 from google import genai
 from google.genai import types
 from ui import JarvisUI
@@ -3026,6 +3027,40 @@ class JarvisLive:
                 self._on_text_command(text)
                 break
 
+    def _start_speech_listener(self) -> None:
+        if self._speech_listener_running:
+            return
+        try:
+            self._speech_recognizer = sr.Recognizer()
+            self._speech_recognizer.energy_threshold = 400
+            self._speech_recognizer.dynamic_energy_threshold = True
+            self._speech_recognizer.pause_threshold = 0.8
+            self._speech_mic = sr.Microphone()
+            self._speech_recognizer.listen_in_background(
+                self._speech_mic,
+                self._handle_speech_callback,
+                phrase_time_limit=3,
+            )
+            self._speech_listener_running = True
+            self.ui.write_log("SYS: Speech listener ready.")
+        except Exception as exc:
+            self.ui.write_log(f"SYS: Speech listener unavailable ({exc})")
+
+    def _handle_speech_callback(self, recognizer: sr.Recognizer, audio: sr.AudioData) -> None:
+        try:
+            text = recognizer.recognize_google(audio, language="en-US")
+        except (sr.UnknownValueError, sr.RequestError, Exception):
+            return
+
+        normalized = re.sub(r"\s+", " ", text.lower()).strip()
+        if not normalized:
+            return
+        self.ui.write_log(f"SYS: Heard speech: {text}")
+        for wake_phrase in self._wake_phrases:
+            if normalized == wake_phrase or normalized.startswith(wake_phrase + " ") or normalized.endswith(" " + wake_phrase) or wake_phrase in normalized:
+                self._on_text_command(text)
+                break
+
     async def _listen_audio(self):
         print("[JARVIS] 🎤 Mic started")
         loop = asyncio.get_event_loop()
@@ -3999,6 +4034,7 @@ class JarvisLive:
                                 tg.create_task(self._tts_worker())
                             tg.create_task(self._send_realtime())
                             tg.create_task(self._listen_audio())
+                            self._start_speech_listener()
                             self._start_speech_listener()
                             tg.create_task(self._receive_audio())
                             if not self._tts_player:
