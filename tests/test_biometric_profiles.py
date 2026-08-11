@@ -47,6 +47,13 @@ def test_verify_biometric_security_matches_enrolled_profile(monkeypatch) -> None
     assert file_controller_module.verify_biometric_security("", "visual scan of james lumsden face") is True
 
 
+def test_default_profile_registry_contains_only_primary_profile() -> None:
+    profiles = file_controller_module.get_authorized_profiles()
+
+    assert profiles["primary"]["name"] == "James Lumsden"
+    assert profiles["authorized"] == {}
+
+
 def test_manage_profiles_overlay_uses_profile_file_defaults(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr("ui.PROFILES_FILE", tmp_path / "authorized_profiles.json")
     monkeypatch.setattr("ui.CONFIG_DIR", tmp_path)
