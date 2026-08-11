@@ -72,7 +72,8 @@ def test_biometric_lock_overlay_does_not_clear_on_failed_verification(monkeypatc
     monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", {"james", "james lumsden"})
     file_controller_module.verify_biometric_security.cache_clear()
 
-    overlay = ui_module.BiometricLockOverlay(parent=None)
+    parent = ui_module.QWidget()
+    overlay = ui_module.BiometricLockOverlay(parent=parent)
     if not getattr(overlay, "_qt_ready", False):
         return
 
