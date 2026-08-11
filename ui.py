@@ -1406,7 +1406,7 @@ class ManageProfilesOverlay(QWidget):
         if self._camera_cap is not None:
             return
         try:
-            if not self.isVisible():
+            if not self.isVisible() or (self.parent() is not None and not self.parent().isVisible()):
                 return
         except RuntimeError:
             return
@@ -1424,7 +1424,7 @@ class ManageProfilesOverlay(QWidget):
         self._camera_cap = cap
         try:
             if self._preview_timer is None:
-                self._preview_timer = QTimer()
+                self._preview_timer = QTimer(self)
                 self._preview_timer.timeout.connect(self._refresh_camera_preview)
                 self._preview_timer.setInterval(180)
             self._preview_timer.start()
