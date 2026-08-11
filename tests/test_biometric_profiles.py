@@ -158,7 +158,7 @@ def test_live_biometric_helper_rejects_when_no_live_face(monkeypatch) -> None:
     monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", {"james", "james lumsden"})
     monkeypatch.setattr(file_controller_module, "_record_voice_sample", lambda *args, **kwargs: (b"audio-sample", 0.002))
     monkeypatch.setattr(file_controller_module, "_capture_live_visual_frame", lambda *args, **kwargs: (b"frame", False))
-    monkeypatch.setattr(file_controller_module, "_verify_reference_face_match", lambda: True)
+    monkeypatch.setattr(file_controller_module, "_verify_reference_face_match", lambda: False)
 
     granted, details = file_controller_module.evaluate_live_biometric_security("James Lumsden")
 
