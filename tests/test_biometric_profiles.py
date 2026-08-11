@@ -44,3 +44,14 @@ def test_verify_biometric_security_matches_enrolled_profile(monkeypatch) -> None
 
     assert file_controller_module.verify_biometric_security("voice sample for james lumsden", "") is True
     assert file_controller_module.verify_biometric_security("", "visual scan of james lumsden face") is True
+
+
+def test_manage_profiles_overlay_uses_profile_file_defaults(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr("ui.PROFILES_FILE", tmp_path / "authorized_profiles.json")
+    monkeypatch.setattr("ui.CONFIG_DIR", tmp_path)
+
+    overlay = ManageProfilesOverlay(parent=None)
+    profiles = overlay._get_profiles()
+
+    assert profiles[0]["name"] == "James Lumsden"
+    assert profiles[0]["id"] == "JAMES-001"
