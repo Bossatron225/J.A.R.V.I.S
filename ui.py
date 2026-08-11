@@ -1575,8 +1575,11 @@ class ManageProfilesOverlay(QWidget):
         self._safe_set_widget_stylesheet(self._setup_status, f"color: {C.GREEN}; background: transparent;")
         self._safe_set_widget_text(self._setup_countdown_label, "Baseline captured")
         self._set_capture_state("ready")
-        self._confirm_btn.setText("CONFIRM BASELINE")
-        self._confirm_btn.show()
+        try:
+            self._confirm_btn.setText("CONFIRM BASELINE")
+            self._confirm_btn.show()
+        except RuntimeError:
+            pass
 
     def _confirm_baseline(self) -> None:
         self._confirm_btn.hide()
