@@ -1335,6 +1335,7 @@ class ManageProfilesOverlay(QWidget):
         self._camera_cap = None
         self._preview_timer = None
         self._capture_state_text = "WAITING"
+        self._setup_name = ""
 
         self._speak_indicator = QLabel("● WAITING")
         self._speak_indicator.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
@@ -1556,44 +1557,50 @@ class ManageProfilesOverlay(QWidget):
         self._load_profiles()
 
     def _set_capture_state(self, state: str) -> None:
-        if state == "recording":
-            self._capture_state_text = "● SPEAK NOW"
-            self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
-            self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.ACC2}; background: transparent;")
-            self._safe_set_widget_text(self._preview_placeholder, "Camera preview active. Keep your face centered while speaking.")
-            self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.TEXT}; background: transparent;")
-            self._start_camera_preview()
-        elif state == "ready":
-            self._capture_state_text = "● READY"
-            self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
-            self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.GREEN}; background: transparent;")
-            self._safe_set_widget_text(self._preview_placeholder, "Capture complete. Review the baseline and confirm if it looks right.")
-            self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.GREEN}; background: transparent;")
-            self._stop_camera_preview()
-        else:
-            self._capture_state_text = "● WAITING"
-            self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
-            self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.TEXT_MED}; background: transparent;")
-            self._safe_set_widget_text(self._preview_placeholder, "Camera preview will appear here while the baseline is being captured.")
-            self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.TEXT_DIM}; background: transparent;")
-            self._stop_camera_preview()
+        try:
+            if state == "recording":
+                self._capture_state_text = "● SPEAK NOW"
+                self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
+                self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.ACC2}; background: transparent;")
+                self._safe_set_widget_text(self._preview_placeholder, "Camera preview active. Keep your face centered while speaking.")
+                self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.TEXT}; background: transparent;")
+                self._start_camera_preview()
+            elif state == "ready":
+                self._capture_state_text = "● READY"
+                self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
+                self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.GREEN}; background: transparent;")
+                self._safe_set_widget_text(self._preview_placeholder, "Capture complete. Review the baseline and confirm if it looks right.")
+                self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.GREEN}; background: transparent;")
+                self._stop_camera_preview()
+            else:
+                self._capture_state_text = "● WAITING"
+                self._safe_set_widget_text(self._speak_indicator, self._capture_state_text)
+                self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.TEXT_MED}; background: transparent;")
+                self._safe_set_widget_text(self._preview_placeholder, "Camera preview will appear here while the baseline is being captured.")
+                self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.TEXT_DIM}; background: transparent;")
+                self._stop_camera_preview()
+        except RuntimeError:
+            pass
 
     def _show_capture_confirmation(self, message: str) -> None:
-        identity = self._setup_name or get_authorized_profiles().get("primary", {}).get("name") or "James Lumsden"
-        granted, details = evaluate_live_biometric_security(identity)
-        summary = message
-        if granted:
-            summary = f"{message}\nLive baseline verified against the stored profile."
-        else:
-            summary = f"{message}\nLive verification incomplete; camera or microphone access may need to be allowed."
-
-        self._safe_set_widget_text(self._setup_status, summary)
-        self._safe_set_widget_stylesheet(self._setup_status, f"color: {C.GREEN if granted else C.ACC2}; background: transparent;")
-        self._safe_set_widget_text(self._setup_countdown_label, "Baseline captured" if granted else "Verification pending")
-        self._set_capture_state("ready")
         try:
-            self._confirm_btn.setText("CONFIRM BASELINE")
-            self._confirm_btn.show()
+            identity = self._setup_name or get_authorized_profiles().get("primary", {}).get("name") or "James Lumsden"
+            granted, _ = evaluate_live_biometric_security(identity)
+            summary = message
+            if granted:
+                summary = f"{message}\nLive baseline verified against the stored profile."
+            else:
+                summary = f"{message}\nLive verification incomplete; camera or microphone access may need to be allowed."
+
+            self._safe_set_widget_text(self._setup_status, summary)
+            self._safe_set_widget_stylesheet(self._setup_status, f"color: {C.GREEN if granted else C.ACC2}; background: transparent;")
+            self._safe_set_widget_text(self._setup_countdown_label, "Baseline captured" if granted else "Verification pending")
+            self._set_capture_state("ready")
+            try:
+                self._confirm_btn.setText("CONFIRM BASELINE")
+                self._confirm_btn.show()
+            except RuntimeError:
+                pass
         except RuntimeError:
             pass
 
