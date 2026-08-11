@@ -1,4 +1,5 @@
 from actions import file_controller as file_controller_module
+import ui as ui_module
 from ui import ManageProfilesOverlay
 
 
