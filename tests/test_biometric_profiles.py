@@ -135,13 +135,36 @@ def test_live_biometric_helper_accepts_live_capture_for_matching_identity(monkey
     })
     monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", {"james", "james lumsden"})
     monkeypatch.setattr(file_controller_module, "_record_voice_sample", lambda *args, **kwargs: (b"audio-sample", 0.001))
-    monkeypatch.setattr(file_controller_module, "_capture_live_visual_frame", lambda *args, **kwargs: (b"frame", False))
+    monkeypatch.setattr(file_controller_module, "_capture_live_visual_frame", lambda *args, **kwargs: (b"frame", True))
+    monkeypatch.setattr(file_controller_module, "_verify_reference_face_match", lambda: True)
 
     granted, details = file_controller_module.evaluate_live_biometric_security("James Lumsden")
 
     assert granted is True
     assert details["voice_detected"] is True
     assert details["visual_detected"] is True
+
+
+def test_live_biometric_helper_rejects_when_no_live_face(monkeypatch) -> None:
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PROFILES", {
+        "primary": {
+            "name": "James Lumsden",
+            "voice_prints": ["james lumsden"],
+            "visual_signatures": ["james lumsden"],
+            "clearance_level": "omega",
+        },
+        "authorized": {},
+    })
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", {"james", "james lumsden"})
+    monkeypatch.setattr(file_controller_module, "_record_voice_sample", lambda *args, **kwargs: (b"audio-sample", 0.002))
+    monkeypatch.setattr(file_controller_module, "_capture_live_visual_frame", lambda *args, **kwargs: (b"frame", False))
+    monkeypatch.setattr(file_controller_module, "_verify_reference_face_match", lambda: True)
+
+    granted, details = file_controller_module.evaluate_live_biometric_security("James Lumsden")
+
+    assert granted is False
+    assert details["voice_detected"] is True
+    assert details["visual_detected"] is False
 
 
 def test_record_voice_sample_uses_speech_recognition_fallback(monkeypatch) -> None:
