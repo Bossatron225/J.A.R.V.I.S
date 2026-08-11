@@ -334,7 +334,10 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
         *(str(token).strip().lower() for token in (primary.get("voice_prints") or []) if str(token).strip()),
         *(str(token).strip().lower() for token in (primary.get("visual_signatures") or []) if str(token).strip()),
     }
-    identity_match = any(token and token in identity_name.lower() for token in profile_tokens)
+    identity_match = bool(identity_name.strip()) and any(
+        token and (token in identity_name.lower() or identity_name.lower() in token)
+        for token in profile_tokens
+    )
 
     audio_bytes, voice_energy = _record_voice_sample()
     image_bytes, face_detected = _capture_live_visual_frame()
