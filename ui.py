@@ -1416,11 +1416,11 @@ class ManageProfilesOverlay(QWidget):
             cap.release()
             return
         self._camera_cap = cap
-        if self._preview_timer is None:
-            self._preview_timer = QTimer(self)
-            self._preview_timer.timeout.connect(self._refresh_camera_preview)
-            self._preview_timer.setInterval(180)
         try:
+            if self._preview_timer is None:
+                self._preview_timer = QTimer()
+                self._preview_timer.timeout.connect(self._refresh_camera_preview)
+                self._preview_timer.setInterval(180)
             self._preview_timer.start()
         except RuntimeError:
             self._stop_camera_preview()
