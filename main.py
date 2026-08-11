@@ -79,7 +79,12 @@ from actions.screen_processor  import _capture_targeted_visual
 from actions.youtube_video     import youtube_video
 from actions.desktop           import desktop_control
 from actions.browser_control   import browser_control
-from actions.file_controller   import file_controller
+from actions.file_controller   import (
+    file_controller,
+    enroll_biometric_profile,
+    get_authorized_profiles,
+    verify_biometric_security,
+)
 from actions.code_helper       import code_helper
 from actions.dev_agent         import dev_agent
 from actions.dev_agent         import REBOOT_MARKER
@@ -1166,11 +1171,35 @@ TOOL_DECLARATIONS = [
             "properties": {
                 "action": {
                     "type": "STRING",
-                    "description": "verify_voice | detect_person | calibrate | status"
+                    "description": "verify_voice | detect_person | enroll | calibrate | status"
                 },
                 "target_identity": {
                     "type": "STRING",
                     "description": "Expected identity to match (e.g. 'James Lumsden', 'Authorized User')"
+                },
+                "name": {
+                    "type": "STRING",
+                    "description": "Display name to enroll or verify"
+                },
+                "voice_print": {
+                    "type": "STRING",
+                    "description": "Voice sample text or signature to enroll or verify"
+                },
+                "visual_signature": {
+                    "type": "STRING",
+                    "description": "Visual signature text or descriptor to enroll or verify"
+                },
+                "profile_id": {
+                    "type": "STRING",
+                    "description": "Identifier for the enrolled profile"
+                },
+                "make_primary": {
+                    "type": "BOOLEAN",
+                    "description": "Whether the new profile should become the primary profile"
+                },
+                "clearance_level": {
+                    "type": "STRING",
+                    "description": "Security clearance level (e.g. omega, alpha)"
                 }
             },
             "required": ["action"]
@@ -2819,16 +2848,47 @@ class JarvisLive:
                 result = "Shutting down JARVIS."
 
             elif name == "security_biometrics":
-                action = str(args.get("action", "verify_voice")).strip().lower()
+                action = str(args.get("action", "status")).strip().lower()
                 target_identity = str(args.get("target_identity", "James Lumsden")).strip()
-                if action == "detect_person":
-                    result = f"Visual Person Detection protocol executed: Person identified as authorized user ({target_identity}). Security clearance verified."
+
+                if action == "enroll":
+                    profile_name = str(args.get("name") or target_identity or "James Lumsden").strip()
+                    profile_id = str(args.get("profile_id") or profile_name.lower().replace(" ", "_")).strip()
+                    voice_text = str(args.get("voice_print") or target_identity or profile_name).strip()
+                    visual_text = str(args.get("visual_signature") or target_identity or profile_name).strip()
+                    make_primary = bool(args.get("make_primary", True))
+                    clearance = str(args.get("clearance_level") or "omega").strip()
+                    result = enroll_biometric_profile(
+                        profile_id=profile_id,
+                        name=profile_name,
+                        voice_print=voice_text,
+                        visual_signature=visual_text,
+                        clearance_level=clearance,
+                        make_primary=make_primary,
+                    )
+                elif action == "detect_person":
+                    visual_text = str(args.get("visual_signature") or target_identity or "").strip()
+                    ok = verify_biometric_security("", visual_text)
+                    result = (
+                        f"Visual Person Detection protocol executed: Person identified as authorized user ({target_identity}). Security clearance verified."
+                        if ok else
+                        f"Visual Person Detection protocol executed: No matching visual profile was found for {target_identity}."
+                    )
                 elif action == "verify_voice":
-                    result = f"Voice Recognition protocol executed: Voiceprint matched with 99.8% confidence for {target_identity}. Access granted."
+                    voice_text = str(args.get("voice_print") or target_identity or "").strip()
+                    ok = verify_biometric_security(voice_text, "")
+                    result = (
+                        f"Voice Recognition protocol executed: Voiceprint matched for {target_identity}. Access granted."
+                        if ok else
+                        f"Voice Recognition protocol executed: No matching voice profile was found for {target_identity}."
+                    )
                 elif action == "calibrate":
                     result = "Biometric sensors calibrated successfully. Voice print and visual model updated."
                 else:
-                    result = f"Security protocol status: Biometrics online. Monitoring active for {target_identity}."
+                    profiles = get_authorized_profiles()
+                    primary = profiles.get("primary") or {}
+                    primary_name = str(primary.get("name") or target_identity or "James Lumsden").strip()
+                    result = f"Security protocol status: Biometrics online. Primary profile: {primary_name}."
 
             else:
                 result = f"Unknown tool: {name}"
