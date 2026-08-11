@@ -66,6 +66,13 @@ def _similarity_metrics(reference_face, live_face):
     return float(corr), mse
 
 
+def _is_face_match(corr: float, mse: float) -> bool:
+    # Two gates: one for strongly correlated frames, one for lower-contrast but close-looking frames.
+    strong_match = corr >= 0.45 and mse <= 0.18
+    soft_match = corr >= 0.14 and mse <= 0.15
+    return bool(strong_match or soft_match)
+
+
 def verify_face(reference_image: str | os.PathLike[str] | None = None, camera_index: int = 0) -> Tuple[bool, str]:
     """Capture a frame from the default webcam and compare it to a reference image."""
     ref_path = Path(reference_image or "auth_reference.jpg")
@@ -91,26 +98,34 @@ def verify_face(reference_image: str | os.PathLike[str] | None = None, camera_in
             capture.release()
             return False, "No webcam was available"
 
-        frame = None
-        ok = False
+        frames = []
         # Read a few frames so camera auto-exposure can settle.
-        for _ in range(12):
+        for _ in range(14):
             ok, frame = capture.read()
             if ok and frame is not None:
-                pass
+                frames.append(frame)
         capture.release()
-        if not ok or frame is None:
+        if not frames:
             return False, "Unable to read a frame from the webcam"
 
-        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        live_face = _extract_primary_face(frame_gray, detector)
-        if live_face is None:
-            return False, "No face was detected in the webcam frame"
+        best_corr = -1.0
+        best_mse = 1.0
+        face_seen = False
+        for frame in frames:
+            frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            live_face = _extract_primary_face(frame_gray, detector)
+            if live_face is None:
+                continue
+            face_seen = True
+            corr, mse = _similarity_metrics(reference_face, live_face)
+            if corr > best_corr:
+                best_corr, best_mse = corr, mse
+            if _is_face_match(corr, mse):
+                return True, f"Face verified (corr={corr:.2f}, mse={mse:.3f})"
 
-        corr, mse = _similarity_metrics(reference_face, live_face)
-        if corr >= 0.58 and mse <= 0.15:
-            return True, f"Face verified (corr={corr:.2f}, mse={mse:.3f})"
-        return False, f"Face did not match (corr={corr:.2f}, mse={mse:.3f})"
+        if not face_seen:
+            return False, "No face was detected in the webcam frame"
+        return False, f"Face did not match (best corr={best_corr:.2f}, mse={best_mse:.3f})"
     except Exception as exc:
         return False, f"Face verification failed: {exc}"
 
