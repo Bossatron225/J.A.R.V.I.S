@@ -56,7 +56,7 @@ def _load_biometric_profiles() -> dict:
     # Initialize default primary user profile if none exists
     default_profiles = {
         "primary_user": {
-            "name": "Tony Stark",
+            "name": "James Lumsden",
             "role": "Administrator",
             "voice_signature_hash": "default_primary_voice_hash",
             "visual_signature_hash": "default_primary_visual_hash",

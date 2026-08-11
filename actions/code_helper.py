@@ -146,17 +146,17 @@ def _load_security_profiles() -> dict:
 
     default_data = {
         "primary_profile": {
-            "name": "Tony Stark",
+            "name": "James Lumsden",
             "clearance": "Alpha-Level",
-            "descriptors": "Tony Stark, adult male, brown hair, goatee, Stark Industries CEO, primary system architect",
-            "voice_signature_notes": "Calm, confident, American accent, barytone range"
+            "descriptors": "James Lumsden, primary system owner, adult male, software-focused personal profile",
+            "voice_signature_notes": "Calm, confident, personal baseline"
         },
         "profiles": {
-            "tony_stark": {
-                "name": "Tony Stark",
+            "james_lumsden": {
+                "name": "James Lumsden",
                 "clearance": "Alpha-Level",
-                "descriptors": "Tony Stark, adult male, brown hair, goatee, Stark Industries CEO, primary system architect",
-                "voice_signature_notes": "Calm, confident, American accent, barytone range"
+                "descriptors": "James Lumsden, primary system owner, adult male, software-focused personal profile",
+                "voice_signature_notes": "Calm, confident, personal baseline"
             }
         }
     }
@@ -181,12 +181,12 @@ def manage_security_profile(action: str, profile_id: str = "", name: str = "", c
 
     if action == "setup_primary":
         if not name:
-            name = "Tony Stark"
-        primary_id = profile_id or "tony_stark"
+            name = "James Lumsden"
+        primary_id = profile_id or "james_lumsden"
         new_profile = {
             "name": name,
             "clearance": clearance or "Alpha-Level",
-            "descriptors": descriptors or "Tony Stark, primary system architect, adult male",
+            "descriptors": descriptors or "James Lumsden, primary system owner, adult male",
             "voice_signature_notes": voice_notes or "Primary biometric baseline"
         }
         profiles[primary_id] = new_profile
@@ -253,7 +253,7 @@ def verify_security_biometrics(voice_sample_path: str = None) -> tuple[bool, str
     for pid, p in profiles.items():
         profile_descriptions.append(f"Profile ID: {pid}, Name: {p.get('name')}, Clearance: {p.get('clearance')}, Visual/Physical Descriptors: {p.get('descriptors')}, Voice Profile Notes: {p.get('voice_signature_notes')}")
     
-    profiles_context = "\n".join(profile_descriptions) if profile_descriptions else f"Primary User: {primary.get('name', 'Tony Stark')} ({primary.get('descriptors', 'Primary Architect')})"
+    profiles_context = "\n".join(profile_descriptions) if profile_descriptions else f"Primary User: {primary.get('name', 'James Lumsden')} ({primary.get('descriptors', 'Primary Owner')})"
 
     screenshot_path = _take_screenshot()
     if not screenshot_path:

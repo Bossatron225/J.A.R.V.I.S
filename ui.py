@@ -1202,7 +1202,7 @@ class ManageProfilesOverlay(QWidget):
         form_row = QHBoxLayout()
         form_row.setSpacing(6)
         self._new_name_input = QLineEdit()
-        self._new_name_input.setPlaceholderText("Profile Name (e.g. Tony Stark)")
+        self._new_name_input.setPlaceholderText("Profile Name (e.g. James Lumsden)")
         self._new_name_input.setFont(QFont("Courier New", 8))
         self._new_name_input.setFixedHeight(30)
         self._new_name_input.setStyleSheet(f"""
@@ -1263,7 +1263,7 @@ class ManageProfilesOverlay(QWidget):
         except Exception:
             pass
         # Default primary profile
-        default_prof = [{"name": "Tony Stark", "id": "STARK-001", "voice_signature": "verified", "visual_signature": "verified"}]
+        default_prof = [{"name": "James Lumsden", "id": "JAMES-001", "voice_signature": "verified", "visual_signature": "verified"}]
         os.makedirs(CONFIG_DIR, exist_ok=True)
         PROFILES_FILE.write_text(json.dumps(default_prof, indent=4), encoding="utf-8")
         return default_prof
@@ -1329,7 +1329,7 @@ class BiometricLockOverlay(QWidget):
         sep.setStyleSheet(f"color: {C.BORDER}; margin: 4px 0;")
         lay.addWidget(sep)
 
-        self._profile_lbl = QLabel("PRIMARY PROFILE: Tony Stark (STARK-001)")
+        self._profile_lbl = QLabel("PRIMARY PROFILE: James Lumsden (JAMES-001)")
         self._profile_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         self._profile_lbl.setStyleSheet(f"color: {C.PRI}; background: transparent;")
         self._profile_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
