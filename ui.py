@@ -157,12 +157,15 @@ def current_palette() -> dict[str, str]:
     return {k: getattr(C, k) for k in _HUE_LINKED}
 
 
-def _ensure_qapplication() -> QApplication:
+def _ensure_qapplication() -> QApplication | None:
     app = QApplication.instance()
     if app is None:
         if os.environ.get("QT_QPA_PLATFORM") is None and os.environ.get("DISPLAY") is None and platform.system() != "Windows":
             os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-        app = QApplication([sys.argv[0]])
+        try:
+            app = QApplication([])
+        except Exception:
+            return None
     return app
 
 
@@ -4068,6 +4071,10 @@ class _RootShim:
 class JarvisUI:
     def __init__(self, face_path: str, size=None):
         self._app = _ensure_qapplication()
+        if self._app is None:
+            self._window_alive = False
+            self._win = None
+            return
         self._app.setStyle("Fusion")
         self._win = MainWindow(face_path)
         self._window_alive = True
