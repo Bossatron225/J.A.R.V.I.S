@@ -64,22 +64,17 @@
   "sessions": [
     {
       "date": "2026-08-11",
-      "summary": "James reviewed headlines regarding extreme heat, opened and minimized Safari, and scheduled a reminder for August 12th.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-11",
-      "summary": "James reviewed current news headlines—including updates on Meta AI, extreme heat, and an earthquake in Colombia—and received a notification about an Amazon sign-in email.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-11",
       "summary": "James received a morning news briefing from JARVIS covering current events and sports, and they discussed the AI's memory architecture and Obsidian vault integration.",
       "language": "English"
     },
     {
       "date": "2026-08-11",
       "summary": "James reviewed today's news headlines, including a major earthquake in Colombia, and successfully accessed the contents of his Obsidian memory vault to review his personal preferences, projects, and system protocols.",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-11",
+      "summary": "James reviewed daily news headlines, received a promotional email, and discussed pending self-improvement proposals for upgrading JARVIS's security and system performance.",
       "language": "English"
     }
   ],
