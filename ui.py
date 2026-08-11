@@ -17,6 +17,9 @@ import functools
 
 import psutil
 
+if os.environ.get("QT_QPA_PLATFORM") is None and os.environ.get("DISPLAY") is None and platform.system() != "Windows":
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 
 if platform.system() == "Windows":
     _WIN_HIDE: dict = {"creationflags": subprocess.CREATE_NO_WINDOW}
