@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 
 from actions import file_controller as file_controller_module
@@ -215,3 +216,30 @@ def test_schedule_shutdown_without_running_loop(monkeypatch) -> None:
 
     assert result is True
     assert called
+
+
+def test_audio_callbacks_are_blocked_during_biometric_lock() -> None:
+    class DummyUI:
+        def __init__(self) -> None:
+            self.muted = False
+            self._biometric_lock_active = True
+
+        def set_state(self, *_args, **_kwargs) -> None:
+            return None
+
+        def write_log(self, *_args, **_kwargs) -> None:
+            return None
+
+        def is_biometric_lock_active(self) -> bool:
+            return self._biometric_lock_active
+
+    ui = DummyUI()
+    live = main_module.JarvisLive(ui)
+    live.out_queue = asyncio.Queue()
+    live.audio_in_queue = asyncio.Queue()
+
+    live._enqueue_outgoing_audio(b"abc")
+    asyncio.run(live._enqueue_incoming_audio(b"def"))
+
+    assert live.out_queue.empty()
+    assert live.audio_in_queue.empty()
