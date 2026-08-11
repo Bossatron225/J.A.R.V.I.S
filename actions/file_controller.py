@@ -1,3 +1,4 @@
+import base64
 import io
 import json
 import os
@@ -290,6 +291,30 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
         "face_detected": face_detected,
         "profile_name": primary.get("name") or identity_name,
     }
+
+
+def establish_biometric_baseline(name: str = "James Lumsden") -> tuple[bool, str]:
+    """Capture a live voice sample and face frame to establish the official biometric baseline."""
+    audio_bytes, voice_energy = _record_voice_sample(duration_seconds=1.6)
+    image_bytes, face_detected = _capture_live_visual_frame()
+    if not audio_bytes and not image_bytes:
+        return False, "Unable to capture microphone or camera input."
+
+    profile_name = (name or "James Lumsden").strip() or "James Lumsden"
+    enroll_biometric_profile(
+        profile_id=profile_name.lower().replace(" ", "_"),
+        name=profile_name,
+        voice_print=profile_name,
+        visual_signature=profile_name,
+        clearance_level="omega",
+        make_primary=True,
+        voice_sample=audio_bytes if audio_bytes else None,
+        visual_sample=image_bytes if image_bytes else None,
+    )
+    return True, (
+        f"Baseline established for {profile_name}. "
+        f"Voice sample captured={'yes' if audio_bytes else 'no'}; face sample captured={'yes' if image_bytes else 'no'}."
+    )
 
 
 @lru_cache(maxsize=32)

@@ -43,6 +43,7 @@ from PyQt6.QtWidgets import (
 
 from actions.file_controller import (
     enroll_biometric_profile,
+    establish_biometric_baseline,
     evaluate_live_biometric_security,
     get_authorized_profiles,
     verify_biometric_security,
@@ -1294,6 +1295,26 @@ class ManageProfilesOverlay(QWidget):
         """)
         lay.addWidget(self._visual_input)
 
+        self._setup_status = QLabel("Setup: use the button below to capture your live voice and face baseline.")
+        self._setup_status.setFont(QFont("Courier New", 8))
+        self._setup_status.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
+        self._setup_status.setWordWrap(True)
+        lay.addWidget(self._setup_status)
+
+        setup_btn = QPushButton("ESTABLISH LIVE BASELINE")
+        setup_btn.setFixedHeight(34)
+        setup_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        setup_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        setup_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.PANEL2}; color: {C.ACC2};
+                border: 1px solid {C.ACC2}; border-radius: 4px;
+            }}
+            QPushButton:hover {{ background: #241900; }}
+        """)
+        setup_btn.clicked.connect(self._establish_baseline)
+        lay.addWidget(setup_btn)
+
         close_btn = QPushButton("CLOSE")
         close_btn.setFixedHeight(34)
         close_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
@@ -1378,6 +1399,16 @@ class ManageProfilesOverlay(QWidget):
         self._voice_input.clear()
         self._visual_input.clear()
         self._load_profiles()
+
+    def _establish_baseline(self):
+        name = self._new_name_input.text().strip() or get_authorized_profiles().get("primary", {}).get("name") or "James Lumsden"
+        ok, message = establish_biometric_baseline(name=name)
+        self._setup_status.setText(message)
+        self._setup_status.setStyleSheet(
+            f"color: {C.GREEN if ok else C.RED}; background: transparent;"
+        )
+        if ok:
+            self._load_profiles()
 
 
 class BiometricLockOverlay(QWidget):
