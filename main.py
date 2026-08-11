@@ -1279,6 +1279,10 @@ class JarvisLive:
         self._tts_pending_sentence = ""  # partial sentence awaiting next chunk
         # Per-session tool result cache (avoids redundant API calls for same args)
         self._tool_optimizer = _ToolOptimizer(_CtxMgr(max_context_window=256))
+        self._speech_recognizer: sr.Recognizer | None = None
+        self._speech_mic: sr.Microphone | None = None
+        self._wake_phrases = ["jarvis", "jarvis wake", "wake up jarvis", "hey jarvis"]
+        self._speech_listener_running = False
 
     @staticmethod
     def _load_runtime_config() -> dict:
@@ -2992,6 +2996,36 @@ class JarvisLive:
                 self._audio_diag_inc("speaker_dropped")
                 pass
 
+    def _start_speech_listener(self) -> None:
+        if self._speech_listener_running:
+            return
+        self._speech_listener_running = True
+        self._speech_recognizer = sr.Recognizer()
+        self._speech_recognizer.energy_threshold = 400
+        self._speech_recognizer.dynamic_energy_threshold = True
+        self._speech_recognizer.pause_threshold = 0.8
+        self._speech_mic = sr.Microphone()
+        self._speech_recognizer.listen_in_background(self._speech_mic, self._handle_speech_callback, phrase_time_limit=3)
+
+    def _handle_speech_callback(self, recognizer: sr.Recognizer, audio: sr.AudioData) -> None:
+        try:
+            text = recognizer.recognize_google(audio, language="en-US")
+        except sr.UnknownValueError:
+            return
+        except sr.RequestError:
+            return
+        except Exception:
+            return
+
+        normalized = re.sub(r"\s+", " ", text.lower()).strip()
+        if not normalized:
+            return
+        self.ui.write_log(f"SYS: Heard speech: {text}")
+        for wake_phrase in self._wake_phrases:
+            if normalized == wake_phrase or normalized.startswith(wake_phrase + " ") or normalized.endswith(" " + wake_phrase) or wake_phrase in normalized:
+                self._on_text_command(text)
+                break
+
     async def _listen_audio(self):
         print("[JARVIS] 🎤 Mic started")
         loop = asyncio.get_event_loop()
@@ -3965,6 +3999,7 @@ class JarvisLive:
                                 tg.create_task(self._tts_worker())
                             tg.create_task(self._send_realtime())
                             tg.create_task(self._listen_audio())
+                            self._start_speech_listener()
                             tg.create_task(self._receive_audio())
                             if not self._tts_player:
                                 tg.create_task(self._play_audio())
