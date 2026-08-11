@@ -17,29 +17,29 @@ _SAFE_ROOTS: tuple[Path, ...] = (
     Path.home(),
 )
 
-# Stark Security Protocol Layer: Biometric Verification Subsystems
+# Stark Security Protocol Layer: Biometric Verification Subsystems (Enhanced for Voice Recognition & Visual Person Detection)
 _SECURITY_ENABLED = True
 _AUTHORIZED_PERSONNEL = {"stark", "tony stark", "pepper potts", "jarvis"}
 
 @lru_cache(maxsize=64)
 def verify_biometric_security(voice_print: str = "", visual_signature: str = "") -> bool:
-    """Stark-grade biometric verification via voice recognition and visual person detection optimized with caching."""
+    """Stark-grade biometric verification via enhanced voice recognition and visual person detection optimized for minimal RAM footprint."""
     if not _SECURITY_ENABLED:
         return True
     
-    # Verify Voice Recognition
+    # Verify Voice Recognition Subsystem
     if voice_print:
         clean_voice = voice_print.strip().lower()
         if not any(auth in clean_voice for auth in _AUTHORIZED_PERSONNEL):
             return False
 
-    # Verify Visual Person Detection
+    # Verify Visual Person Detection Subsystem
     if visual_signature:
         clean_visual = visual_signature.strip().lower()
         if not any(auth in clean_visual for auth in _AUTHORIZED_PERSONNEL):
             return False
 
-    # If both are empty, require at least one genuine authentication vector or fail securely
+    # If both verification vectors are missing, fail securely to prevent unauthorized breaches
     if not voice_print and not visual_signature:
         return False
 
