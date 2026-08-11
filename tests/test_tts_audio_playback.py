@@ -123,3 +123,18 @@ def test_play_audio_bytes_ignores_sounddevice_errors(monkeypatch):
     monkeypatch.setattr(tts.sd, "wait", lambda: (_ for _ in ()).throw(RuntimeError("AUHAL")))
 
     tts._play_audio_bytes(b"abc", sample_rate=16000)
+
+
+def test_play_audio_bytes_suppresses_sounddevice_stderr(monkeypatch, capsys):
+    def fake_play(*args, **kwargs):
+        print("||PaMacCore (AUHAL)|| Error", file=sys.stderr)
+        raise RuntimeError("AUHAL")
+
+    monkeypatch.setattr(tts.sd, "play", fake_play)
+    monkeypatch.setattr(tts.sd, "wait", lambda: None)
+
+    tts._play_audio_bytes(b"abc", sample_rate=16000)
+
+    captured = capsys.readouterr()
+    assert "Audio playback failed" in captured.out
+    assert "PaMacCore" not in captured.err
