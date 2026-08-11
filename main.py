@@ -2332,6 +2332,8 @@ class JarvisLive:
         )
 
     def set_speaking(self, value: bool):
+        if getattr(self.ui, "is_biometric_lock_active", lambda: False)():
+            return
         with self._speaking_lock:
             self._is_speaking = value
         if value:
