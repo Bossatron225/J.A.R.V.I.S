@@ -110,3 +110,16 @@ def test_live_biometric_helper_requires_audio_and_face(monkeypatch) -> None:
     assert granted is False
     assert details["voice_detected"] is False
     assert details["visual_detected"] is False
+
+
+def test_manage_profiles_overlay_supports_capture_confirmation(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr("ui.PROFILES_FILE", tmp_path / "authorized_profiles.json")
+    monkeypatch.setattr("ui.CONFIG_DIR", tmp_path)
+
+    overlay = ManageProfilesOverlay(parent=None)
+    overlay._set_capture_state("recording")
+    assert "SPEAK NOW" in overlay._speak_indicator.text()
+
+    overlay._show_capture_confirmation("Baseline ready")
+    assert overlay._confirm_btn.isVisible() is True
+    assert overlay._confirm_btn.text() == "CONFIRM BASELINE"
