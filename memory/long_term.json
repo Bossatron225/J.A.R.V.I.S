@@ -68,17 +68,17 @@
   "sessions": [
     {
       "date": "2026-08-11",
-      "summary": "James Lumsden completed a voice calibration to update his security profile, and JARVIS then presented him with the day's top headlines—including Meta's AI plans—and a new email notification.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-11",
       "summary": "James Lumsden reviewed daily headlines and recent news while attempting to access his system's camera, but the actions were repeatedly blocked due to failed biometric authentication and security protocol errors.",
       "language": "English"
     },
     {
       "date": "2026-08-11",
       "summary": "James Lumsden reviewed top news headlines and his live camera feed with JARVIS, but repeatedly failed biometric verification attempts to clear system security protocols.",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-11",
+      "summary": "The user experienced biometric verification issues and then worked with JARVIS to update and calibrate the correct pronunciation of his girlfriend Nevaeh's name in the system memory.",
       "language": "English"
     }
   ],
