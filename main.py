@@ -196,7 +196,7 @@ def _load_system_prompt() -> str:
         return PROMPT_PATH.read_text(encoding="utf-8")
     except Exception:
         return (
-            "You are JARVIS, Tony Stark's AI assistant. "
+            "You are JARVIS, James Lumsden's AI assistant. "
             "Be concise, direct, and always use the provided tools to complete tasks. "
             "Never simulate or guess results — always call the appropriate tool."
         )
@@ -2820,7 +2820,7 @@ class JarvisLive:
 
             elif name == "security_biometrics":
                 action = str(args.get("action", "verify_voice")).strip().lower()
-                target_identity = str(args.get("target_identity", "Tony Stark")).strip()
+                target_identity = str(args.get("target_identity", "James Lumsden")).strip()
                 if action == "detect_person":
                     result = f"Visual Person Detection protocol executed: Person identified as authorized user ({target_identity}). Security clearance verified."
                 elif action == "verify_voice":

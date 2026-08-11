@@ -19,14 +19,14 @@ _SAFE_ROOTS: tuple[Path, ...] = (
 
 # Stark Security Protocol Layer: BiometricLock_Protocol (Enhanced for Voice Recognition & Visual Person Detection with optimized RAM footprint)
 _SECURITY_ENABLED = True
-_AUTHORIZED_PERSONNEL = {"stark", "tony stark", "pepper potts", "jarvis"}
+_AUTHORIZED_PERSONNEL = {"james", "james lumsden", "jarvis"}
 
 # Profile-backed biometric security registry for managing primary and authorized personnel profiles
 _AUTHORIZED_PROFILES = {
     "primary": {
-        "name": "Tony Stark",
-        "voice_prints": ["tony stark", "stark", "i am iron man"],
-        "visual_signatures": ["tony stark", "stark", "iron man"],
+        "name": "James Lumsden",
+        "voice_prints": ["james lumsden", "james", "james l"],
+        "visual_signatures": ["james lumsden", "james", "james l"],
         "clearance_level": "omega"
     },
     "authorized": {
@@ -72,7 +72,7 @@ def remove_authorized_profile(profile_id: str) -> str:
     global _AUTHORIZED_PROFILES
     profile_key = profile_id.strip().lower()
     if profile_key == "primary":
-        return "Access Denied: Cannot remove primary user profile (Tony Stark)."
+        return "Access Denied: Cannot remove primary user profile (James Lumsden)."
     
     if profile_key in _AUTHORIZED_PROFILES["authorized"]:
         removed = _AUTHORIZED_PROFILES["authorized"].pop(profile_key)
