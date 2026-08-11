@@ -21,29 +21,107 @@ _SAFE_ROOTS: tuple[Path, ...] = (
 _SECURITY_ENABLED = True
 _AUTHORIZED_PERSONNEL = {"stark", "tony stark", "pepper potts", "jarvis"}
 
+# Profile-backed biometric security registry for managing primary and authorized personnel profiles
+_AUTHORIZED_PROFILES = {
+    "primary": {
+        "name": "Tony Stark",
+        "voice_prints": ["tony stark", "stark", "i am iron man"],
+        "visual_signatures": ["tony stark", "stark", "iron man"],
+        "clearance_level": "omega"
+    },
+    "authorized": {
+        "pepper potts": {
+            "name": "Pepper Potts",
+            "voice_prints": ["pepper potts", "pepper"],
+            "visual_signatures": ["pepper potts", "pepper"],
+            "clearance_level": "alpha"
+        },
+        "jarvis": {
+            "name": "JARVIS",
+            "voice_prints": ["jarvis"],
+            "visual_signatures": ["jarvis", "ai interface"],
+            "clearance_level": "omega"
+        }
+    }
+}
+
+def add_authorized_profile(profile_id: str, name: str, voice_print: str, visual_signature: str, clearance_level: str = "beta") -> str:
+    """Adds a new authorized profile to the BiometricLock_Protocol registry."""
+    global _AUTHORIZED_PROFILES
+    profile_key = profile_id.strip().lower()
+    if profile_key in _AUTHORIZED_PROFILES["authorized"] or profile_key == "primary":
+        return f"Profile registry error: Profile '{profile_id}' already exists."
+    
+    _AUTHORIZED_PROFILES["authorized"][profile_key] = {
+        "name": name,
+        "voice_prints": [voice_print.strip().lower()],
+        "visual_signatures": [visual_signature.strip().lower()],
+        "clearance_level": clearance_level
+    }
+    
+    # Also update global flat set for legacy fast-path compatibility
+    _AUTHORIZED_PERSONNEL.add(name.lower())
+    _AUTHORIZED_PERSONNEL.add(voice_print.lower())
+    _AUTHORIZED_PERSONNEL.add(visual_signature.lower())
+    
+    verify_biometric_security.cache_clear()
+    return f"BiometricLock_Protocol: Successfully added authorized profile for '{name}' with ID '{profile_id}'."
+
+def remove_authorized_profile(profile_id: str) -> str:
+    """Removes an authorized profile from the BiometricLock_Protocol registry."""
+    global _AUTHORIZED_PROFILES
+    profile_key = profile_id.strip().lower()
+    if profile_key == "primary":
+        return "Access Denied: Cannot remove primary user profile (Tony Stark)."
+    
+    if profile_key in _AUTHORIZED_PROFILES["authorized"]:
+        removed = _AUTHORIZED_PROFILES["authorized"].pop(profile_key)
+        verify_biometric_security.cache_clear()
+        return f"BiometricLock_Protocol: Successfully removed profile for '{removed.get('name', profile_id)}'."
+    
+    return f"Profile registry error: Profile '{profile_id}' not found."
+
+def get_authorized_profiles() -> dict:
+    """Retrieves all currently configured biometric security profiles."""
+    return {
+        "primary": _AUTHORIZED_PROFILES["primary"],
+        "authorized": list(_AUTHORIZED_PROFILES["authorized"].keys())
+    }
+
 @lru_cache(maxsize=32)
 def verify_biometric_security(voice_print: str = "", visual_signature: str = "") -> bool:
-    """Stark-grade BiometricLock_Protocol verification via voice recognition and visual person detection optimized for reduced RAM footprint."""
+    """Stark-grade BiometricLock_Protocol verification via profile-backed voice recognition and visual person detection optimized for reduced RAM footprint."""
     if not _SECURITY_ENABLED:
         return True
     
-    # Verify Voice Recognition Subsystem
-    if voice_print:
-        clean_voice = voice_print.strip().lower()
-        if not any(auth in clean_voice for auth in _AUTHORIZED_PERSONNEL):
-            return False
+    clean_voice = voice_print.strip().lower() if voice_print else ""
+    clean_visual = visual_signature.strip().lower() if visual_signature else ""
 
-    # Verify Visual Person Detection Subsystem
-    if visual_signature:
-        clean_visual = visual_signature.strip().lower()
-        if not any(auth in clean_visual for auth in _AUTHORIZED_PERSONNEL):
-            return False
+    # Check primary profile
+    primary = _AUTHORIZED_PROFILES["primary"]
+    if clean_voice and any(vp in clean_voice for vp in primary["voice_prints"]):
+        return True
+    if clean_visual and any(vs in clean_visual for vs in primary["visual_signatures"]):
+        return True
 
-    # If both verification vectors are missing, fail securely to prevent unauthorized breaches
+    # Check additional authorized profiles
+    for prof in _AUTHORIZED_PROFILES["authorized"].values():
+        if clean_voice and any(vp in clean_voice for vp in prof["voice_prints"]):
+            return True
+        if clean_visual and any(vs in clean_visual for vs in prof["visual_signatures"]):
+            return True
+
+    # Fallback to legacy flat set check
+    if clean_voice and any(auth in clean_voice for auth in _AUTHORIZED_PERSONNEL):
+        return True
+    if clean_visual and any(auth in clean_visual for auth in _AUTHORIZED_PERSONNEL):
+        return True
+
+    # If both verification vectors are missing or unmatched, fail securely
     if not voice_print and not visual_signature:
         return False
 
-    return True
+    return False
 
 @lru_cache(maxsize=32)
 def _is_safe_path(target: Path) -> bool:
@@ -546,6 +624,15 @@ def file_controller(
             "disk_usage": lambda: get_disk_usage(path),
             "organize_desktop": lambda: organize_desktop(),
             "info": lambda: get_file_info(path, name=name),
+            "add_profile": lambda: add_authorized_profile(
+                profile_id=params.get("profile_id", ""),
+                name=params.get("profile_name", ""),
+                voice_print=params.get("profile_voice", ""),
+                visual_signature=params.get("profile_visual", ""),
+                clearance_level=params.get("clearance_level", "beta")
+            ),
+            "remove_profile": lambda: remove_authorized_profile(params.get("profile_id", "")),
+            "list_profiles": lambda: str(get_authorized_profiles()),
         }
 
         if action in actions:
