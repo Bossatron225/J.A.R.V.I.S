@@ -1,7 +1,8 @@
+import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 try:
     import cv2
