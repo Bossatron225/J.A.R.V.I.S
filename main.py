@@ -2315,6 +2315,9 @@ class JarvisLive:
         return url, sec
 
     def _on_text_command(self, text: str):
+        if getattr(self.ui, "is_biometric_lock_active", lambda: False)():
+            self.ui.write_log("SYS: Biometric lock active — input blocked until verification completes.")
+            return
         self._predictive_daemon.record_text_command(text)
         if self._maybe_handle_remote_url_request(text):
             return
@@ -2369,6 +2372,8 @@ class JarvisLive:
         self.ui.write_log("SYS: Interrupted — listening...")
 
     def speak(self, text: str):
+        if getattr(self.ui, "is_biometric_lock_active", lambda: False)():
+            return
         if not self._loop or not self.session:
             return
         asyncio.run_coroutine_threadsafe(
