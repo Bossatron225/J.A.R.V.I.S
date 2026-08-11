@@ -13,6 +13,7 @@ def get_base_dir() -> Path:
 
 BASE_DIR = get_base_dir()
 API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
+SECURITY_CONFIG_PATH = BASE_DIR / "config" / "security_profiles.json"
 DESKTOP = Path.home() / "Desktop"
 MAX_BUILD_ATTEMPTS = 3
 GEMINI_MODEL = "models/gemini-flash-lite-latest"
@@ -133,13 +134,127 @@ def _take_screenshot() -> Path | None:
         print(f"[Code] ⚠️ Screenshot failed: {e}")
         return None
 
+def _load_security_profiles() -> dict:
+    try:
+        if SECURITY_CONFIG_PATH.exists():
+            with open(SECURITY_CONFIG_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and "profiles" in data:
+                    return data
+    except Exception as e:
+        print(f"[Security] ⚠️ Failed to load security profiles: {e}")
+
+    default_data = {
+        "primary_profile": {
+            "name": "Tony Stark",
+            "clearance": "Alpha-Level",
+            "descriptors": "Tony Stark, adult male, brown hair, goatee, Stark Industries CEO, primary system architect",
+            "voice_signature_notes": "Calm, confident, American accent, barytone range"
+        },
+        "profiles": {
+            "tony_stark": {
+                "name": "Tony Stark",
+                "clearance": "Alpha-Level",
+                "descriptors": "Tony Stark, adult male, brown hair, goatee, Stark Industries CEO, primary system architect",
+                "voice_signature_notes": "Calm, confident, American accent, barytone range"
+            }
+        }
+    }
+    try:
+        SECURITY_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(SECURITY_CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(default_data, f, indent=4)
+    except Exception as ex:
+        print(f"[Security] ⚠️ Could not initialize default security profiles file: {ex}")
+    return default_data
+
+def manage_security_profile(action: str, profile_id: str = "", name: str = "", clearance: str = "", descriptors: str = "", voice_notes: str = "") -> tuple[bool, str]:
+    """
+    Manages authorized user profiles for BiometricLock_Protocol.
+    Actions: 'setup_primary', 'add', 'list', 'remove'
+    """
+    data = _load_security_profiles()
+    profiles = data.setdefault("profiles", {})
+
+    action = (action or "").lower().strip()
+    profile_id = (profile_id or "").lower().strip().replace(" ", "_")
+
+    if action == "setup_primary":
+        if not name:
+            name = "Tony Stark"
+        primary_id = profile_id or "tony_stark"
+        new_profile = {
+            "name": name,
+            "clearance": clearance or "Alpha-Level",
+            "descriptors": descriptors or "Tony Stark, primary system architect, adult male",
+            "voice_signature_notes": voice_notes or "Primary biometric baseline"
+        }
+        profiles[primary_id] = new_profile
+        data["primary_profile"] = new_profile
+        try:
+            SECURITY_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with open(SECURITY_CONFIG_PATH, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4)
+            return True, f"Primary biometric profile successfully configured for {name}."
+        except Exception as e:
+            return False, f"Failed to save primary profile: {e}"
+
+    elif action == "add":
+        if not profile_id or not name:
+            return False, "Profile ID and Name are required to add an authorized profile."
+        new_profile = {
+            "name": name,
+            "clearance": clearance or "Standard-Level",
+            "descriptors": descriptors or name,
+            "voice_signature_notes": voice_notes or "Authorized personnel voice signature"
+        }
+        profiles[profile_id] = new_profile
+        try:
+            with open(SECURITY_CONFIG_PATH, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4)
+            return True, f"Authorized profile '{name}' ({profile_id}) added successfully."
+        except Exception as e:
+            return False, f"Failed to save authorized profile: {e}"
+
+    elif action == "list":
+        if not profiles:
+            return True, "No authorized biometric profiles found."
+        profile_list = [f"- {p.get('name')} (ID: {pid}, Clearance: {p.get('clearance')}, Descriptors: {p.get('descriptors')})" for pid, p in profiles.items()]
+        return True, "Authorized Biometric Profiles:\n" + "\n".join(profile_list)
+
+    elif action == "remove":
+        if not profile_id:
+            return False, "Profile ID is required for removal."
+        if profile_id in profiles:
+            del profiles[profile_id]
+            try:
+                with open(SECURITY_CONFIG_PATH, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4)
+                return True, f"Profile '{profile_id}' successfully revoked and removed."
+            except Exception as e:
+                return False, f"Failed to update security profile store: {e}"
+        return False, f"Profile '{profile_id}' not found in authorized registry."
+
+    return False, f"Unknown profile management action: {action}"
+
 def verify_security_biometrics(voice_sample_path: str = None) -> tuple[bool, str]:
     """
     Stark Security Protocol: BiometricLock_Protocol integration.
-    Enforces enhanced voice recognition & visual person detection with minimized
+    Enforces enhanced profile-backed voice recognition & visual person detection with minimized
     RAM footprint and Stark-grade telemetry/security constraints.
     """
     print("[Security] 🛡️ Initializing BiometricLock_Protocol: Voice Recognition & Visual Person Detection...")
+    
+    security_data = _load_security_profiles()
+    profiles = security_data.get("profiles", {})
+    primary = security_data.get("primary_profile", {})
+    
+    profile_descriptions = []
+    for pid, p in profiles.items():
+        profile_descriptions.append(f"Profile ID: {pid}, Name: {p.get('name')}, Clearance: {p.get('clearance')}, Visual/Physical Descriptors: {p.get('descriptors')}, Voice Profile Notes: {p.get('voice_signature_notes')}")
+    
+    profiles_context = "\n".join(profile_descriptions) if profile_descriptions else f"Primary User: {primary.get('name', 'Tony Stark')} ({primary.get('descriptors', 'Primary Architect')})"
+
     screenshot_path = _take_screenshot()
     if not screenshot_path:
         return False, "Visual person detection sensor array failed to initialize."
@@ -165,9 +280,9 @@ def verify_security_biometrics(voice_sample_path: str = None) -> tuple[bool, str
 
         auth_prompt = (
             "Execute BiometricLock_Protocol analysis on this security feed/environment capture (and optional voice biometric sample). "
-            "Verify strictly whether authorized personnel (Tony Stark or designated clearance holder) "
-            "is detected via visual facial/person recognition and acoustic voice match. "
-            "Respond ONLY in valid JSON format: {\"authorized\": true/false, \"confidence\": float, \"message\": \"string\"}"
+            "Verify strictly whether any of the following authorized registered profiles are detected via visual facial/person recognition and acoustic voice match:\n"
+            f"{profiles_context}\n\n"
+            "Respond ONLY in valid JSON format: {\"authorized\": true/false, \"matched_profile\": \"string or null\", \"confidence\": float, \"message\": \"string\"}"
         )
         contents.append(auth_prompt)
 
@@ -182,6 +297,7 @@ def verify_security_biometrics(voice_sample_path: str = None) -> tuple[bool, str
 
         data = json.loads(clean_json)
         authorized = data.get("authorized", False)
+        matched = data.get("matched_profile", "Unknown")
         msg = data.get("message", "BiometricLock_Protocol verification complete.")
 
         try:
@@ -190,8 +306,8 @@ def verify_security_biometrics(voice_sample_path: str = None) -> tuple[bool, str
             pass
 
         if authorized:
-            print(f"[Security] BiometricLock_Protocol Access Granted: {msg}")
-            return True, msg
+            print(f"[Security] BiometricLock_Protocol Access Granted [{matched}]: {msg}")
+            return True, f"Authorized [{matched}]: {msg}"
         else:
             print(f"[Security] BiometricLock_Protocol Access Denied: {msg}")
             return False, msg
@@ -204,7 +320,7 @@ def verify_security_biometrics(voice_sample_path: str = None) -> tuple[bool, str
         print(f"[Security] ⚠️ BiometricLock_Protocol authentication exception: {e}. Secure lockdown enforced.")
         return False, f"BiometricLock_Protocol security authentication failed: {e}"
 
-_VALID_INTENTS = {"write", "edit", "explain", "run", "build", "screen_debug", "optimize", "test", "security_check"}
+_VALID_INTENTS = {"write", "edit", "explain", "run", "build", "screen_debug", "optimize", "test", "security_check", "security_profile"}
 
 def _detect_intent(description: str, file_path: str, code: str) -> str:
     desc = (description or "").strip()
@@ -231,7 +347,8 @@ def _detect_intent(description: str, file_path: str, code: str) -> str:
                 "  screen_debug = analyze an error currently visible on the user's screen\n"
                 "  optimize     = refactor / clean up / speed up existing code\n"
                 "  test         = write and run unit tests for existing code or file\n"
-                "  security_check = execute BiometricLock_Protocol (voice recognition & visual person detection)\n\n"
+                "  security_check = execute BiometricLock_Protocol (voice recognition & visual person detection)\n"
+                "  security_profile = manage, set up, add, or list authorized biometric profiles\n\n"
                 "Reply with ONLY the intent word, nothing else."
             )
             ans = _extract_text(_get_gemini().generate_content(prompt)).strip().lower()
@@ -647,7 +764,7 @@ def code_helper(
     Called from main.py.
 
     parameters:
-        action      : write | edit | explain | run | build | screen_debug | optimize | test | security_check | auto
+        action      : write | edit | explain | run | build | screen_debug | optimize | test | security_check | security_profile | auto
         description : What the code should do / what change to make / what problem to analyze
         language    : Programming language (default: python)
         output_path : Where to save — user specifies full path or filename
@@ -666,6 +783,13 @@ def code_helper(
     args = p.get("args", [])
     timeout = int(p.get("timeout", 30))
     voice_sample = p.get("voice_sample", "").strip()
+    
+    profile_action = p.get("profile_action", "").strip()
+    profile_id = p.get("profile_id", "").strip()
+    profile_name = p.get("profile_name", "").strip()
+    profile_clearance = p.get("profile_clearance", "").strip()
+    profile_descriptors = p.get("profile_descriptors", "").strip()
+    profile_voice_notes = p.get("profile_voice_notes", "").strip()
 
     if action == "auto":
         action = _detect_intent(description, file_path, code)
@@ -707,5 +831,36 @@ def code_helper(
             speak(message)
         return f"BiometricLock_Protocol Status: {'AUTHORIZED'}\nDetails: {message}" if authorized else f"BiometricLock_Protocol Status: {'DENIED'}\nDetails: {message}"
 
+    elif action == "security_profile":
+        if not profile_action:
+            if description:
+                desc_lower = description.lower()
+                if "setup" in desc_lower or "primary" in desc_lower:
+                    profile_action = "setup_primary"
+                elif "add" in desc_lower or "create" in desc_lower:
+                    profile_action = "add"
+                elif "list" in desc_lower or "show" in desc_lower:
+                    profile_action = "list"
+                elif "remove" in desc_lower or "delete" in desc_lower:
+                    profile_action = "remove"
+                else:
+                    profile_action = "list"
+            else:
+                profile_action = "list"
+        
+        if player:
+            player.write_log(f"[Security] Managing Biometric Profile [{profile_action}]...")
+        success, message = manage_security_profile(
+            action=profile_action,
+            profile_id=profile_id,
+            name=profile_name or description,
+            clearance=profile_clearance,
+            descriptors=profile_descriptors,
+            voice_notes=profile_voice_notes
+        )
+        if speak:
+            speak(message)
+        return f"Biometric Profile Management [{profile_action.upper()}]: {'SUCCESS' if success else 'FAILED'}\nDetails: {message}"
+
     else:
-        return f"Unknown action: '{action}'. Use write, edit, explain, run, build, optimize, test, screen_debug, or security_check."
+        return f"Unknown action: '{action}'. Use write, edit, explain, run, build, optimize, test, screen_debug, security_check, or security_profile."
