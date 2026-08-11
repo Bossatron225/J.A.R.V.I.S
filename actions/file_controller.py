@@ -1,9 +1,24 @@
+import io
+import json
 import os
-import shutil
 import platform
+import shutil
+import wave
 from pathlib import Path
 from datetime import datetime
 from functools import lru_cache
+
+import numpy as np
+
+try:
+    import sounddevice as sd
+except ImportError:  # pragma: no cover - optional runtime dependency
+    sd = None
+
+try:
+    import cv2
+except ImportError:  # pragma: no cover - optional runtime dependency
+    cv2 = None
 
 try:
     import send2trash
@@ -129,6 +144,147 @@ def get_authorized_profiles() -> dict:
         "primary": _AUTHORIZED_PROFILES["primary"],
         "authorized": {key: value for key, value in _AUTHORIZED_PROFILES["authorized"].items()},
     }
+
+
+def _get_gemini_api_key() -> str:
+    try:
+        cfg_path = Path(__file__).resolve().parent.parent / "config" / "api_keys.json"
+        if cfg_path.exists():
+            return str(json.loads(cfg_path.read_text(encoding="utf-8")).get("gemini_api_key", "") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _pcm_to_wav(audio_bytes: bytes, sample_rate: int = 16_000) -> bytes:
+    with io.BytesIO() as buf:
+        with wave.open(buf, "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(sample_rate)
+            wav.writeframes(audio_bytes)
+        return buf.getvalue()
+
+
+def _record_voice_sample(duration_seconds: float = 1.2, sample_rate: int = 16_000) -> tuple[bytes, float]:
+    if sd is None:
+        return b"", 0.0
+    try:
+        frames = sd.rec(int(sample_rate * duration_seconds), samplerate=sample_rate, channels=1, dtype="int16")
+        sd.wait()
+        audio_bytes = frames.tobytes()
+        if not audio_bytes:
+            return b"", 0.0
+        samples = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
+        rms = float(np.sqrt(np.mean(np.square(samples)))) / 32768.0 if samples.size else 0.0
+        return audio_bytes, rms
+    except Exception:
+        return b"", 0.0
+
+
+def _capture_live_visual_frame() -> tuple[bytes | None, bool]:
+    if cv2 is None:
+        return None, False
+    try:
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            return None, False
+        for _ in range(8):
+            cap.read()
+        ok, frame = cap.read()
+        cap.release()
+        if not ok or frame is None:
+            return None, False
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        if face_cascade.empty():
+            return None, False
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+        face_detected = bool(len(faces) > 0)
+        _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+        return (buf.tobytes() if buf is not None else None), face_detected
+    except Exception:
+        return None, False
+
+
+def _verify_live_voice_with_gemini(audio_bytes: bytes, target_identity: str) -> bool:
+    if not audio_bytes:
+        return False
+    api_key = _get_gemini_api_key()
+    if not api_key:
+        return False
+    try:
+        from google import genai
+        from google.genai import types as gtypes
+
+        client = genai.Client(api_key=api_key)
+        wav_bytes = _pcm_to_wav(audio_bytes)
+        prompt = (
+            f"Transcribe the speech in this short audio clip and answer YES if the speaker appears to be {target_identity} "
+            "or a close match, otherwise NO. Respond with a single word: YES or NO."
+        )
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[gtypes.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"), prompt],
+        )
+        text = (getattr(response, "text", "") or "").strip().lower()
+        return "yes" in text
+    except Exception:
+        return False
+
+
+def _verify_live_face_with_gemini(image_bytes: bytes, target_identity: str) -> bool:
+    if not image_bytes:
+        return False
+    api_key = _get_gemini_api_key()
+    if not api_key:
+        return False
+    try:
+        from google import genai
+        from google.genai import types as gtypes
+
+        client = genai.Client(api_key=api_key)
+        prompt = (
+            f"Look at this image and answer YES if it appears to be {target_identity} or a close match, otherwise NO. "
+            "Respond with a single word: YES or NO."
+        )
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[gtypes.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"), prompt],
+        )
+        text = (getattr(response, "text", "") or "").strip().lower()
+        return "yes" in text
+    except Exception:
+        return False
+
+
+def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, dict]:
+    """Use live microphone and camera input to evaluate the current user against the configured profile."""
+    primary = _AUTHORIZED_PROFILES.get("primary") or {}
+    identity_name = str(target_identity or primary.get("name") or "James Lumsden").strip()
+    profile_tokens = {
+        (primary.get("name") or "").strip().lower(),
+        *(str(token).strip().lower() for token in (primary.get("voice_prints") or []) if str(token).strip()),
+        *(str(token).strip().lower() for token in (primary.get("visual_signatures") or []) if str(token).strip()),
+    }
+    identity_match = any(token and token in identity_name.lower() for token in profile_tokens)
+
+    audio_bytes, voice_energy = _record_voice_sample()
+    image_bytes, face_detected = _capture_live_visual_frame()
+
+    voice_detected = bool(audio_bytes and (voice_energy >= 0.01 or _verify_live_voice_with_gemini(audio_bytes, identity_name)))
+    visual_detected = bool(face_detected or (image_bytes and _verify_live_face_with_gemini(image_bytes, identity_name)))
+
+    granted = bool(voice_detected and visual_detected and identity_match)
+    return granted, {
+        "voice_detected": voice_detected,
+        "visual_detected": visual_detected,
+        "identity_match": identity_match,
+        "voice_energy": voice_energy,
+        "face_detected": face_detected,
+        "profile_name": primary.get("name") or identity_name,
+    }
+
 
 @lru_cache(maxsize=32)
 def verify_biometric_security(voice_print: str = "", visual_signature: str = "") -> bool:
