@@ -58,7 +58,12 @@ from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
     save_session_summary, get_recent_sessions,
 )
-from memory.obsidian_memory import remember_user_fact, recall_user_profile
+from memory.obsidian_memory import (
+    remember_user_fact,
+    recall_user_profile,
+    build_personal_memory_context,
+    recall_personal_memory,
+)
 
 from actions.file_processor import file_processor
 from actions.flight_finder     import flight_finder
@@ -1134,6 +1139,20 @@ TOOL_DECLARATIONS = [
                 "fact": {"type": "STRING", "description": "Fact to store in the Obsidian memory vault"},
             },
             "required": []
+        }
+    },
+    {
+        "name": "personal_memory",
+        "description": (
+            "Searches both the structured JSON memory and the local Obsidian memory for a user-specific fact. "
+            "Use this whenever the user asks about preferences, plans, relationships, or past facts."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "query": {"type": "STRING", "description": "Short phrase or topic to search for in personal memory"}
+            },
+            "required": ["query"]
         }
     },
 ]
@@ -2325,9 +2344,9 @@ class JarvisLive:
         except Exception:
             self._asst_name = "JARVIS"
 
-        memory     = load_memory()
-        mem_str    = format_memory_for_prompt(memory)
+        memory = load_memory()
         obsidian_mem = recall_user_profile()
+        personal_context = build_personal_memory_context(memory, obsidian_mem)
         sys_prompt = _load_system_prompt()
 
         now      = datetime.now()
@@ -2353,10 +2372,8 @@ class JarvisLive:
         )
 
         parts = [time_ctx, identity_ctx]
-        if mem_str:
-            parts.append(mem_str)
-        if obsidian_mem and obsidian_mem.strip() and "No permanent long-term profile data" not in obsidian_mem:
-            parts.append("[LOCAL OBSIDIAN MEMORY]\n" + obsidian_mem.strip())
+        if personal_context:
+            parts.append(personal_context)
         parts.append(sys_prompt)
 
         cfg_kwargs: dict = dict(
@@ -2442,6 +2459,14 @@ class JarvisLive:
                 result = remember_user_fact(category, fact) if fact else "No fact provided."
             else:
                 result = recall_user_profile()
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": result, "silent": True}
+            )
+
+        if name == "personal_memory":
+            query = str(args.get("query", "") or "").strip()
+            result = recall_personal_memory(query) if query else "No query provided."
             return types.FunctionResponse(
                 id=fc.id, name=name,
                 response={"result": result, "silent": True}

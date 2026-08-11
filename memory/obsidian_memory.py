@@ -53,7 +53,11 @@ def _ensure_header(profile_file: Path) -> None:
     header = (
         "# Jarvis Long-Term Memory\n\n"
         "This file is maintained by Jarvis and reflects durable facts about the user.\n"
-        "The detailed history is preserved below, and a compact summary is kept at the top.\n\n"
+        "The detailed history is preserved below, and a compact dashboard summary stays at the top.\n\n"
+        "## Dashboard\n"
+        "- Current priorities: capture durable preferences, plans, and important relationships.\n"
+        "- Recent facts: add new details here as they become relevant.\n"
+        "- Full history: preserved in the detailed sections below.\n\n"
         "## Summary\n"
         "- Keep entries concise and factual.\n"
         "- Preserve the full history in the detailed sections below.\n\n"
@@ -65,23 +69,31 @@ def _update_summary(profile_file: Path, category: str, new_fact: str) -> None:
     text = profile_file.read_text(encoding="utf-8")
     if "## Summary" not in text:
         return
-    summary_block = "## Summary\n"
+    summary_block = "## Summary"
     if summary_block not in text:
         return
-    intro, rest = text.split(summary_block, 1)
-    lines = [line for line in rest.splitlines() if line.strip()]
-    bullet = f"- [{category}] {new_fact}"
-    if bullet in lines:
+
+    lines = text.splitlines()
+    summary_idx = next((idx for idx, line in enumerate(lines) if line.strip() == summary_block), None)
+    if summary_idx is None:
         return
-    lines = [line for line in lines if not line.startswith(f"- [{category}] ")]
-    lines.insert(0, bullet)
-    if len(lines) > 12:
-        lines = lines[:12]
-    updated = intro + summary_block + "\n".join(lines) + "\n\n" + rest.splitlines()[0] if False else ""
-    # Preserve the full history and keep a concise summary list at the top.
-    summary_lines = ["## Summary"] + lines
-    updated = intro + "\n\n" + "\n".join(summary_lines) + "\n\n" + rest.split("\n", 1)[1] if "\n" in rest else intro + "\n\n" + "\n".join(summary_lines) + "\n"
-    profile_file.write_text(updated, encoding="utf-8")
+
+    bullet = f"- [{category}] {new_fact}"
+    existing_summary = [line for line in lines[summary_idx + 1:] if line.strip() and not line.startswith("## ")]
+    filtered = [line for line in existing_summary if not line.startswith(f"- [{category}] ")]
+    filtered.insert(0, bullet)
+    if len(filtered) > 8:
+        filtered = filtered[:8]
+
+    new_lines = []
+    for idx, line in enumerate(lines):
+        if idx == summary_idx:
+            new_lines.append(summary_block)
+            new_lines.extend(filtered)
+        else:
+            new_lines.append(line)
+
+    profile_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
 
 
 def _looks_similar(existing: str, new_fact: str) -> bool:
@@ -126,6 +138,54 @@ def remember_user_fact(fact_category: str, new_fact: str) -> str:
         return f"Successfully saved to Obsidian memory under {category}."
     except Exception as exc:  # pragma: no cover - defensive path
         return f"Failed to write to memory: {exc}"
+
+
+def build_personal_memory_context(json_memory: object, obsidian_profile: object) -> str:
+    """Combine JSON-backed memory and Obsidian-backed memory into one prompt block."""
+    parts: list[str] = []
+
+    if isinstance(json_memory, dict):
+        from memory.memory_manager import format_memory_for_prompt
+
+        json_text = format_memory_for_prompt(json_memory).strip()
+    else:
+        json_text = str(json_memory or "").strip()
+
+    if json_text:
+        parts.append(json_text.rstrip())
+
+    obsidian_text = str(obsidian_profile or "").strip()
+    if obsidian_text and "No permanent long-term profile data" not in obsidian_text and "Failed to read memory file" not in obsidian_text:
+        parts.append("[LOCAL OBSIDIAN MEMORY]\n" + obsidian_text.strip())
+
+    if not parts:
+        return ""
+
+    return "\n\n".join(parts).rstrip() + "\n"
+
+
+def recall_personal_memory(query: str) -> str:
+    """Search both JSON-backed and Obsidian-backed memory for a query."""
+    from memory.memory_manager import load_memory, format_memory_for_prompt
+
+    query_text = (query or "").strip().lower()
+    if not query_text:
+        return "No query provided."
+
+    memory = load_memory()
+    json_text = format_memory_for_prompt(memory).strip()
+    obsidian_text = recall_user_profile().strip()
+
+    hits: list[str] = []
+    if json_text and query_text in json_text.lower():
+        hits.append("JSON memory: " + json_text[:700].strip())
+    if obsidian_text and query_text in obsidian_text.lower():
+        hits.append("Obsidian memory: " + obsidian_text[:700].strip())
+
+    if not hits:
+        return f"No matching memory found for '{query}'."
+
+    return "\n\n".join(hits[:2])
 
 
 def recall_user_profile() -> str:
