@@ -1850,6 +1850,22 @@ class BiometricLockOverlay(QWidget):
             "👁️ Visual Person Detection: PROFILE VERIFIED ✓" if details.get("visual_detected") else "👁️ Visual Person Detection: PROFILE NOT FOUND"
         )
         self._visual_chk.setStyleSheet(f"color: {C.GREEN if details.get('visual_detected') else C.RED}; background: transparent;")
+        if os.environ.get("JARVIS_BIOMETRIC_DEBUG") == "1":
+            debug_line = (
+                "SYS: Biometric debug "
+                f"voice={details.get('voice_detected')} "
+                f"visual={details.get('visual_detected')} "
+                f"face_detected={details.get('face_detected')} "
+                f"voice_energy={float(details.get('voice_energy') or 0.0):.4f} "
+                f"ref_match={details.get('reference_face_match')} "
+                f"ref_reason={details.get('reference_face_reason', 'n/a')}"
+            )
+            try:
+                host = self.window()
+                if host is not None and hasattr(host, "_log"):
+                    host._log.append_log(debug_line)
+            except Exception:
+                pass
         if self._apply_verification_state(details.get("voice_detected", False), details.get("visual_detected", False)):
             QTimer.singleShot(700, self.verified.emit)
 
