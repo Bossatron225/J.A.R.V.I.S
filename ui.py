@@ -1591,12 +1591,18 @@ class ManageProfilesOverlay(QWidget):
     def _show_capture_confirmation(self, message: str) -> None:
         try:
             identity = self._setup_name or get_authorized_profiles().get("primary", {}).get("name") or "James Lumsden"
-            granted, _ = evaluate_live_biometric_security(identity)
+            granted, details = evaluate_live_biometric_security(identity)
             summary = message
             if granted:
                 summary = f"{message}\nBaseline captured and verified against the stored profile."
             else:
                 summary = f"{message}\nBaseline capture completed, but verification is still pending."
+                if details.get("voice_detected"):
+                    summary += " Voice signal detected."
+                if details.get("visual_detected"):
+                    summary += " Face signal detected."
+                if not details.get("voice_detected") and not details.get("visual_detected"):
+                    summary += " No usable live voice or face sample could be confirmed."
 
             self._safe_set_widget_text(self._setup_status, summary)
             self._safe_set_widget_stylesheet(self._setup_status, f"color: {C.GREEN if granted else C.ACC2}; background: transparent;")

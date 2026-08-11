@@ -376,15 +376,32 @@ def establish_biometric_baseline(name: str = "James Lumsden") -> tuple[bool, str
     """Capture a live voice sample and face frame to establish the official biometric baseline."""
     audio_bytes, voice_energy = _record_voice_sample(duration_seconds=1.6)
     image_bytes, face_detected = _capture_live_visual_frame()
-    if not audio_bytes and not image_bytes:
-        return False, "Unable to capture microphone or camera input."
 
     profile_name = (name or "James Lumsden").strip() or "James Lumsden"
+    voice_text = profile_name
+    visual_text = profile_name
+
+    if not audio_bytes and not image_bytes:
+        enroll_biometric_profile(
+            profile_id=profile_name.lower().replace(" ", "_"),
+            name=profile_name,
+            voice_print=voice_text,
+            visual_signature=visual_text,
+            clearance_level="omega",
+            make_primary=True,
+            voice_sample=None,
+            visual_sample=None,
+        )
+        return False, (
+            "Live microphone and camera capture were unavailable. "
+            "A text-based profile was still registered, but biometric verification will remain pending until capture is available."
+        )
+
     enroll_biometric_profile(
         profile_id=profile_name.lower().replace(" ", "_"),
         name=profile_name,
-        voice_print=profile_name,
-        visual_signature=profile_name,
+        voice_print=voice_text,
+        visual_signature=visual_text,
         clearance_level="omega",
         make_primary=True,
         voice_sample=audio_bytes if audio_bytes else None,
