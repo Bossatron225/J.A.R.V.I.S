@@ -20,6 +20,7 @@ def get_base_dir() -> Path:
 BASE_DIR         = get_base_dir()
 API_CONFIG_PATH  = BASE_DIR / "config" / "api_keys.json"
 APPROVALS_PATH   = BASE_DIR / "memory" / "dev_agent_approvals.json"
+BIOMETRIC_PROFILE_PATH = BASE_DIR / "config" / "biometric_profiles.json"
 PROJECTS_DIR     = Path.home() / "Desktop" / "JarvisProjects"
 MAX_FIX_ATTEMPTS = 5
 MODEL_PLANNER    = "models/gemini-flash-lite-latest"
@@ -138,6 +139,91 @@ def _collect_default_self_improvement_targets(repo_root: str) -> tuple[str, ...]
         if path and path.exists() and path.suffix == ".py":
             targets.append(str(path))
     return tuple(targets)
+
+
+def _load_biometric_store() -> dict:
+    try:
+        if BIOMETRIC_PROFILE_PATH.exists():
+            data = json.loads(BIOMETRIC_PROFILE_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {
+        "primary_profile": {
+            "name": "Tony Stark",
+            "role": "Primary Authority",
+            "voice_print_signature": "stark_prime_voice_signature",
+            "visual_signature": "stark_prime_visual_signature",
+            "clearance_level": 10,
+            "created_at": datetime.utcnow().isoformat() + "Z"
+        },
+        "authorized_profiles": []
+    }
+
+
+def _save_biometric_store(store: dict) -> None:
+    BIOMETRIC_PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    BIOMETRIC_PROFILE_PATH.write_text(json.dumps(store, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _manage_biometric_profile(action: str, name: str, role: str, clearance: int, voice_sig: str, visual_sig: str) -> str:
+    store = _load_biometric_store()
+    action = action.lower()
+
+    if action == "status":
+        primary = store.get("primary_profile", {})
+        auth = store.get("authorized_profiles", [])
+        lines = [
+            f"BiometricLock_Protocol Status:",
+            f"Primary Profile: {primary.get('name', 'Unknown')} ({primary.get('role', 'N/A')}) [Clearance: {primary.get('clearance_level', 10)}]",
+            f"Authorized Profiles Count: {len(auth)}"
+        ]
+        for p in auth:
+            lines.append(f"  - {p.get('name')} | Role: {p.get('role')} | Clearance: {p.get('clearance_level', 1)}")
+        return "\n".join(lines)
+
+    if action == "set_primary":
+        store["primary_profile"] = {
+            "name": name or "Tony Stark",
+            "role": role or "Primary Authority",
+            "voice_print_signature": voice_sig or "custom_prime_voice",
+            "visual_signature": visual_sig or "custom_prime_visual",
+            "clearance_level": int(clearance or 10),
+            "updated_at": datetime.utcnow().isoformat() + "Z"
+        }
+        _save_biometric_store(store)
+        return f"Primary biometric profile successfully updated to: {name or 'Tony Stark'}."
+
+    if action == "add":
+        if not name:
+            return "Error: Profile name is required to add an authorized profile."
+        new_profile = {
+            "id": uuid.uuid4().hex[:8],
+            "name": name,
+            "role": role or "Authorized User",
+            "voice_print_signature": voice_sig or f"{name.lower().replace(' ', '_')}_voice",
+            "visual_signature": visual_sig or f"{name.lower().replace(' ', '_')}_visual",
+            "clearance_level": int(clearance or 5),
+            "created_at": datetime.utcnow().isoformat() + "Z"
+        }
+        auth = store.get("authorized_profiles", [])
+        auth.append(new_profile)
+        store["authorized_profiles"] = auth
+        _save_biometric_store(store)
+        return f"Authorized biometric profile added for {name} with clearance level {new_profile['clearance_level']}."
+
+    if action == "remove":
+        auth = store.get("authorized_profiles", [])
+        original_len = len(auth)
+        auth = [p for p in auth if p.get("name", "").lower() != name.lower()]
+        if len(auth) == original_len:
+            return f"Authorized profile not found: {name}"
+        store["authorized_profiles"] = auth
+        _save_biometric_store(store)
+        return f"Authorized biometric profile removed: {name}"
+
+    return f"Unknown biometric action: {action}. Use 'status', 'set_primary', 'add', or 'remove'."
 
 
 def _parse_self_improvement_plan(raw_plan: str) -> dict:
@@ -1422,6 +1508,28 @@ def dev_agent(
     approval_id = str(p.get("approval_id", "") or "").strip()
     require_approval = bool(p.get("require_approval", True))
     self_reboot = bool(p.get("self_reboot", True))
+
+    biometric_action = str(p.get("biometric_action", "") or "").strip().lower()
+    profile_name = str(p.get("profile_name", "") or "").strip()
+    profile_role = str(p.get("profile_role", "") or "").strip()
+    clearance_level = int(p.get("clearance_level", 5))
+    voice_sig = str(p.get("voice_sig", "") or "").strip()
+    visual_sig = str(p.get("visual_sig", "") or "").strip()
+
+    if biometric_action or "biometric" in description.lower() or "biometriclock" in description.lower():
+        if not biometric_action:
+            biometric_action = "status"
+        result_msg = _manage_biometric_profile(
+            action=biometric_action,
+            name=profile_name,
+            role=profile_role,
+            clearance=clearance_level,
+            voice_sig=voice_sig,
+            visual_sig=visual_sig
+        )
+        if speak:
+            speak("BiometricLock protocol profile management executed, sir.")
+        return result_msg
 
     if isinstance(target_files, str):
         target_files = [item.strip() for item in target_files.split(",") if item.strip()]
