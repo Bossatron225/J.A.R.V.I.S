@@ -54,7 +54,6 @@ import sounddevice as sd
 import speech_recognition as sr
 from google import genai
 from google.genai import types
-from auth import verify_face
 from ui import JarvisUI
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
@@ -195,51 +194,6 @@ AUDIO_TUNING_PROFILES = {
 def _get_api_key() -> str:
     with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
         return json.load(f)["gemini_api_key"]
-
-
-HIGH_RISK_TOOL_NAMES = {
-    "open_app",
-    "browser_control",
-    "file_controller",
-    "send_message",
-    "imessage_control",
-    "mail_control",
-    "find_my",
-    "ifttt_webhooks",
-    "alexa_routines",
-    "google_calendar",
-    "computer_control",
-    "computer_settings",
-    "desktop",
-    "wiz_lights",
-    "youtube_video",
-    "workspace_agent",
-    "game_updater",
-    "reminder",
-    "system_monitor",
-}
-FACE_AUTH_MAX_ATTEMPTS = 3
-FACE_AUTH_RETRY_DELAY_SECONDS = 0.35
-
-
-def _resolve_face_auth_reference() -> Path:
-    override = os.environ.get("JARVIS_AUTH_REFERENCE")
-    if override:
-        return Path(override).expanduser()
-    return BASE_DIR / "auth_reference.jpg"
-
-
-def _verify_face_with_retries(reference_path: Path, attempts: int = FACE_AUTH_MAX_ATTEMPTS) -> tuple[bool, str]:
-    last_reason = "Face authentication failed."
-    total = max(1, int(attempts))
-    for attempt in range(1, total + 1):
-        ok, reason = verify_face(str(reference_path))
-        if ok:
-            return True, reason
-        last_reason = reason or last_reason
-        if attempt < total:
-            time.sleep(FACE_AUTH_RETRY_DELAY_SECONDS)
-    return False, f"{last_reason} (after {total} attempt(s))"
 
 
 @lru_cache(maxsize=4)
@@ -2563,30 +2517,6 @@ class JarvisLive:
 
         print(f"[JARVIS] 🔧 {name}  {args}")
         self.ui.set_state("THINKING")
-
-        if name in HIGH_RISK_TOOL_NAMES:
-            auth_reference = _resolve_face_auth_reference()
-            if os.environ.get("JARVIS_AUTH_DISABLE") == "1":
-                self.ui.write_log("SYS: Face auth disabled by environment override.")
-            elif not auth_reference.exists():
-                self.ui.write_log(
-                    f"SYS: Face auth required before {name}; reference image missing at {auth_reference}."
-                )
-                return types.FunctionResponse(
-                    id=fc.id,
-                    name=name,
-                    response={"result": f"Face authentication required before {name}. Place your reference image at {auth_reference}."},
-                )
-            else:
-                self.ui.write_log(f"SYS: Face auth check started before {name}.")
-                ok, reason = _verify_face_with_retries(auth_reference)
-                if not ok:
-                    self.ui.write_log(f"SYS: Face auth failed before {name}: {reason}")
-                    return types.FunctionResponse(
-                        id=fc.id,
-                        name=name,
-                        response={"result": f"Face authentication failed before {name}: {reason}"},
-                    )
 
         if name == "save_memory":
             category = args.get("category", "notes")
