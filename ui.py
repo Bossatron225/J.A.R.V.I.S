@@ -32,7 +32,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QBrush, QColor, QConicalGradient, QDragEnterEvent, QDropEvent, QFont,
-    QFontDatabase, QKeySequence, QLinearGradient, QPainter, QPainterPath,
+    QFontDatabase, QImage, QKeySequence, QLinearGradient, QPainter, QPainterPath,
     QPen, QPixmap, QRadialGradient, QShortcut,
 )
 from PyQt6.QtWidgets import (
@@ -1324,6 +1324,11 @@ class ManageProfilesOverlay(QWidget):
         self._preview_placeholder.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
         preview_layout.addWidget(self._preview_placeholder, stretch=1)
 
+        self._camera_cap = None
+        self._preview_timer = QTimer(self)
+        self._preview_timer.timeout.connect(self._refresh_camera_preview)
+        self._preview_timer.setInterval(180)
+
         self._speak_indicator = QLabel("● WAITING")
         self._speak_indicator.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         self._speak_indicator.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1381,6 +1386,86 @@ class ManageProfilesOverlay(QWidget):
         lay.addWidget(close_btn)
 
         self._load_profiles()
+
+    def _safe_set_widget_text(self, widget: QLabel | None, text: str) -> None:
+        if widget is None:
+            return
+        try:
+            widget.setText(text)
+        except RuntimeError:
+            pass
+
+    def _safe_set_widget_stylesheet(self, widget: QLabel | None, stylesheet: str) -> None:
+        if widget is None:
+            return
+        try:
+            widget.setStyleSheet(stylesheet)
+        except RuntimeError:
+            pass
+
+    def _start_camera_preview(self) -> None:
+        if self._camera_cap is not None:
+            return
+        try:
+            import cv2
+        except ImportError:
+            return
+        try:
+            cap = cv2.VideoCapture(0)
+        except Exception:
+            return
+        if not cap.isOpened():
+            cap.release()
+            return
+        self._camera_cap = cap
+        self._preview_timer.start()
+
+    def _refresh_camera_preview(self) -> None:
+        if self._camera_cap is None:
+            return
+        try:
+            import cv2
+        except ImportError:
+            self._stop_camera_preview()
+            return
+        try:
+            ok, frame = self._camera_cap.read()
+        except Exception:
+            self._stop_camera_preview()
+            return
+        if not ok or frame is None:
+            self._stop_camera_preview()
+            return
+        try:
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = rgb_frame.shape
+            bytes_per_line = ch * w
+            image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+            pixmap = QPixmap.fromImage(image)
+            scaled = pixmap.scaled(
+                self._preview_placeholder.width() or 220,
+                self._preview_placeholder.height() or 120,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self._preview_placeholder.setPixmap(scaled)
+            self._preview_placeholder.setText("")
+            self._preview_placeholder.setStyleSheet("background: transparent;")
+        except RuntimeError:
+            self._stop_camera_preview()
+
+    def _stop_camera_preview(self) -> None:
+        self._preview_timer.stop()
+        if self._camera_cap is not None:
+            try:
+                self._camera_cap.release()
+            except Exception:
+                pass
+            self._camera_cap = None
+        try:
+            self._preview_placeholder.setPixmap(QPixmap())
+        except RuntimeError:
+            pass
 
     def _load_profiles(self):
         profiles_data = get_authorized_profiles()
@@ -1453,20 +1538,23 @@ class ManageProfilesOverlay(QWidget):
 
     def _set_capture_state(self, state: str) -> None:
         if state == "recording":
-            self._speak_indicator.setText("● SPEAK NOW")
-            self._speak_indicator.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
-            self._preview_placeholder.setText("Camera preview active. Keep your face centered while speaking.")
-            self._preview_placeholder.setStyleSheet(f"color: {C.TEXT}; background: transparent;")
+            self._safe_set_widget_text(self._speak_indicator, "● SPEAK NOW")
+            self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.ACC2}; background: transparent;")
+            self._safe_set_widget_text(self._preview_placeholder, "Camera preview active. Keep your face centered while speaking.")
+            self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.TEXT}; background: transparent;")
+            self._start_camera_preview()
         elif state == "ready":
-            self._speak_indicator.setText("● READY")
-            self._speak_indicator.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
-            self._preview_placeholder.setText("Capture complete. Review the baseline and confirm if it looks right.")
-            self._preview_placeholder.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+            self._safe_set_widget_text(self._speak_indicator, "● READY")
+            self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.GREEN}; background: transparent;")
+            self._safe_set_widget_text(self._preview_placeholder, "Capture complete. Review the baseline and confirm if it looks right.")
+            self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.GREEN}; background: transparent;")
+            self._stop_camera_preview()
         else:
-            self._speak_indicator.setText("● WAITING")
-            self._speak_indicator.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
-            self._preview_placeholder.setText("Camera preview will appear here while the baseline is being captured.")
-            self._preview_placeholder.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+            self._safe_set_widget_text(self._speak_indicator, "● WAITING")
+            self._safe_set_widget_stylesheet(self._speak_indicator, f"color: {C.TEXT_MED}; background: transparent;")
+            self._safe_set_widget_text(self._preview_placeholder, "Camera preview will appear here while the baseline is being captured.")
+            self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.TEXT_DIM}; background: transparent;")
+            self._stop_camera_preview()
 
     def _show_capture_confirmation(self, message: str) -> None:
         self._setup_status.setText(message)
