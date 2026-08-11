@@ -2940,6 +2940,8 @@ class JarvisLive:
 
     def _enqueue_outgoing_audio(self, data: bytes) -> None:
         """Keep mic audio near-real-time by discarding oldest frames when queue is full."""
+        if getattr(self.ui, "is_biometric_lock_active", lambda: False)():
+            return
         try:
             self.out_queue.put_nowait({"data": data, "mime_type": "audio/pcm"})
             self._audio_diag_inc("mic_enqueued")
@@ -2958,6 +2960,8 @@ class JarvisLive:
 
     async def _enqueue_incoming_audio(self, data: bytes) -> None:
         """Queue assistant audio with profile-aware overflow policy."""
+        if getattr(self.ui, "is_biometric_lock_active", lambda: False)():
+            return
         if not self.audio_in_queue:
             return
         policy = str(self._audio_cfg.get("speaker_drop_policy", "preserve") or "preserve").strip().lower()
