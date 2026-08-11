@@ -127,7 +127,7 @@ def get_authorized_profiles() -> dict:
     """Retrieves all currently configured biometric security profiles."""
     return {
         "primary": _AUTHORIZED_PROFILES["primary"],
-        "authorized": list(_AUTHORIZED_PROFILES["authorized"].keys())
+        "authorized": {key: value for key, value in _AUTHORIZED_PROFILES["authorized"].items()},
     }
 
 @lru_cache(maxsize=32)

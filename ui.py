@@ -38,6 +38,12 @@ from PyQt6.QtWidgets import (
     QStackedWidget, QTextEdit, QVBoxLayout, QWidget, QProgressBar,
 )
 
+from actions.file_controller import (
+    enroll_biometric_profile,
+    get_authorized_profiles,
+    verify_biometric_security,
+)
+
 def _base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
@@ -1229,6 +1235,30 @@ class ManageProfilesOverlay(QWidget):
         form_row.addWidget(add_btn, stretch=1)
         lay.addLayout(form_row)
 
+        self._voice_input = QLineEdit()
+        self._voice_input.setPlaceholderText("Voice signature text")
+        self._voice_input.setFont(QFont("Courier New", 8))
+        self._voice_input.setFixedHeight(30)
+        self._voice_input.setStyleSheet(f"""
+            QLineEdit {{
+                background: {C.PANEL2}; color: {C.WHITE};
+                border: 1px solid {C.BORDER}; border-radius: 3px; padding: 2px 6px;
+            }}
+        """)
+        lay.addWidget(self._voice_input)
+
+        self._visual_input = QLineEdit()
+        self._visual_input.setPlaceholderText("Visual signature text")
+        self._visual_input.setFont(QFont("Courier New", 8))
+        self._visual_input.setFixedHeight(30)
+        self._visual_input.setStyleSheet(f"""
+            QLineEdit {{
+                background: {C.PANEL2}; color: {C.WHITE};
+                border: 1px solid {C.BORDER}; border-radius: 3px; padding: 2px 6px;
+            }}
+        """)
+        lay.addWidget(self._visual_input)
+
         close_btn = QPushButton("CLOSE")
         close_btn.setFixedHeight(34)
         close_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
@@ -1246,43 +1276,72 @@ class ManageProfilesOverlay(QWidget):
         self._load_profiles()
 
     def _load_profiles(self):
-        profiles = self._get_profiles()
+        profiles_data = get_authorized_profiles()
+        primary = profiles_data.get("primary") or {}
+        authorized = profiles_data.get("authorized") or {}
         lines = []
-        for p in profiles:
-            lines.append(f"• Name: {p.get('name')}  |  ID: {p.get('id')}  |  Voice/Visual: Registered ✓")
+
+        if primary.get("name"):
+            voice_samples = ", ".join(primary.get("voice_prints", []) or [])
+            visual_samples = ", ".join(primary.get("visual_signatures", []) or [])
+            lines.append(
+                f"• PRIMARY: {primary.get('name')} | Voice: {voice_samples or 'n/a'} | Visual: {visual_samples or 'n/a'}"
+            )
+
+        for profile_id, profile in authorized.items():
+            voice_samples = ", ".join(profile.get("voice_prints", []) or [])
+            visual_samples = ", ".join(profile.get("visual_signatures", []) or [])
+            lines.append(
+                f"• {profile.get('name')} ({profile_id}) | Voice: {voice_samples or 'n/a'} | Visual: {visual_samples or 'n/a'}"
+            )
+
         if not lines:
             lines.append("No profiles registered. Primary user profile will be initialized.")
         self._profile_list_edit.setPlainText("\n".join(lines))
 
     def _get_profiles(self) -> list[dict]:
-        try:
-            if PROFILES_FILE.exists():
-                data = json.loads(PROFILES_FILE.read_text(encoding="utf-8"))
-                if isinstance(data, list):
-                    return data
-        except Exception:
-            pass
-        # Default primary profile
-        default_prof = [{"name": "James Lumsden", "id": "JAMES-001", "voice_signature": "verified", "visual_signature": "verified"}]
-        os.makedirs(CONFIG_DIR, exist_ok=True)
-        PROFILES_FILE.write_text(json.dumps(default_prof, indent=4), encoding="utf-8")
-        return default_prof
+        profiles_data = get_authorized_profiles()
+        primary = profiles_data.get("primary") or {}
+        authorized = profiles_data.get("authorized") or {}
+        result = []
+        if primary.get("name"):
+            result.append({
+                "name": primary.get("name"),
+                "id": primary.get("id", "PRIMARY"),
+                "voice_signature": "verified" if primary.get("voice_prints") else "enrolled",
+                "visual_signature": "verified" if primary.get("visual_signatures") else "enrolled",
+            })
+        for profile_id, profile in authorized.items():
+            result.append({
+                "name": profile.get("name"),
+                "id": profile_id,
+                "voice_signature": "enrolled",
+                "visual_signature": "enrolled",
+            })
+        return result
 
     def _add_profile(self):
         name = self._new_name_input.text().strip()
         if not name:
             return
-        profiles = self._get_profiles()
-        new_id = f"STARK-{random.randint(100, 999)}"
-        profiles.append({
-            "name": name,
-            "id": new_id,
-            "voice_signature": "enrolled",
-            "visual_signature": "enrolled"
-        })
-        os.makedirs(CONFIG_DIR, exist_ok=True)
-        PROFILES_FILE.write_text(json.dumps(profiles, indent=4), encoding="utf-8")
+
+        voice_text = self._voice_input.text().strip() or name
+        visual_text = self._visual_input.text().strip() or name
+        make_primary = not bool(get_authorized_profiles().get("primary", {}).get("name"))
+        profile_id = name.lower().replace(" ", "_")
+
+        enroll_biometric_profile(
+            profile_id=profile_id,
+            name=name,
+            voice_print=voice_text,
+            visual_signature=visual_text,
+            clearance_level="omega",
+            make_primary=make_primary,
+        )
+
         self._new_name_input.clear()
+        self._voice_input.clear()
+        self._visual_input.clear()
         self._load_profiles()
 
 
@@ -1329,11 +1388,12 @@ class BiometricLockOverlay(QWidget):
         sep.setStyleSheet(f"color: {C.BORDER}; margin: 4px 0;")
         lay.addWidget(sep)
 
-        self._profile_lbl = QLabel("PRIMARY PROFILE: James Lumsden (JAMES-001)")
+        self._profile_lbl = QLabel("PRIMARY PROFILE: James Lumsden (PRIMARY)")
         self._profile_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         self._profile_lbl.setStyleSheet(f"color: {C.PRI}; background: transparent;")
         self._profile_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(self._profile_lbl)
+        self._refresh_profile_label()
 
         self._status_lbl = QLabel("STATUS: AWAITING VOICE & VISUAL SCAN")
         self._status_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
@@ -1401,21 +1461,39 @@ class BiometricLockOverlay(QWidget):
         override_btn.clicked.connect(self.verified.emit)
         lay.addWidget(override_btn)
 
+    def _refresh_profile_label(self):
+        primary = get_authorized_profiles().get("primary") or {}
+        name = primary.get("name") or "James Lumsden"
+        self._profile_lbl.setText(f"PRIMARY PROFILE: {name} (PRIMARY)")
+
     def _run_scan(self):
         self._scan_btn.setEnabled(False)
+        self._refresh_profile_label()
         self._status_lbl.setText("STATUS: SCANNING PROFILE BIOMETRICS...")
         QTimer.singleShot(1000, self._step_voice)
 
     def _step_voice(self):
-        self._voice_chk.setText("🎙️ Voice Recognition: PROFILE VERIFIED ✓")
-        self._voice_chk.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+        primary = get_authorized_profiles().get("primary") or {}
+        voice_text = ", ".join(primary.get("voice_prints", []) or []) or primary.get("name") or "James Lumsden"
+        verified_voice = verify_biometric_security(voice_text, "")
+        self._voice_chk.setText(
+            "🎙️ Voice Recognition: PROFILE VERIFIED ✓" if verified_voice else "🎙️ Voice Recognition: PROFILE NOT FOUND"
+        )
+        self._voice_chk.setStyleSheet(f"color: {C.GREEN if verified_voice else C.RED}; background: transparent;")
         QTimer.singleShot(900, self._step_visual)
 
     def _step_visual(self):
-        self._visual_chk.setText("👁️ Visual Person Detection: PROFILE VERIFIED ✓")
-        self._visual_chk.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
-        self._status_lbl.setText("STATUS: PROFILE CLEARANCE GRANTED")
-        self._status_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+        primary = get_authorized_profiles().get("primary") or {}
+        visual_text = ", ".join(primary.get("visual_signatures", []) or []) or primary.get("name") or "James Lumsden"
+        verified_visual = verify_biometric_security("", visual_text)
+        self._visual_chk.setText(
+            "👁️ Visual Person Detection: PROFILE VERIFIED ✓" if verified_visual else "👁️ Visual Person Detection: PROFILE NOT FOUND"
+        )
+        self._visual_chk.setStyleSheet(f"color: {C.GREEN if verified_visual else C.RED}; background: transparent;")
+        self._status_lbl.setText(
+            "STATUS: PROFILE CLEARANCE GRANTED" if verified_visual and verified_voice else "STATUS: PROFILE NOT VERIFIED"
+        )
+        self._status_lbl.setStyleSheet(f"color: {C.GREEN if verified_visual and verified_voice else C.RED}; background: transparent;")
         QTimer.singleShot(700, self.verified.emit)
 
 
