@@ -4,6 +4,7 @@ import json
 import os
 import platform
 import shutil
+import sys
 import wave
 from contextlib import contextmanager, redirect_stderr
 from pathlib import Path
