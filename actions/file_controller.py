@@ -34,6 +34,7 @@ except ImportError:
     _SEND2TRASH = False
 
 _OS = platform.system()  # "Windows" | "Darwin" | "Linux"
+_USE_SOUNDDEVICE_CAPTURE = os.environ.get("JARVIS_USE_SOUNDDEVICE_CAPTURE", "0") == "1"
 
 _SAFE_ROOTS: tuple[Path, ...] = (
     Path.home(),
@@ -167,7 +168,9 @@ def _pcm_to_wav(audio_bytes: bytes, sample_rate: int = 16_000) -> bytes:
 
 
 def _record_voice_sample(duration_seconds: float = 1.2, sample_rate: int = 16_000) -> tuple[bytes, float]:
-    if sd is not None:
+    # macOS PortAudio/AUHAL can be noisy/unreliable in this project context.
+    # Default to SpeechRecognition capture unless explicitly overridden.
+    if sd is not None and (_OS != "Darwin" or _USE_SOUNDDEVICE_CAPTURE):
         try:
             stderr_buffer = io.StringIO()
             with redirect_stderr(stderr_buffer):
@@ -213,15 +216,37 @@ def _capture_live_visual_frame() -> tuple[bytes | None, bool]:
         if not ok or frame is None:
             return None, False
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-        if face_cascade.empty():
-            return None, False
-        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-        face_detected = bool(len(faces) > 0)
+        face_detected = False
+        face_cascade_ctor = getattr(cv2, "CascadeClassifier", None)
+        if face_cascade_ctor is not None:
+            face_cascade = face_cascade_ctor(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            if not getattr(face_cascade, "empty", lambda: True)():
+                faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+                face_detected = bool(len(faces) > 0)
         _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
         return (buf.tobytes() if buf is not None else None), face_detected
     except Exception:
         return None, False
+
+
+def _resolve_face_auth_reference() -> Path:
+    override = os.environ.get("JARVIS_AUTH_REFERENCE")
+    if override:
+        return Path(override).expanduser()
+    return Path(__file__).resolve().parent.parent / "auth_reference.jpg"
+
+
+def _verify_reference_face_match() -> bool:
+    ref_path = _resolve_face_auth_reference()
+    if not ref_path.exists():
+        return False
+    try:
+        from auth import verify_face
+
+        ok, _reason = verify_face(str(ref_path))
+        return bool(ok)
+    except Exception:
+        return False
 
 
 def _verify_live_voice_with_gemini(audio_bytes: bytes, target_identity: str) -> bool:
@@ -361,6 +386,7 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
 
     audio_bytes, voice_energy = _record_voice_sample()
     image_bytes, face_detected = _capture_live_visual_frame()
+    reference_face_match = _verify_reference_face_match()
 
     stored_voice_sample = primary.get("voice_sample")
     stored_visual_sample = primary.get("visual_sample")
@@ -378,7 +404,7 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
             voice_detected = _voice_matches_baseline(audio_bytes, baseline_audio)
 
     if face_detected or image_bytes:
-        if face_detected or _verify_live_face_with_gemini(image_bytes, identity_name):
+        if reference_face_match or face_detected or _verify_live_face_with_gemini(image_bytes, identity_name):
             visual_detected = True
         elif stored_visual_sample:
             try:
@@ -394,6 +420,7 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
     return granted, {
         "voice_detected": voice_detected,
         "visual_detected": visual_detected,
+        "reference_face_match": reference_face_match,
         "identity_match": identity_match,
         "voice_energy": voice_energy,
         "face_detected": face_detected,
