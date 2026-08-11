@@ -15,7 +15,35 @@ except Exception:  # pragma: no cover - optional dependency
     np = None
 
 
+def _load_detector():
+    classifier = getattr(cv2, "CascadeClassifier", None)
+    if classifier is None:
+        return None
+    detector = classifier(str(Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml"))
+    if hasattr(detector, "empty") and detector.empty():
+        return None
+    return detector
+
+
+def _center_face_crop(gray_frame):
+    h, w = gray_frame.shape[:2]
+    side = int(min(h, w) * 0.58)
+    side = max(64, side)
+    cx = w // 2
+    cy = h // 2
+    x1 = max(0, cx - side // 2)
+    y1 = max(0, cy - side // 2)
+    x2 = min(w, x1 + side)
+    y2 = min(h, y1 + side)
+    if x2 <= x1 or y2 <= y1:
+        return None
+    return gray_frame[y1:y2, x1:x2]
+
+
 def _extract_primary_face(gray_frame, detector):
+    if detector is None:
+        return _center_face_crop(gray_frame)
+
     faces = detector.detectMultiScale(
         gray_frame,
         scaleFactor=1.1,
@@ -23,7 +51,7 @@ def _extract_primary_face(gray_frame, detector):
         minSize=(64, 64),
     )
     if len(faces) == 0:
-        return None
+        return _center_face_crop(gray_frame)
     x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
     return gray_frame[y : y + h, x : x + w]
 
@@ -48,11 +76,7 @@ def verify_face(reference_image: str | os.PathLike[str] | None = None, camera_in
         return False, "OpenCV/numpy are not available in this environment"
 
     try:
-        detector = cv2.CascadeClassifier(
-            str(Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml")
-        )
-        if detector.empty():
-            return False, "OpenCV Haar cascade was not available"
+        detector = _load_detector()
 
         reference_bgr = cv2.imread(str(ref_path))
         if reference_bgr is None:
@@ -67,7 +91,13 @@ def verify_face(reference_image: str | os.PathLike[str] | None = None, camera_in
             capture.release()
             return False, "No webcam was available"
 
-        ok, frame = capture.read()
+        frame = None
+        ok = False
+        # Read a few frames so camera auto-exposure can settle.
+        for _ in range(12):
+            ok, frame = capture.read()
+            if ok and frame is not None:
+                pass
         capture.release()
         if not ok or frame is None:
             return False, "Unable to read a frame from the webcam"
