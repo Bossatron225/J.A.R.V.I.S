@@ -3023,7 +3023,8 @@ class JarvisLive:
                     await asyncio.sleep(0.1)
         except Exception as e:
             print(f"[JARVIS] ❌ Mic: {e}")
-            raise
+            self.ui.write_log(f"SYS: Microphone unavailable — continuing without live mic input ({e})")
+            return
 
     async def _receive_audio(self):
         print("[JARVIS] 👂 Recv started")

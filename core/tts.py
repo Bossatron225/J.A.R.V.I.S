@@ -94,18 +94,21 @@ def _play_np(samples, sample_rate: int) -> None:
     """Play float32 mono (or stereo) audio via sounddevice.
     Accepts numpy arrays or PyTorch tensors.
     """
-    reset_audio_output()
-    arr = _to_numpy(samples)
-    if arr.ndim == 2 and arr.shape[1] == 2:
-        arr = arr.mean(axis=1)
-    elif arr.ndim > 1 and arr.shape[-1] == 2:
-        arr = arr.mean(axis=-1)
+    try:
+        reset_audio_output()
+        arr = _to_numpy(samples)
+        if arr.ndim == 2 and arr.shape[1] == 2:
+            arr = arr.mean(axis=1)
+        elif arr.ndim > 1 and arr.shape[-1] == 2:
+            arr = arr.mean(axis=-1)
 
-    # sounddevice expects a 1-D float32 array for PCM playback. Converting to
-    # a plain list avoids the NumPy 2.5 deprecation warning triggered by the
-    # library's internal reshape path.
-    sd.play(arr.astype(np.float32, copy=False).reshape(-1).tolist(), sample_rate)
-    sd.wait()
+        # sounddevice expects a 1-D float32 array for PCM playback. Converting to
+        # a plain list avoids the NumPy 2.5 deprecation warning triggered by the
+        # library's internal reshape path.
+        sd.play(arr.astype(np.float32, copy=False).reshape(-1).tolist(), sample_rate)
+        sd.wait()
+    except Exception as exc:
+        print(f"[TTS] Audio playback failed: {exc}")
 
 
 def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> None:
@@ -117,8 +120,8 @@ def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> Non
     Raw PCM data is also supported when ElevenLabs returns a byte stream instead
     of a RIFF/WAV container.
     """
-    reset_audio_output()
     try:
+        reset_audio_output()
         import miniaudio
 
         decoded = miniaudio.decode(
@@ -173,8 +176,11 @@ def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> Non
         raise RuntimeError("Unsupported raw PCM audio payload") from exc
 
     arr = arr.astype(np.float32, copy=False).reshape(-1)
-    sd.play(arr.tolist(), sample_rate)
-    sd.wait()
+    try:
+        sd.play(arr.tolist(), sample_rate)
+        sd.wait()
+    except Exception as exc:
+        print(f"[TTS] Audio playback failed: {exc}")
 
 
 # ---------------------------------------------------------------------------
