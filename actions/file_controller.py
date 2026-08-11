@@ -94,6 +94,8 @@ def enroll_biometric_profile(
     visual_signature: str,
     clearance_level: str = "omega",
     make_primary: bool = False,
+    voice_sample: bytes | None = None,
+    visual_sample: bytes | None = None,
 ) -> str:
     """Enrolls a biometric profile with stored voice and visual signature hints for later verification."""
     global _AUTHORIZED_PROFILES
@@ -109,6 +111,10 @@ def enroll_biometric_profile(
         "visual_signatures": [normalized_visual] if normalized_visual else [],
         "clearance_level": clearance_level,
     }
+    if voice_sample is not None:
+        entry["voice_sample"] = base64.b64encode(voice_sample).decode("ascii")
+    if visual_sample is not None:
+        entry["visual_sample"] = base64.b64encode(visual_sample).decode("ascii")
 
     if make_primary:
         _AUTHORIZED_PROFILES["primary"] = entry
