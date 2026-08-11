@@ -1671,6 +1671,8 @@ class BiometricLockOverlay(QWidget):
             return
         self._qt_ready = True
         super().__init__(parent)
+        self._failed_scans = 0
+        self._max_failed_scans = 3
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"""
             BiometricLockOverlay {{
@@ -1816,13 +1818,23 @@ class BiometricLockOverlay(QWidget):
 
     def _apply_verification_state(self, verified_voice: bool, verified_visual: bool) -> bool:
         granted = verified_visual and verified_voice
+        if granted:
+            self._failed_scans = 0
+            self._status_lbl.setText("STATUS: PROFILE CLEARANCE GRANTED")
+            self._status_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+            self._scan_btn.setEnabled(False)
+            self._scan_btn.setText("ACCESS GRANTED")
+            return granted
+
+        self._failed_scans += 1
         self._status_lbl.setText(
-            "STATUS: PROFILE CLEARANCE GRANTED" if granted else "STATUS: PROFILE NOT VERIFIED"
+            f"STATUS: PROFILE NOT VERIFIED ({self._failed_scans}/{self._max_failed_scans})"
         )
-        self._status_lbl.setStyleSheet(f"color: {C.GREEN if granted else C.RED}; background: transparent;")
-        self._scan_btn.setEnabled(not granted)
-        self._scan_btn.setText("ACCESS GRANTED" if granted else "RETRY BIOMETRIC SCAN")
-        if not granted:
+        self._status_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
+        self._scan_btn.setEnabled(True)
+        self._scan_btn.setText("RETRY BIOMETRIC SCAN")
+        if self._failed_scans >= self._max_failed_scans:
+            self._status_lbl.setText("STATUS: SECURITY LOCKDOWN")
             self.failed.emit()
         return granted
 
