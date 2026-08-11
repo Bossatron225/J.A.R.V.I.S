@@ -232,7 +232,13 @@ def _nvml_gpu_windows() -> float:
                     continue
 
         if _nvml_lib is None:
-            import pynvml
+            try:
+                import pynvml  # type: ignore[import-not-found]
+            except Exception:
+                pynvml = None
+            if pynvml is None:
+                _nvml_ok = False
+                return -1.0
             pynvml.nvmlInit()
             h = pynvml.nvmlDeviceGetHandleByIndex(0)
             _nvml_ok = True
@@ -313,7 +319,7 @@ class _SysMetrics:
 
     def _get_gpu(self) -> float:
         try:
-            import pynvml
+            import pynvml  # type: ignore[import-not-found]
             pynvml.nvmlInit()
             h = pynvml.nvmlDeviceGetHandleByIndex(0)
             return float(pynvml.nvmlDeviceGetUtilizationRates(h).gpu)
@@ -357,7 +363,7 @@ class _SysMetrics:
 
         if _OS == "Windows":
             try:
-                import wmi
+                import wmi  # type: ignore[import-not-found]
                 w = wmi.WMI(namespace="root/wmi")
                 tz = w.MSAcpi_ThermalZoneTemperature()
                 if tz:
@@ -2767,7 +2773,7 @@ class MainWindow(QMainWindow):
     def _create_lnk_windows(lnk: str, target: str, args: str,
                              work_dir: str, icon_loc: str) -> None:
         try:
-            from win32com.client import Dispatch
+            from win32com.client import Dispatch  # type: ignore[import-not-found]
             sh = Dispatch("WScript.Shell")
             sc = sh.CreateShortCut(lnk)
             sc.TargetPath       = target
