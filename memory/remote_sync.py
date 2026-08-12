@@ -48,7 +48,11 @@ def fetch_remote_memory(base_url: str) -> dict:
     try:
         with request.urlopen(url, timeout=10) as response:
             payload = json.loads(response.read().decode('utf-8'))
-            return payload if isinstance(payload, dict) else {}
+            if isinstance(payload, dict):
+                if 'memory' in payload and isinstance(payload['memory'], dict):
+                    return payload['memory']
+                return payload
+            return {}
     except (error.URLError, TimeoutError, ValueError):
         return {}
 
