@@ -65,6 +65,10 @@ from memory.obsidian_memory import (
     build_personal_memory_context,
     recall_personal_memory,
 )
+from memory.remote_sync import (
+    load_memory_with_vps_sync,
+    push_memory_to_vps,
+)
 from memory.document_ingestion import (
     ingest_document,
     index_codebase,
@@ -2449,7 +2453,7 @@ class JarvisLive:
         except Exception:
             self._asst_name = "JARVIS"
 
-        memory = load_memory()
+        memory = load_memory_with_vps_sync(load_memory(), os.getenv('JARVIS_VPS_URL'))
         obsidian_mem = recall_user_profile()
         personal_context = build_personal_memory_context(memory, obsidian_mem)
         sys_prompt = _load_system_prompt()
@@ -3498,7 +3502,7 @@ class JarvisLive:
             return
         self._session_log = []    # reset immediately so the next session starts clean
 
-        memory = load_memory()
+        memory = load_memory_with_vps_sync(load_memory(), os.getenv('JARVIS_VPS_URL'))
         lang_entry = memory.get("identity", {}).get("language", {})
         lang = (lang_entry.get("value", "") if isinstance(lang_entry, dict) else str(lang_entry)).strip()
         lang = lang or "English"
@@ -4195,6 +4199,16 @@ class JarvisLive:
                 # Only save if there was a real conversation (≥3 turns)
                 if len(self._session_log) >= 3:
                     asyncio.create_task(self._save_session_summary())
+
+                vps_url = os.getenv('JARVIS_VPS_URL')
+                if vps_url:
+                    try:
+                        local_memory = load_memory()
+                        merged_memory = load_memory_with_vps_sync(local_memory, vps_url)
+                        if merged_memory:
+                            push_memory_to_vps(vps_url, merged_memory)
+                    except Exception as e:
+                        print(f"[Memory Sync] ⚠️ Could not sync to VPS: {e}")
 
             self.set_speaking(False)
             self.ui.set_state("SLEEPING")
