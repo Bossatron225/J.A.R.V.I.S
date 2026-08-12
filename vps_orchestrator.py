@@ -55,6 +55,16 @@ class VPSOrchestrator:
             payload["queue_size"] = len(self.queue)
             return payload
 
+    def reboot(self) -> dict:
+        with self.lock:
+            self.status["status"] = "restarting"
+            self.status["reboot_requested_at"] = datetime.now(timezone.utc).isoformat()
+        return {
+            "status": "restarting",
+            "service": "jarvis-vps-orchestrator",
+            "reboot_requested_at": self.status.get("reboot_requested_at"),
+        }
+
     def process_task(self, task: dict) -> dict:
         action = str(task.get("action", "")).strip().lower()
         payload = task.get("payload") or {}
@@ -119,6 +129,10 @@ def create_app() -> Flask:
     def api_status():
         return jsonify(orchestrator.get_status())
 
+    @app.post("/api/reboot")
+    def api_reboot():
+        return jsonify(orchestrator.reboot())
+
     @app.get("/api/tasks")
     def list_tasks():
         return jsonify({"tasks": orchestrator.get_tasks()})
@@ -162,6 +176,15 @@ def create_app() -> Flask:
             "service": "jarvis-vps-orchestrator",
             "secure_entry": orchestrator.public_entry,
             "status": "ready",
+        })
+
+    @app.get("/api/health")
+    def api_health():
+        return jsonify({
+            "ok": True,
+            "service": "jarvis-vps-orchestrator",
+            "status": "online",
+            "public_entry": orchestrator.public_entry,
         })
 
     @app.get("/api/memory")
