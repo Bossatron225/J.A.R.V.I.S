@@ -69,6 +69,7 @@ from memory.remote_sync import (
     load_memory_with_vps_sync,
     push_memory_to_vps,
 )
+from local_worker import LocalWorker
 from memory.document_ingestion import (
     ingest_document,
     index_codebase,
@@ -1312,6 +1313,7 @@ class JarvisLive:
         self._speech_mic: sr.Microphone | None = None
         self._wake_phrases = ["jarvis", "jarvis wake", "wake up jarvis", "hey jarvis"]
         self._speech_listener_running = False
+        self._local_worker = None
 
     @staticmethod
     def _load_runtime_config() -> dict:
@@ -4002,6 +4004,29 @@ class JarvisLive:
                 print(f"[Dashboard] Command error: {e}")
                 await asyncio.sleep(0.5)
 
+    async def _run_vps_local_worker(self) -> None:
+        """Poll the VPS queue and run only the local actions that belong on this Mac."""
+        while True:
+            vps_url = os.getenv("JARVIS_VPS_URL")
+            if not vps_url:
+                await asyncio.sleep(15)
+                continue
+            try:
+                worker = self._local_worker or LocalWorker(vps_url)
+                self._local_worker = worker
+                tasks = worker.poll_for_tasks(limit=5)
+                if tasks:
+                    self.ui.write_log(f"SYS: Local worker processed {len(tasks)} queued task(s) from VPS.")
+                    for task in tasks:
+                        action = str(task.get("action") or "").strip().lower()
+                        result = worker.execute_local_action(action, task.get("payload") or {})
+                        print(f"[Local Worker] {action}: {result}")
+                        if result.get("status") == "rejected":
+                            self.ui.write_log(f"SYS: VPS task rejected on local worker: {action}")
+            except Exception as e:
+                print(f"[Local Worker] Poll error: {e}")
+            await asyncio.sleep(5)
+
     # ── main loop ───────────────────────────────────────────────────────────
 
     async def run(self):
@@ -4035,6 +4060,8 @@ class JarvisLive:
         except Exception as e:
             print(f"[Dashboard] Disabled: {e}")
             self._dashboard = None
+
+        asyncio.create_task(self._run_vps_local_worker())
 
         while True:
             try:
