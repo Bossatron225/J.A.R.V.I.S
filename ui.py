@@ -2518,6 +2518,10 @@ class MainWindow(QMainWindow):
         self._visual_watch_status_lbl.setFont(QFont("Courier New", 7))
         self._visual_watch_status_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
         self._visual_watch_status_lbl.setToolTip("Live tab/window/app watch activity")
+        self._vps_status_lbl = QLabel("VPS: checking...")
+        self._vps_status_lbl.setFont(QFont("Courier New", 7))
+        self._vps_status_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        self._vps_status_lbl.setToolTip("Remote VPS health status")
 
         _cam_cont = QWidget()
         _cam_cont.setStyleSheet("background: #000308;")
@@ -3381,6 +3385,20 @@ class MainWindow(QMainWindow):
         self._style_mute_btn()
         lay.addWidget(self._mute_btn)
 
+        self._vps_reboot_btn = QPushButton("♻  REBOOT VPS")
+        self._vps_reboot_btn.setFixedHeight(30)
+        self._vps_reboot_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        self._vps_reboot_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._vps_reboot_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: #120d00; color: {C.ACC2};
+                border: 1px solid {C.ACC2}; border-radius: 3px;
+            }}
+            QPushButton:hover {{ background: #1a1000; }}
+        """)
+        self._vps_reboot_btn.clicked.connect(self._handle_vps_reboot)
+        lay.addWidget(self._vps_reboot_btn)
+
         return w
 
     def _build_quick_drawer(self) -> QWidget:
@@ -3742,6 +3760,7 @@ class MainWindow(QMainWindow):
 
         lay.addWidget(_fl("[F4] Mute  ·  [F11] Fullscreen"))
         lay.addWidget(self._remote_url_status_lbl)
+        lay.addWidget(self._vps_status_lbl)
         lay.addWidget(self._wake_bridge_status_lbl)
         lay.addWidget(self._audio_status_lbl)
         lay.addWidget(self._visual_watch_status_lbl)
