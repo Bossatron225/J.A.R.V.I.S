@@ -3690,6 +3690,19 @@ class MainWindow(QMainWindow):
             self._remote_url_status_lbl.setText("Remote URL: unavailable")
             self._remote_url_status_lbl.setToolTip("Current public or manual remote dashboard URL")
 
+    def set_vps_status(self, text: str, level: str = "neutral", tooltip: str | None = None):
+        colors = {"ok": C.GREEN, "warn": C.ACC2, "bad": C.RED, "off": C.TEXT_DIM, "neutral": C.TEXT_DIM}
+        color = colors.get(level, C.TEXT_DIM)
+        shown = (text or "VPS: unknown").strip()
+        if len(shown) > 80:
+            shown = shown[:77] + "..."
+        self._vps_status_lbl.setText(shown)
+        self._vps_status_lbl.setStyleSheet(f"color: {color}; background: transparent;")
+        if tooltip:
+            self._vps_status_lbl.setToolTip(tooltip)
+        else:
+            self._vps_status_lbl.setToolTip(shown)
+
     def set_wake_bridge_status(self, text: str, level: str = "neutral", tooltip: str | None = None):
         colors = {
             "ok": C.GREEN,
@@ -3767,6 +3780,53 @@ class MainWindow(QMainWindow):
         lay.addStretch()
         lay.addWidget(_fl("By FatihMakes", C.PRI_DIM))
         return w
+
+    def _handle_vps_reboot(self):
+        url = os.getenv("JARVIS_VPS_URL")
+        if not url:
+            self.set_vps_status("VPS: no URL configured", "warn", "Set JARVIS_VPS_URL to enable remote reboot.")
+            return
+        try:
+            import json
+            from urllib import request, error
+            req = request.Request(
+                f"{url.rstrip('/')}/api/reboot",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with request.urlopen(req, timeout=10) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+            self.set_vps_status("VPS: reboot requested", "warn", str(payload))
+            self._log.append_log("SYS: VPS reboot requested.")
+        except (error.URLError, TimeoutError, ValueError, OSError):
+            self.set_vps_status("VPS: reboot failed", "bad", "Could not reach remote server.")
+            self._log.append_log("SYS: VPS reboot failed — server unreachable.")
+
+    def _poll_vps_status(self):
+        url = os.getenv("JARVIS_VPS_URL")
+        if not url:
+            self.set_vps_status("VPS: not configured", "neutral", "Set JARVIS_VPS_URL to monitor the remote server.")
+            return
+        try:
+            import json
+            from urllib import request, error
+            with request.urlopen(f"{url.rstrip('/')}/api/health", timeout=8) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+            ok = bool(payload.get("ok", False))
+            if ok:
+                self.set_vps_status("VPS: online", "ok", str(payload))
+            else:
+                self.set_vps_status("VPS: unhealthy", "warn", str(payload))
+        except (error.URLError, TimeoutError, ValueError, OSError):
+            self.set_vps_status("VPS: offline", "bad", "Remote server is unreachable.")
+
+    def _start_vps_status_polling(self):
+        timer = QTimer(self)
+        timer.timeout.connect(self._poll_vps_status)
+        timer.start(12000)
+        self._vps_poll_timer = timer
+        self._poll_vps_status()
 
     def _on_file_selected(self, payload):
         paths = []
