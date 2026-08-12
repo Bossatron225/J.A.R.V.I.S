@@ -2626,6 +2626,7 @@ class MainWindow(QMainWindow):
             self._show_setup()
         else:
             QTimer.singleShot(400, self._show_biometric_lock)
+        QTimer.singleShot(500, self._start_vps_status_polling)
 
         sc_mute = QShortcut(QKeySequence("F4"), self)
         sc_mute.activated.connect(self._toggle_mute)
