@@ -30,6 +30,7 @@ except Exception:  # pragma: no cover - optional dependency at runtime
 
 
 DEFAULT_PHONE_NUMBER = "+353833592353"
+DEFAULT_PORT = int(os.getenv("JARVIS_TWILIO_PORT", "5001"))
 
 
 def normalize_phone_number(value: str | int | None) -> str:
@@ -200,4 +201,4 @@ def create_twilio_bridge_app(config: dict | None = None):
 
 if __name__ == "__main__":
     app = create_twilio_bridge_app()
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=DEFAULT_PORT)
