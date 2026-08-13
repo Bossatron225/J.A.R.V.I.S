@@ -2241,11 +2241,11 @@ class JarvisLive:
         ack_target = sender or chat_name
         if ack_target:
             status = "online" if self.session else "reconnecting"
-            ack = (
-                "JARVIS wake protocol accepted. "
-                f"Status: {status}. "
-                "You can now send remote commands."
-            )
+            ack = self._build_wake_remote_access_message()
+            if status == "online":
+                ack = ack + f"\nLocal status: {status}."
+            else:
+                ack = ack + f"\nLocal status: {status}."
             result = await asyncio.to_thread(send_imessage, ack_target, ack)
             self.ui.write_log(f"SYS: iMessage wake acknowledgement: {result}")
         return True
@@ -2362,6 +2362,45 @@ class JarvisLive:
         else:
             sec = "SECURITY: STATUS UNAVAILABLE"
         return url, key, auto, manual, sec
+
+    def _build_wake_remote_access_message(self) -> str:
+        """Return the live remote access details to include in a wake acknowledgement."""
+        if self._dashboard is None:
+            return (
+                "JARVIS wake accepted. "
+                "The Mac app is active locally, but the remote VPS dashboard is unavailable."
+            )
+
+        if hasattr(self._dashboard, "new_key"):
+            key = self._dashboard.new_key()
+        else:
+            key = ""
+
+        if hasattr(self._dashboard, "get_remote_url"):
+            url = self._dashboard.get_remote_url()
+        elif hasattr(self._dashboard, "get_url"):
+            url = self._dashboard.get_url()
+        else:
+            url = "remote dashboard unavailable"
+
+        auto = ""
+        if key and hasattr(self._dashboard, "get_auto_login_url"):
+            auto = self._dashboard.get_auto_login_url(key)
+        elif key:
+            auto = f"{url}/auto-login?key={key}"
+
+        sec = self._dashboard.get_remote_security_status() if hasattr(self._dashboard, "get_remote_security_status") else "SECURITY: STATUS UNAVAILABLE"
+        lines = [
+            "JARVIS wake accepted.",
+            f"Remote link: {url}",
+        ]
+        if key:
+            lines.append(f"Access key: {key}")
+        if auto:
+            lines.append(f"Auto-login: {auto}")
+        lines.append(sec)
+        lines.append("If the Mac is online, local launch will proceed automatically; otherwise use the remote link above.")
+        return "\n".join(lines)
 
     def _is_disconnect_error(self, err: Exception | BaseException) -> bool:
         return _is_disconnect_error(err)
