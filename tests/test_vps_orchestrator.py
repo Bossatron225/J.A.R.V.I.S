@@ -52,3 +52,7 @@ def test_vps_orchestrator_health_and_task_queue():
     assert 'queue_size' in ops_payload
     assert 'queue' in ops_payload
     assert 'public_entry' in ops_payload
+
+    dashboard = client.get('/dashboard')
+    assert dashboard.status_code == 200
+    assert b'JARVIS VPS Dashboard' in dashboard.data
