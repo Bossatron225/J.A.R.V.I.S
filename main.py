@@ -2531,6 +2531,21 @@ class JarvisLive:
     def speak(self, text: str):
         if getattr(self.ui, "is_biometric_lock_active", lambda: False)():
             return
+        vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
+        if vps_url:
+            try:
+                url = f"{vps_url.rstrip('/')}/api/health"
+                with urllib.request.urlopen(url, timeout=4) as resp:
+                    payload = resp.read(2048)
+                try:
+                    data = json.loads(payload.decode("utf-8", errors="replace"))
+                except Exception:
+                    data = {}
+                if isinstance(data, dict) and data.get("ok") is not False:
+                    self.ui.write_log("SYS: VPS healthy; local speech suppressed to keep remote voice authoritative.")
+                    return
+            except Exception:
+                pass
         if not self._loop or not self.session:
             return
         asyncio.run_coroutine_threadsafe(
