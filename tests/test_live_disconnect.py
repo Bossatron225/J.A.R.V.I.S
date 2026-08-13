@@ -129,9 +129,49 @@ def test_launch_local_jarvis_if_needed_uses_python_entry(monkeypatch) -> None:
 
     monkeypatch.setattr(main_module, "_subprocess", FakeSubprocess())
     monkeypatch.setattr(main_module._platform, "system", lambda: "Darwin")
+    monkeypatch.delenv("JARVIS_VPS_URL", raising=False)
 
     launched = jarvis._launch_local_jarvis_if_needed()
 
     assert launched is True
     assert calls and calls[0][0][0].endswith("python")
     assert str(calls[0][0][-1]).endswith("main.py")
+
+
+def test_launch_local_jarvis_if_needed_prefers_vps_when_configured(monkeypatch) -> None:
+    jarvis = JarvisLive(DummyUI())
+    jarvis.session = None
+    calls = []
+
+    def fake_popen(args, **kwargs):
+        calls.append((args, kwargs))
+        class DummyProc:
+            pass
+        return DummyProc()
+
+    class FakeSubprocess:
+        DEVNULL = None
+
+        @staticmethod
+        def Popen(*args, **kwargs):
+            return fake_popen(*args, **kwargs)
+
+    class FakeResp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, *_args, **_kwargs):
+            return b'{"ok": true, "status": "online"}'
+
+    monkeypatch.setattr(main_module, "_subprocess", FakeSubprocess())
+    monkeypatch.setattr(main_module._platform, "system", lambda: "Darwin")
+    monkeypatch.setenv("JARVIS_VPS_URL", "https://vps.example.com")
+    monkeypatch.setattr(main_module.urllib.request, "urlopen", lambda *args, **kwargs: FakeResp())
+
+    launched = jarvis._launch_local_jarvis_if_needed()
+
+    assert launched is False
+    assert calls == []
