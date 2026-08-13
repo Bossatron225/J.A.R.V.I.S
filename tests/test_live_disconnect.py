@@ -104,3 +104,24 @@ def test_wake_message_includes_remote_url_and_access_key() -> None:
     assert "REMOTE-KEY-123" in message
     assert "auto-login" in message.lower()
     assert "PUBLIC=ON" in message
+
+
+def test_launch_local_jarvis_if_needed_uses_python_entry(monkeypatch) -> None:
+    jarvis = JarvisLive(DummyUI())
+    jarvis.session = None
+    calls = []
+
+    def fake_popen(args, **kwargs):
+        calls.append((args, kwargs))
+        class DummyProc:
+            pass
+        return DummyProc()
+
+    monkeypatch.setattr("main.subprocess.Popen", fake_popen)
+    monkeypatch.setattr("main.platform.system", lambda: "Darwin")
+
+    launched = jarvis._launch_local_jarvis_if_needed()
+
+    assert launched is True
+    assert calls and calls[0][0][0].endswith("python")
+    assert str(calls[0][0][-1]).endswith("main.py")
