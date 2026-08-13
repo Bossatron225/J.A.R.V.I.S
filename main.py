@@ -4062,18 +4062,25 @@ class JarvisLive:
             await asyncio.to_thread(mail_monitor_start, interval)
             self.ui.write_log("SYS: Monitor ready.")
 
-        # Start dashboard (optional — needs: pip install fastapi "uvicorn[standard]" cryptography)
-        try:
-            from dashboard.server import DashboardServer
-            self._dashboard = DashboardServer()
-            self._dashboard.set_connect_callback(self._on_phone_connected)
-            self._dashboard.set_public_url_callback(self._on_public_url_changed)
-            asyncio.create_task(self._dashboard.serve())
-            # Runs for the whole lifetime, not just inside an active session
-            asyncio.create_task(self._process_dashboard_commands())
-        except Exception as e:
-            print(f"[Dashboard] Disabled: {e}")
+        # Start the local dashboard only when this Mac is intended to be the public entrypoint.
+        # When a VPS brain is configured, keep the dashboard and public tunnel on the server instead,
+        # so a local shutdown does not kill the remote JARVIS brain.
+        vps_url = os.getenv("JARVIS_VPS_URL", "").strip()
+        if vps_url:
+            self.ui.write_log("SYS: VPS brain configured; local dashboard disabled to keep remote access alive.")
             self._dashboard = None
+        else:
+            try:
+                from dashboard.server import DashboardServer
+                self._dashboard = DashboardServer()
+                self._dashboard.set_connect_callback(self._on_phone_connected)
+                self._dashboard.set_public_url_callback(self._on_public_url_changed)
+                asyncio.create_task(self._dashboard.serve())
+                # Runs for the whole lifetime, not just inside an active session
+                asyncio.create_task(self._process_dashboard_commands())
+            except Exception as e:
+                print(f"[Dashboard] Disabled: {e}")
+                self._dashboard = None
 
         asyncio.create_task(self._run_vps_local_worker())
 
