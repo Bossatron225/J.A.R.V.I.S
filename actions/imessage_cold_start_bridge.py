@@ -524,9 +524,7 @@ def _refresh_remote_access_snapshot() -> tuple[str, str, str]:
         return "".join(__import__("secrets").choice(alphabet) for _ in range(6))
 
     url = _read_config_url()
-    key = (os.getenv("JARVIS_REMOTE_KEY") or "").strip()
-    if not key:
-        key = _generate_key()
+    key = _generate_key()
     os.environ["JARVIS_REMOTE_KEY"] = key
 
     if url:
@@ -636,6 +634,7 @@ def main() -> int:
 
         sender_allowed = str(cfg.get("imessage_wake_sender", "") or "").strip()
         phrase = str(cfg.get("imessage_wake_phrase", "jarvis wake") or "jarvis wake").strip().lower()
+        remote_uplink_phrase = str(cfg.get("imessage_remote_uplink_phrase", "remote uplink") or "remote uplink").strip().lower()
         secret = str(cfg.get("imessage_wake_secret", "") or "").strip().lower()
         interval = max(5, min(int(cfg.get("imessage_monitor_interval_seconds", 15) or 15), 300))
         wake_cooldown = max(15, min(int(cfg.get("imessage_wake_cooldown_seconds", 120) or 120), 3600))
@@ -662,29 +661,32 @@ def main() -> int:
                     continue
 
                 text = str(msg.get("text") or "")
-                if not _phrase_in_text(phrase, text):
+                match_remote_uplink = _phrase_in_text(remote_uplink_phrase, text)
+                match_wake = _phrase_in_text(phrase, text)
+                if not (match_wake or match_remote_uplink):
                     continue
+                trigger_label = "remote uplink" if match_remote_uplink else "wake phrase"
                 _log(
-                    "wake phrase matched "
+                    f"{trigger_label} matched "
                     f"(rowid={msg.get('rowid')}, sender={msg.get('sender')}, chat={msg.get('chat_name')})"
                 )
 
                 now = time.time()
                 last_wake_ts = float(state.get("last_wake_ts") or 0.0)
                 if (now - last_wake_ts) < wake_cooldown:
-                    _log("wake phrase suppressed (cooldown)")
+                    _log(f"{trigger_label} suppressed (cooldown)")
                     state["last_wake_rowid"] = rowid
                     _save_state(state)
                     continue
 
                 text_l = text.strip().lower()
                 if secret and secret not in text_l:
-                    _log("wake phrase matched but secret mismatched")
+                    _log(f"{trigger_label} matched but secret mismatched")
                     continue
                 sender_ok = _sender_matches(sender_allowed, msg.get("sender", ""), msg.get("chat_name", ""))
                 if not sender_ok:
                     _log(
-                        "wake phrase matched but sender unauthorized "
+                        f"{trigger_label} matched but sender unauthorized "
                         f"(allowed={sender_allowed!r}, sender={msg.get('sender')!r}, chat={msg.get('chat_name')!r})"
                     )
                     continue
@@ -692,6 +694,30 @@ def main() -> int:
                 state["last_wake_rowid"] = rowid
                 state["last_wake_ts"] = now
                 _save_state(state)
+
+                if match_remote_uplink:
+                    target = msg.get("sender") or msg.get("chat_name") or sender_allowed
+                    vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
+                    if vps_url:
+                        try:
+                            health_url = f"{vps_url.rstrip('/')}/api/health"
+                            req = urllib.request.Request(health_url, headers={"User-Agent": "JARVIS-wake-bridge/1.0"})
+                            with urllib.request.urlopen(req, timeout=4) as resp:
+                                payload = resp.read(2048)
+                            data = json.loads(payload.decode("utf-8", errors="replace")) if payload else {}
+                            if isinstance(data, dict) and data.get("ok") is not False:
+                                _log(f"remote uplink triggered against VPS at {vps_url}; skipping local launch")
+                                public_url, key, auto = _fetch_vps_remote_access_snapshot(vps_url)
+                                if not public_url:
+                                    public_url, key, auto = _refresh_remote_access_snapshot()
+                                notice = _build_remote_wake_notice(public_url, key, auto)
+                                _send_imessage(target, notice)
+                                continue
+                        except Exception:
+                            pass
+                    public_url, key, auto = _refresh_remote_access_snapshot()
+                    _send_imessage(target, _build_remote_wake_notice(public_url, key, auto))
+                    continue
 
                 if _is_jarvis_running(target_script):
                     _log("wake command received but jarvis already running")
