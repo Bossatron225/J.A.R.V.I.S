@@ -2393,14 +2393,15 @@ class JarvisLive:
 
         lines = [
             "JARVIS wake accepted.",
-            f"Remote link: {url}",
+            f"Local status: {('online' if self.session is not None else 'remote only')}",
+            f"Remote access: {url}",
         ]
         if key:
-            lines.append(f"Access key: {key}")
+            lines.append(f"Key: {key}")
         if auto:
             lines.append(f"Auto-login: {auto}")
         lines.append(sec)
-        lines.append("If the Mac is online, local launch will proceed automatically; otherwise use the remote link above.")
+        lines.append("Tap the remote access link above. If the Mac is online, local launch is attempted automatically.")
         return "\n".join(lines)
 
     def _launch_local_jarvis_if_needed(self) -> bool:
