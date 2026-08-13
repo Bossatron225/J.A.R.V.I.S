@@ -565,7 +565,7 @@ def _build_remote_wake_notice(url: str, key: str = "", auto_login: str = "") -> 
         lines.append(f"Key: {key}")
     if auto_login:
         lines.append(f"Auto: {auto_login}")
-    lines.append("Status: remote only")
+    lines.append("Status: VPS remote voice active")
     lines.append("SECURITY: PUBLIC=ON | PIN=OFF")
     return "\n".join(lines)
 
