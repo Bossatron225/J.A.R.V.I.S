@@ -577,6 +577,8 @@ class DashboardServer:
                 if found:
                     if self._public_url != found:
                         self._public_url = found
+                        os.environ["JARVIS_PUBLIC_URL"] = found
+                        os.environ["PUBLIC_ENTRY_URL"] = found
                         self._notify_public_url(found)
                         print(f"[Dashboard] Public URL: {found}")
                         continue

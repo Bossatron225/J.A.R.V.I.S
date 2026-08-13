@@ -36,6 +36,17 @@ def test_cold_start_wake_notice_includes_live_remote_access(monkeypatch):
     assert "Auto:" in notice
 
 
+def test_cold_start_wake_notice_reports_offline_when_mac_is_powered_off():
+    notice = bridge._build_remote_wake_notice(
+        url="remote dashboard unavailable",
+        key="",
+        auto_login="",
+    )
+
+    assert "remote dashboard unavailable" in notice
+    assert "Power is off" in notice or "offline" in notice.lower()
+
+
 def test_refresh_remote_access_snapshot_uses_current_config(monkeypatch, tmp_path):
     monkeypatch.setattr(bridge, "BASE_DIR", tmp_path)
     cfg_path = tmp_path / "config" / "api_keys.json"

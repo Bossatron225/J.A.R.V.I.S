@@ -1,6 +1,20 @@
 import json
+import os
 
 from vps_orchestrator import create_app
+
+
+def test_vps_remote_access_prefers_public_url_over_local_ip(monkeypatch):
+    monkeypatch.setenv("JARVIS_PUBLIC_URL", "https://public.example.com")
+    monkeypatch.setenv("PUBLIC_ENTRY_URL", "https://public.example.com")
+    app = create_app()
+    client = app.test_client()
+
+    payload = client.get('/api/remote_access').get_json()
+
+    assert payload['ok'] is True
+    assert payload['url'] == 'https://public.example.com'
+    assert payload['auto_login_url'].startswith('https://public.example.com/auto-login?key=')
 
 
 def test_vps_orchestrator_health_and_task_queue():
@@ -72,3 +86,11 @@ def test_vps_orchestrator_health_and_task_queue():
     remote_payload = remote_chat.get_json()
     assert remote_payload['accepted'] is True
     assert remote_payload['text'] == 'hello from remote'
+
+    remote_access = client.get('/api/remote_access')
+    assert remote_access.status_code == 200
+    access_payload = remote_access.get_json()
+    assert access_payload['ok'] is True
+    assert 'url' in access_payload
+    assert 'key' in access_payload
+    assert 'auto_login_url' in access_payload
