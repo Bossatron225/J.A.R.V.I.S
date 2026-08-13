@@ -103,9 +103,9 @@ def test_wake_message_includes_remote_url_and_access_key() -> None:
 
     assert "https://remote.example.com" in message
     assert "REMOTE-KEY-123" in message
-    assert "Remote access:" in message
-    assert "Key:" in message
-    assert "auto-login" in message.lower()
+    assert "link=" in message
+    assert "key=" in message
+    assert "auto=" in message.lower()
     assert "PUBLIC=ON" in message
 
 

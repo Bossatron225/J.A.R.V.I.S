@@ -2392,16 +2392,15 @@ class JarvisLive:
             sec = self._dashboard.get_remote_security_status() if hasattr(self._dashboard, "get_remote_security_status") else "SECURITY: STATUS UNAVAILABLE"
 
         lines = [
-            "JARVIS wake accepted.",
-            f"Local status: {('online' if self.session is not None else 'remote only')}",
-            f"Remote access: {url}",
+            "JARVIS wake accepted",
+            f"status={('online' if self.session is not None else 'remote only')}",
+            f"link={url}",
         ]
         if key:
-            lines.append(f"Key: {key}")
+            lines.append(f"key={key}")
         if auto:
-            lines.append(f"Auto-login: {auto}")
+            lines.append(f"auto={auto}")
         lines.append(sec)
-        lines.append("Tap the remote access link above. If the Mac is online, local launch is attempted automatically.")
         return "\n".join(lines)
 
     def _launch_local_jarvis_if_needed(self) -> bool:
