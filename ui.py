@@ -3812,11 +3812,20 @@ class MainWindow(QMainWindow):
         try:
             import json
             from urllib import request, error
-            with request.urlopen(f"{url.rstrip('/')}/api/health", timeout=8) as resp:
+            with request.urlopen(f"{url.rstrip('/')}/api/ops", timeout=8) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
-            ok = bool(payload.get("ok", False))
-            if ok:
-                self.set_vps_status("VPS: online", "ok", str(payload))
+            connected = bool(payload.get("connected", payload.get("ok", False)))
+            status = str(payload.get("status") or "unknown").lower()
+            queue_size = payload.get("queue_size", 0)
+            uptime = payload.get("uptime_seconds")
+
+            if connected and status not in {"restarting", "error"}:
+                uptime_text = ""
+                if isinstance(uptime, (int, float)):
+                    uptime_text = f" • {int(uptime)}s"
+                self.set_vps_status(f"VPS: connected • q{queue_size}{uptime_text}", "ok", str(payload))
+            elif status == "restarting":
+                self.set_vps_status("VPS: restarting", "warn", str(payload))
             else:
                 self.set_vps_status("VPS: unhealthy", "warn", str(payload))
         except (error.URLError, TimeoutError, ValueError, OSError):
