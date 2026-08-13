@@ -499,6 +499,21 @@ def _send_imessage(receiver: str, message_text: str) -> None:
         _log(f"ack send failed: {e}")
 
 
+def _build_remote_wake_notice(url: str, key: str = "", auto_login: str = "") -> str:
+    url = (url or os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "remote dashboard unavailable").strip()
+    lines = [
+        "JARVIS wake accepted",
+        f"Open: {url}",
+    ]
+    if key:
+        lines.append(f"Key: {key}")
+    if auto_login:
+        lines.append(f"Auto: {auto_login}")
+    lines.append("Status: remote only")
+    lines.append("SECURITY: PUBLIC=ON | PIN=OFF")
+    return "\n".join(lines)
+
+
 def main() -> int:
     if platform.system() != "Darwin":
         return 0
@@ -600,13 +615,21 @@ def main() -> int:
                     continue
 
                 launched = _launch_jarvis(python_exec, target_script)
+                target = msg.get("sender") or msg.get("chat_name") or sender_allowed
                 if launched:
-                    _send_imessage(
-                        msg.get("sender") or msg.get("chat_name") or sender_allowed,
-                        f"JARVIS started successfully. ({time.strftime('%Y-%m-%d %H:%M:%S')})",
-                    )
+                    if not target:
+                        target = sender_allowed
+                    public_url = (os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "").strip()
+                    key = ""
+                    if public_url:
+                        key = os.getenv("JARVIS_REMOTE_KEY") or ""
+                    auto = ""
+                    if public_url and key:
+                        auto = f"{public_url}/auto-login?key={key}"
+                    notice = _build_remote_wake_notice(public_url or "remote dashboard unavailable", key, auto)
+                    _send_imessage(target, notice)
                 else:
-                    _send_imessage(msg.get("sender") or msg.get("chat_name") or sender_allowed, "Wake received, but I could not launch JARVIS.")
+                    _send_imessage(target, "Wake received, but I could not launch JARVIS.")
         except Exception as e:
             err = str(e)
             _write_health("error", mode=mode, error=err[:220])
