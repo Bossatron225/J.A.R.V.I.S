@@ -39,13 +39,14 @@ if _platform.system() == "Windows":
 # ─────────────────────────────────────────────────────────────────────────────
 
 import asyncio
+import json
 import os
 import re
 import sqlite3
 import threading
 import time
-import json
 import traceback
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from functools import lru_cache
