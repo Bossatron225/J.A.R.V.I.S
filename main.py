@@ -1314,6 +1314,7 @@ class JarvisLive:
         self._wake_phrases = ["jarvis", "jarvis wake", "wake up jarvis", "hey jarvis"]
         self._speech_listener_running = False
         self._local_worker = None
+        self._vps_link_established_said = False
 
     @staticmethod
     def _load_runtime_config() -> dict:
@@ -4007,11 +4008,25 @@ class JarvisLive:
         while True:
             vps_url = os.getenv("JARVIS_VPS_URL")
             if not vps_url:
+                self._vps_link_established_said = False
                 await asyncio.sleep(15)
                 continue
             try:
                 worker = self._local_worker or LocalWorker(vps_url)
                 self._local_worker = worker
+
+                try:
+                    with urllib.request.urlopen(f"{vps_url.rstrip('/')}/api/ops", timeout=8) as resp:
+                        payload = json.loads(resp.read().decode("utf-8"))
+                except Exception:
+                    payload = {}
+
+                if bool(payload.get("connected", False)) and not self._vps_link_established_said:
+                    self._vps_link_established_said = True
+                    if self.session:
+                        self.speak("Server link established.")
+                    self.ui.write_log("SYS: Server link established.")
+
                 tasks = worker.poll_for_tasks(limit=5)
                 if tasks:
                     self.ui.write_log(f"SYS: Local worker processed {len(tasks)} queued task(s) from VPS.")
