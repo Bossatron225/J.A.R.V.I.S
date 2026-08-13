@@ -175,3 +175,28 @@ def test_launch_local_jarvis_if_needed_prefers_vps_when_configured(monkeypatch) 
 
     assert launched is False
     assert calls == []
+
+
+def test_local_speech_is_blocked_when_vps_is_healthy(monkeypatch) -> None:
+    jarvis = JarvisLive(DummyUI())
+    jarvis.session = object()
+    jarvis._loop = object()
+    calls = []
+
+    class FakeResp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, *_args, **_kwargs):
+            return b'{"ok": true, "status": "online"}'
+
+    monkeypatch.setenv("JARVIS_VPS_URL", "https://vps.example.com")
+    monkeypatch.setattr(main_module.urllib.request, "urlopen", lambda *args, **kwargs: FakeResp())
+    monkeypatch.setattr(main_module.asyncio, "run_coroutine_threadsafe", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    jarvis.speak("hello")
+
+    assert calls == []
