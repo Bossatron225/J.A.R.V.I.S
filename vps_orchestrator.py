@@ -227,7 +227,7 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
-        return _build_root_page(), 200, {"Content-Type": "text/html; charset=utf-8"}
+        return redirect("/dashboard", code=302)
 
     @app.get("/health")
     def health():
@@ -239,10 +239,6 @@ def create_app() -> Flask:
             "public_entry": orchestrator.public_entry,
             "queue_size": len(orchestrator.queue),
         })
-
-    @app.get("/")
-    def index():
-        return redirect("/dashboard", code=302)
 
     @app.get("/dashboard")
     def dashboard_index():
