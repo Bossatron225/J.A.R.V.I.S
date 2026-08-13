@@ -559,15 +559,43 @@ def _build_remote_wake_notice(url: str, key: str = "", auto_login: str = "") -> 
     url = (url or os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "remote dashboard unavailable").strip()
     lines = [
         "JARVIS wake accepted",
-        f"Open: {url}",
     ]
+    if url and "remote dashboard unavailable" not in url:
+        lines.append(f"Open: {url}")
+    else:
+        lines.append("Open: remote dashboard unavailable")
+        lines.append("Power is off or the Mac is offline; remote access is unavailable until the Mac boots or the VPS owns the wake path.")
     if key:
         lines.append(f"Key: {key}")
     if auto_login:
         lines.append(f"Auto: {auto_login}")
-    lines.append("Status: VPS remote voice active")
-    lines.append("SECURITY: PUBLIC=ON | PIN=OFF")
+    if url and "remote dashboard unavailable" not in url:
+        lines.append("Status: VPS remote voice active")
+        lines.append("SECURITY: PUBLIC=ON | PIN=OFF")
+    else:
+        lines.append("Status: remote access unavailable while the Mac is off")
     return "\n".join(lines)
+
+
+def _fetch_vps_remote_access_snapshot(vps_url: str) -> tuple[str, str, str]:
+    try:
+        if not vps_url:
+            return "", "", ""
+        url = f"{vps_url.rstrip('/')}/api/remote_access"
+        req = urllib.request.Request(url, headers={"User-Agent": "JARVIS-wake-bridge/1.0"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            payload = resp.read(4096)
+        if not payload:
+            return "", "", ""
+        data = json.loads(payload.decode("utf-8", errors="replace"))
+        if not isinstance(data, dict):
+            return "", "", ""
+        public_url = str(data.get("url") or "").strip()
+        key = str(data.get("key") or "").strip()
+        auto_login = str(data.get("auto_login_url") or "").strip()
+        return public_url, key, auto_login
+    except Exception:
+        return "", "", ""
 
 
 def main() -> int:
@@ -681,7 +709,9 @@ def main() -> int:
                         if isinstance(data, dict) and data.get("ok") is not False:
                             _log(f"VPS active at {vps_url}; skipping local launch to keep wake remote-first")
                             target = msg.get("sender") or msg.get("chat_name") or sender_allowed
-                            public_url, key, auto = _refresh_remote_access_snapshot()
+                            public_url, key, auto = _fetch_vps_remote_access_snapshot(vps_url)
+                            if not public_url:
+                                public_url, key, auto = _refresh_remote_access_snapshot()
                             notice = _build_remote_wake_notice(public_url, key, auto)
                             _send_imessage(target, notice)
                             continue

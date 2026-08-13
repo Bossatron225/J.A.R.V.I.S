@@ -133,6 +133,64 @@ class VPSOrchestrator:
             payload["queue_size"] = len(self.queue)
             return payload
 
+    def get_public_remote_snapshot(self) -> dict:
+        env_public = (os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "").strip()
+        public_entry = env_public or self.public_entry
+        key = ""
+        auto_login_url = ""
+        security_status = "SECURITY: PUBLIC=OFF | PIN=OFF"
+
+        dashboard = self.dashboard_server
+        if dashboard is not None:
+            if hasattr(dashboard, "new_key"):
+                key = str(dashboard.new_key()).strip()
+            if hasattr(dashboard, "get_remote_url"):
+                try:
+                    dashboard_url = str(dashboard.get_remote_url() or "").strip()
+                    if dashboard_url and not dashboard_url.startswith(("http://192.168.", "http://10.", "http://172.", "http://127.0.0.1", "https://192.168.", "https://10.", "https://172.", "https://127.0.0.1")):
+                        public_entry = dashboard_url
+                except Exception:
+                    pass
+            if hasattr(dashboard, "get_auto_login_url") and key:
+                try:
+                    candidate = str(dashboard.get_auto_login_url(key) or "").strip()
+                    if candidate and not candidate.startswith(("http://192.168.", "http://10.", "http://172.", "http://127.0.0.1", "https://192.168.", "https://10.", "https://172.", "https://127.0.0.1")):
+                        auto_login_url = candidate
+                except Exception:
+                    auto_login_url = ""
+            if hasattr(dashboard, "get_remote_security_status"):
+                try:
+                    security_status = str(dashboard.get_remote_security_status() or security_status).strip()
+                except Exception:
+                    security_status = security_status
+
+        if not public_entry:
+            public_entry = self.public_entry
+
+        if env_public:
+            public_entry = env_public
+
+        if key and not auto_login_url:
+            auto_login_url = f"{public_entry.rstrip('/')}/auto-login?key={key}"
+
+        if not auto_login_url and key:
+            auto_login_url = f"{public_entry.rstrip('/')}/auto-login?key={key}"
+
+        if auto_login_url and not auto_login_url.startswith(("http://", "https://")):
+            auto_login_url = f"{public_entry.rstrip('/')}/auto-login?key={key}"
+
+        if env_public and auto_login_url:
+            auto_login_url = f"{env_public.rstrip('/')}/auto-login?key={key}"
+
+        return {
+            "ok": True,
+            "url": public_entry,
+            "key": key,
+            "auto_login_url": auto_login_url,
+            "security": security_status,
+            "source": "vps",
+        }
+
     def get_ops_snapshot(self) -> dict:
         with self.lock:
             queue_snapshot = [deepcopy(item) for item in self.queue]
@@ -404,6 +462,10 @@ def create_app() -> Flask:
             "status": "online",
             "public_entry": orchestrator.public_entry,
         })
+
+    @app.get("/api/remote_access")
+    def api_remote_access():
+        return jsonify(orchestrator.get_public_remote_snapshot())
 
     @app.get("/api/ops")
     def api_ops():
