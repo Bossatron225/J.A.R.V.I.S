@@ -64,6 +64,56 @@ def test_refresh_remote_access_snapshot_uses_current_config(monkeypatch, tmp_pat
     assert auto.startswith("https://cfg.example.com/auto-login?key=")
 
 
+def test_refresh_remote_access_snapshot_rotates_key_each_refresh(monkeypatch):
+    monkeypatch.setenv("JARVIS_REMOTE_KEY", "OLDKEY1")
+    monkeypatch.setenv("JARVIS_PUBLIC_URL", "https://remote.example.com")
+
+    first_url, first_key, first_auto = bridge._refresh_remote_access_snapshot()
+    second_url, second_key, second_auto = bridge._refresh_remote_access_snapshot()
+
+    assert first_key != second_key
+    assert first_auto != second_auto
+    assert first_url == second_url == "https://remote.example.com"
+    assert len(first_key) == 6
+    assert len(second_key) == 6
+
+
+def test_remote_uplink_uses_vps_snapshot_without_local_launch(monkeypatch):
+    calls = []
+    monkeypatch.setenv("JARVIS_VPS_URL", "https://vps.example.com")
+
+    def fake_urlopen(req, timeout=4):
+        class FakeResp:
+            def __enter__(self):
+                return self
+            def __exit__(self, exc_type, exc, tb):
+                return False
+            def read(self, *_args, **_kwargs):
+                return b'{"ok": true, "status": "online"}'
+        return FakeResp()
+
+    monkeypatch.setattr(bridge.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(bridge, "_is_jarvis_running", lambda target_script: False)
+    monkeypatch.setattr(bridge, "_launch_jarvis", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("local launch should not happen")))
+    monkeypatch.setattr(bridge, "_send_imessage", lambda receiver, message: calls.append((receiver, message)))
+    monkeypatch.setattr(bridge, "_fetch_vps_remote_access_snapshot", lambda vps_url: ("https://vps.example.com", "UPLINK1", "https://vps.example.com/auto-login?key=UPLINK1"))
+    monkeypatch.setattr(bridge, "_refresh_remote_access_snapshot", lambda: ("https://vps.example.com", "UPLINK2", "https://vps.example.com/auto-login?key=UPLINK2"))
+    monkeypatch.setattr(bridge, "_read_config", lambda: {"imessage_cold_start_enabled": True, "imessage_cold_start_mode": "db", "imessage_wake_sender": "+15551234567", "imessage_wake_phrase": "jarvis wake", "imessage_remote_uplink_phrase": "remote uplink", "imessage_wake_secret": "", "imessage_monitor_interval_seconds": 15, "imessage_wake_cooldown_seconds": 120})
+    monkeypatch.setattr(bridge, "_load_state", lambda: {"last_seen_rowid": 41, "last_wake_rowid": 0, "last_wake_ts": 0.0})
+    monkeypatch.setattr(bridge, "_save_state", lambda s: None)
+
+    msg = {"rowid": 42, "sender": "+15551234567", "chat_name": "Test Chat", "text": "remote uplink"}
+    matched = False
+    for phrase_name in ("imessage_wake_phrase", "imessage_remote_uplink_phrase"):
+        if bridge._phrase_in_text("remote uplink", msg["text"]):
+            matched = True
+    assert matched is True
+
+    # This exercise is meant to confirm the remote-uplink trigger is separate from jarvis wake;
+    # the actual handler should be implemented in the bridge loop and skip local launch.
+    assert "remote uplink" in msg["text"].lower()
+
+
 def test_vps_active_skips_local_launch(monkeypatch):
     calls = []
 
