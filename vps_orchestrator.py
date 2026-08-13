@@ -227,7 +227,21 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
-        return redirect("/dashboard", code=302)
+        dashboard_path = BASE_DIR / "dashboard" / "static" / "app.html"
+        if dashboard_path.exists():
+            return send_file(str(dashboard_path), mimetype="text/html")
+        return jsonify({
+            "ok": True,
+            "service": "jarvis-vps-orchestrator",
+            "mode": "vps",
+            "status": "online",
+            "title": "JARVIS VPS Dashboard",
+            "public_entry": orchestrator.public_entry,
+            "dashboard_url": (
+                orchestrator.dashboard_server.get_remote_url() if orchestrator.dashboard_server is not None and hasattr(orchestrator.dashboard_server, "get_remote_url") else None
+            ),
+            "message": "The dashboard runs on the VPS and remains active even if the Mac app shuts down.",
+        })
 
     @app.get("/health")
     def health():

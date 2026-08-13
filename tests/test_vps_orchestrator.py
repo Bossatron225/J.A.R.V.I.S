@@ -8,8 +8,9 @@ def test_vps_orchestrator_health_and_task_queue():
     client = app.test_client()
 
     root = client.get('/')
-    assert root.status_code == 302
-    assert root.headers.get('Location', '').endswith('/dashboard')
+    assert root.status_code == 200
+    assert 'text/html' in root.content_type
+    assert 'JARVIS' in root.get_data(as_text=True)
 
     dashboard = client.get('/dashboard')
     assert dashboard.status_code == 200
