@@ -1454,13 +1454,14 @@ class JarvisLive:
             security = self._dashboard.get_remote_security_status() if hasattr(self._dashboard, "get_remote_security_status") else "SECURITY: STATUS UNAVAILABLE"
             message_lines = [
                 "JARVIS remote is online.",
-                f"Cloudflare URL: {url}",
-                f"Access key: {key}",
-                "Key expiry: 10 minutes.",
+                f"Open: {url}",
             ]
+            if key:
+                message_lines.append(f"Key: {key}")
             auto_login = self._dashboard.get_auto_login_url(key) if hasattr(self._dashboard, "get_auto_login_url") else ""
             if auto_login:
-                message_lines.append(f"Auto-login: {auto_login}")
+                message_lines.append(f"Auto: {auto_login}")
+            message_lines.append(f"Status: online")
             message_lines.append(security)
             result = send_imessage(self._boot_remote_notice_receiver, "\n".join(message_lines))
             self.ui.write_log("SYS: Boot remote notice sent.")
@@ -2393,13 +2394,14 @@ class JarvisLive:
 
         lines = [
             "JARVIS wake accepted",
-            f"status={('online' if self.session is not None else 'remote only')}",
-            f"link={url}",
         ]
+        if url:
+            lines.append(f"Open: {url}")
         if key:
-            lines.append(f"key={key}")
+            lines.append(f"Key: {key}")
         if auto:
-            lines.append(f"auto={auto}")
+            lines.append(f"Auto: {auto}")
+        lines.append(f"Status: {('online' if self.session is not None else 'remote only')}")
         lines.append(sec)
         return "\n".join(lines)
 
