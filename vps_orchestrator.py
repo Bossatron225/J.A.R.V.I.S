@@ -6,7 +6,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, redirect, send_file
 
 def _build_root_page() -> str:
     public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.internal"
@@ -240,8 +240,15 @@ def create_app() -> Flask:
             "queue_size": len(orchestrator.queue),
         })
 
+    @app.get("/")
+    def index():
+        return redirect("/dashboard", code=302)
+
     @app.get("/dashboard")
     def dashboard_index():
+        dashboard_path = BASE_DIR / "dashboard" / "static" / "app.html"
+        if dashboard_path.exists():
+            return send_file(str(dashboard_path), mimetype="text/html")
         return jsonify({
             "ok": True,
             "service": "jarvis-vps-orchestrator",
