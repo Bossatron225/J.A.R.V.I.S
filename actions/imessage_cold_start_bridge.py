@@ -596,6 +596,28 @@ def _fetch_vps_remote_access_snapshot(vps_url: str) -> tuple[str, str, str]:
         return "", "", ""
 
 
+def _fetch_vps_remote_uplink(vps_url: str) -> tuple[str, str, str, str]:
+    try:
+        if not vps_url:
+            return "", "", "", ""
+        url = f"{vps_url.rstrip('/')}/api/remote_uplink"
+        req = urllib.request.Request(url, headers={"User-Agent": "JARVIS-wake-bridge/1.0"}, method="GET")
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            payload = resp.read(4096)
+        if not payload:
+            return "", "", "", ""
+        data = json.loads(payload.decode("utf-8", errors="replace"))
+        if not isinstance(data, dict):
+            return "", "", "", ""
+        public_url = str(data.get("url") or "").strip()
+        key = str(data.get("key") or "").strip()
+        auto_login = str(data.get("auto_login_url") or "").strip()
+        message = str(data.get("message") or "").strip()
+        return public_url, key, auto_login, message
+    except Exception:
+        return "", "", "", ""
+
+
 def main() -> int:
     if platform.system() != "Darwin":
         return 0
@@ -707,10 +729,12 @@ def main() -> int:
                             data = json.loads(payload.decode("utf-8", errors="replace")) if payload else {}
                             if isinstance(data, dict) and data.get("ok") is not False:
                                 _log(f"remote uplink triggered against VPS at {vps_url}; skipping local launch")
-                                public_url, key, auto = _fetch_vps_remote_access_snapshot(vps_url)
+                                public_url, key, auto, message = _fetch_vps_remote_uplink(vps_url)
                                 if not public_url:
-                                    public_url, key, auto = _refresh_remote_access_snapshot()
-                                notice = _build_remote_wake_notice(public_url, key, auto)
+                                    public_url, key, auto = _fetch_vps_remote_access_snapshot(vps_url)
+                                    if not public_url:
+                                        public_url, key, auto = _refresh_remote_access_snapshot()
+                                notice = message or _build_remote_wake_notice(public_url, key, auto)
                                 _send_imessage(target, notice)
                                 continue
                         except Exception:
