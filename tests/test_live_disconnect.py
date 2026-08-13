@@ -13,9 +13,13 @@ from main import JarvisLive
 class DummyUI:
     def __init__(self) -> None:
         self.state = None
+        self.vps_status = None
 
     def set_state(self, value: str) -> None:
         self.state = value
+
+    def set_vps_status(self, text: str, level: str = "neutral", tooltip: str | None = None) -> None:
+        self.vps_status = (text, level, tooltip)
 
     def write_log(self, *_args, **_kwargs) -> None:
         pass
@@ -200,3 +204,5 @@ def test_local_speech_is_blocked_when_vps_is_healthy(monkeypatch) -> None:
     jarvis.speak("hello")
 
     assert calls == []
+    assert jarvis.ui.vps_status is not None
+    assert "remote voice active" in jarvis.ui.vps_status[0].lower()
