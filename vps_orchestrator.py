@@ -8,6 +8,63 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, Response
 
+HTML_PAGE = """
+<!doctype html>
+<html lang=\"en\">
+  <head>
+    <meta charset=\"utf-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+    <title>JARVIS VPS</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #07111f;
+        color: #e8f3ff;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        margin: 0;
+      }
+      .card {
+        max-width: 760px;
+        width: min(90vw, 760px);
+        background: rgba(17, 31, 49, 0.92);
+        border: 1px solid rgba(147, 197, 253, 0.35);
+        border-radius: 16px;
+        padding: 2rem 2.25rem;
+        box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: clamp(2rem, 5vw, 3rem);
+        letter-spacing: 0.08em;
+      }
+      p {
+        margin: 0.5rem 0;
+        line-height: 1.55;
+        color: #d5e6ff;
+      }
+      code {
+        background: rgba(148, 163, 184, 0.12);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 6px;
+        padding: 0.15rem 0.45rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class=\"card\">
+      <h1>JARVIS VPS</h1>
+      <p>System online. Remote brain active.</p>
+      <p>Public endpoint: <code>{public_entry}</code></p>
+      <p>Health: <code>/api/health</code></p>
+      <p>Operations: <code>/api/ops</code></p>
+      <p>Dashboard: <code>/dashboard</code></p>
+    </div>
+  </body>
+</html>
+""".format(public_entry=os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.internal")
+
 try:
     from dashboard.server import DashboardServer
 except Exception:  # pragma: no cover
@@ -168,15 +225,7 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
-        return jsonify({
-            "ok": True,
-            "service": "jarvis-vps-orchestrator",
-            "mode": "vps",
-            "status": "online",
-            "public_entry": orchestrator.public_entry,
-            "queue_size": len(orchestrator.queue),
-            "message": "JARVIS VPS online",
-        })
+        return HTML_PAGE, 200, {"Content-Type": "text/html; charset=utf-8"}
 
     @app.get("/health")
     def health():
