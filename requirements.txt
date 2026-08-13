@@ -1,5 +1,6 @@
 PyQt6
 sounddevice
+SpeechRecognition
 google-genai
 google-generativeai
 google-api-python-client
