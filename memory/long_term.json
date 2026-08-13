@@ -67,16 +67,6 @@
   },
   "sessions": [
     {
-      "date": "2026-08-11",
-      "summary": "The user experienced biometric verification issues and then worked with JARVIS to update and calibrate the correct pronunciation of his girlfriend Nevaeh's name in the system memory.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-13",
-      "summary": "The user greeted the system and received an update on today's top world news, including a solar eclipse in Europe and geopolitical tensions.",
-      "language": "English"
-    },
-    {
       "date": "2026-08-13",
       "summary": "James reviewed today's top news headlines and had JARVIS save a new project to his memory.",
       "language": "English"
@@ -84,6 +74,11 @@
     {
       "date": "2026-08-13",
       "summary": "The user reviewed system diagnostics with JARVIS and discussed the operational status and shutdown behaviors of both the local application and the remote VPS server.",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-13",
+      "summary": "James Lumsden reviewed today's news and discussed system diagnostics with JARVIS. He also clarified and confirmed the operational behavior of the shutdown protocol regarding the local device versus the remote VPS server.",
       "language": "English"
     }
   ],
