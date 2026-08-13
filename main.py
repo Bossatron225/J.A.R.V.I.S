@@ -2240,12 +2240,12 @@ class JarvisLive:
 
         ack_target = sender or chat_name
         if ack_target:
-            status = "online" if self.session else "reconnecting"
+            local_started = False
+            if self.session is None:
+                local_started = self._launch_local_jarvis_if_needed()
+            status = "online" if self.session or local_started else "remote only"
             ack = self._build_wake_remote_access_message()
-            if status == "online":
-                ack = ack + f"\nLocal status: {status}."
-            else:
-                ack = ack + f"\nLocal status: {status}."
+            ack = ack + f"\nLocal status: {status}."
             result = await asyncio.to_thread(send_imessage, ack_target, ack)
             self.ui.write_log(f"SYS: iMessage wake acknowledgement: {result}")
         return True
@@ -2366,30 +2366,31 @@ class JarvisLive:
     def _build_wake_remote_access_message(self) -> str:
         """Return the live remote access details to include in a wake acknowledgement."""
         if self._dashboard is None:
-            return (
-                "JARVIS wake accepted. "
-                "The Mac app is active locally, but the remote VPS dashboard is unavailable."
-            )
-
-        if hasattr(self._dashboard, "new_key"):
-            key = self._dashboard.new_key()
-        else:
+            url = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "remote dashboard unavailable"
             key = ""
-
-        if hasattr(self._dashboard, "get_remote_url"):
-            url = self._dashboard.get_remote_url()
-        elif hasattr(self._dashboard, "get_url"):
-            url = self._dashboard.get_url()
+            auto = ""
+            sec = "SECURITY: STATUS UNAVAILABLE"
         else:
-            url = "remote dashboard unavailable"
+            if hasattr(self._dashboard, "new_key"):
+                key = self._dashboard.new_key()
+            else:
+                key = ""
 
-        auto = ""
-        if key and hasattr(self._dashboard, "get_auto_login_url"):
-            auto = self._dashboard.get_auto_login_url(key)
-        elif key:
-            auto = f"{url}/auto-login?key={key}"
+            if hasattr(self._dashboard, "get_remote_url"):
+                url = self._dashboard.get_remote_url()
+            elif hasattr(self._dashboard, "get_url"):
+                url = self._dashboard.get_url()
+            else:
+                url = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "remote dashboard unavailable"
 
-        sec = self._dashboard.get_remote_security_status() if hasattr(self._dashboard, "get_remote_security_status") else "SECURITY: STATUS UNAVAILABLE"
+            auto = ""
+            if key and hasattr(self._dashboard, "get_auto_login_url"):
+                auto = self._dashboard.get_auto_login_url(key)
+            elif key:
+                auto = f"{url}/auto-login?key={key}"
+
+            sec = self._dashboard.get_remote_security_status() if hasattr(self._dashboard, "get_remote_security_status") else "SECURITY: STATUS UNAVAILABLE"
+
         lines = [
             "JARVIS wake accepted.",
             f"Remote link: {url}",
@@ -2401,6 +2402,28 @@ class JarvisLive:
         lines.append(sec)
         lines.append("If the Mac is online, local launch will proceed automatically; otherwise use the remote link above.")
         return "\n".join(lines)
+
+    def _launch_local_jarvis_if_needed(self) -> bool:
+        """Launch the Mac-side app if it is not already active and a local runtime is available."""
+        if self.session is not None:
+            return True
+        if platform.system() != "Darwin":
+            return False
+        try:
+            subprocess.Popen(
+                [sys.executable, str(BASE_DIR / "main.py")],
+                cwd=str(BASE_DIR),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                close_fds=True,
+            )
+            self.ui.write_log("SYS: Local JARVIS launch triggered for wake command.")
+            return True
+        except Exception as exc:
+            self.ui.write_log(f"SYS: Local JARVIS launch failed: {exc}")
+            return False
 
     def _is_disconnect_error(self, err: Exception | BaseException) -> bool:
         return _is_disconnect_error(err)
