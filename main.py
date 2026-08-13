@@ -3086,7 +3086,6 @@ class JarvisLive:
         normalized = re.sub(r"\s+", " ", text.lower()).strip()
         if not normalized:
             return
-        self.ui.write_log(f"SYS: Heard speech: {text}")
         for wake_phrase in self._wake_phrases:
             if normalized == wake_phrase or normalized.startswith(wake_phrase + " ") or normalized.endswith(" " + wake_phrase) or wake_phrase in normalized:
                 self._on_text_command(text)
@@ -3120,7 +3119,6 @@ class JarvisLive:
         normalized = re.sub(r"\s+", " ", text.lower()).strip()
         if not normalized:
             return
-        self.ui.write_log(f"SYS: Heard speech: {text}")
         for wake_phrase in self._wake_phrases:
             if normalized == wake_phrase or normalized.startswith(wake_phrase + " ") or normalized.endswith(" " + wake_phrase) or wake_phrase in normalized:
                 self._on_text_command(text)
