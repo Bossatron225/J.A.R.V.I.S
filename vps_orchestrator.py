@@ -138,7 +138,19 @@ class VPSOrchestrator:
         public_entry = env_public or self.public_entry
         key = ""
         auto_login_url = ""
-        security_status = "SECURITY: PUBLIC=OFF | PIN=OFF"
+        public_like_url = bool(public_entry) and not public_entry.startswith((
+            "http://127.0.0.1",
+            "http://localhost",
+            "http://10.",
+            "http://172.",
+            "http://192.168.",
+            "https://127.0.0.1",
+            "https://localhost",
+            "https://10.",
+            "https://172.",
+            "https://192.168.",
+        ))
+        security_status = "SECURITY: PUBLIC=ON | PIN=OFF" if public_like_url else "SECURITY: PUBLIC=OFF | PIN=OFF"
 
         dashboard = self.dashboard_server
         if dashboard is not None:
@@ -160,7 +172,9 @@ class VPSOrchestrator:
                     auto_login_url = ""
             if hasattr(dashboard, "get_remote_security_status"):
                 try:
-                    security_status = str(dashboard.get_remote_security_status() or security_status).strip()
+                    dashboard_security = str(dashboard.get_remote_security_status() or "").strip()
+                    if dashboard_security and (not public_like_url or "PUBLIC=OFF" not in dashboard_security):
+                        security_status = dashboard_security
                 except Exception:
                     security_status = security_status
 

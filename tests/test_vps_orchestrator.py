@@ -17,6 +17,18 @@ def test_vps_remote_access_prefers_public_url_over_local_ip(monkeypatch):
     assert payload['auto_login_url'].startswith('https://public.example.com/auto-login?key=')
 
 
+def test_vps_remote_access_security_reports_public_on_for_live_url(monkeypatch):
+    monkeypatch.setenv("JARVIS_PUBLIC_URL", "http://161.35.38.152:8000")
+    app = create_app()
+    client = app.test_client()
+
+    payload = client.get('/api/remote_access').get_json()
+
+    assert payload['ok'] is True
+    assert 'PUBLIC=ON' in payload['security']
+    assert 'PIN=OFF' in payload['security']
+
+
 def test_vps_orchestrator_health_and_task_queue():
     app = create_app()
     client = app.test_client()
