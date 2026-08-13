@@ -8,7 +8,9 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, Response
 
-HTML_PAGE = """
+def _build_root_page() -> str:
+    public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.internal"
+    return f"""
 <!doctype html>
 <html lang=\"en\">
   <head>
@@ -16,7 +18,7 @@ HTML_PAGE = """
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
     <title>JARVIS VPS</title>
     <style>
-      body {
+      body {{
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         background: #07111f;
         color: #e8f3ff;
@@ -24,8 +26,8 @@ HTML_PAGE = """
         place-items: center;
         min-height: 100vh;
         margin: 0;
-      }
-      .card {
+      }}
+      .card {{
         max-width: 760px;
         width: min(90vw, 760px);
         background: rgba(17, 31, 49, 0.92);
@@ -33,23 +35,23 @@ HTML_PAGE = """
         border-radius: 16px;
         padding: 2rem 2.25rem;
         box-shadow: 0 24px 60px rgba(0,0,0,0.35);
-      }
-      h1 {
+      }}
+      h1 {{
         margin: 0 0 0.5rem;
         font-size: clamp(2rem, 5vw, 3rem);
         letter-spacing: 0.08em;
-      }
-      p {
+      }}
+      p {{
         margin: 0.5rem 0;
         line-height: 1.55;
         color: #d5e6ff;
-      }
-      code {
+      }}
+      code {{
         background: rgba(148, 163, 184, 0.12);
         border: 1px solid rgba(148, 163, 184, 0.2);
         border-radius: 6px;
         padding: 0.15rem 0.45rem;
-      }
+      }}
     </style>
   </head>
   <body>
@@ -63,7 +65,7 @@ HTML_PAGE = """
     </div>
   </body>
 </html>
-""".format(public_entry=os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.internal")
+"""
 
 try:
     from dashboard.server import DashboardServer
@@ -225,7 +227,7 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
-        return HTML_PAGE, 200, {"Content-Type": "text/html; charset=utf-8"}
+        return _build_root_page(), 200, {"Content-Type": "text/html; charset=utf-8"}
 
     @app.get("/health")
     def health():
