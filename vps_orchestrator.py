@@ -467,6 +467,30 @@ def create_app() -> Flask:
     def api_remote_access():
         return jsonify(orchestrator.get_public_remote_snapshot())
 
+    @app.post("/api/remote_uplink")
+    @app.get("/api/remote_uplink")
+    def api_remote_uplink():
+        snapshot = orchestrator.get_public_remote_snapshot()
+        message = [
+            "JARVIS remote uplink accepted",
+            f"Open: {snapshot.get('url') or 'remote dashboard unavailable'}",
+            f"Key: {snapshot.get('key') or ''}",
+            f"Auto: {snapshot.get('auto_login_url') or ''}",
+            "Status: VPS remote voice active",
+            "SECURITY: PUBLIC=ON | PIN=OFF",
+        ]
+        message = "\n".join(part for part in message if part and not (part.endswith(": ") or part.endswith(":")))
+        payload = {
+            "ok": True,
+            "source": "vps",
+            "url": snapshot.get("url"),
+            "key": snapshot.get("key"),
+            "auto_login_url": snapshot.get("auto_login_url"),
+            "message": message,
+            "security": snapshot.get("security"),
+        }
+        return jsonify(payload)
+
     @app.get("/api/ops")
     def api_ops():
         snapshot = orchestrator.get_ops_snapshot()
