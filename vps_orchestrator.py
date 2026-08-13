@@ -326,6 +326,79 @@ def create_app() -> Flask:
             "queue_size": len(orchestrator.queue),
         })
 
+    @app.get("/auto-login")
+    def auto_login():
+        key = str(request.args.get("key") or "").strip()
+        dashboard = orchestrator.dashboard_server
+        pending = getattr(dashboard, "_pending_keys", {}) if dashboard is not None else {}
+        if key and key in pending:
+            try:
+                pending.pop(key, None)
+            except Exception:
+                pass
+
+        html = f"""
+        <!doctype html>
+        <html lang=\"en\">
+        <head>
+          <meta charset=\"utf-8\" />
+          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+          <title>JARVIS Remote Access</title>
+          <style>
+            body {{
+              margin: 0;
+              min-height: 100vh;
+              display: grid;
+              place-items: center;
+              background: #07111f;
+              color: #e8f3ff;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            }}
+            .card {{
+              width: min(92vw, 560px);
+              background: rgba(17, 31, 49, 0.92);
+              border: 1px solid rgba(147, 197, 253, 0.35);
+              border-radius: 16px;
+              padding: 2rem 2.25rem;
+              box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+              text-align: center;
+            }}
+            h1 {{ margin: 0 0 0.6rem; font-size: clamp(1.8rem, 4vw, 2.6rem); letter-spacing: 0.08em; }}
+            p {{ line-height: 1.6; color: #d5e6ff; }}
+            a {{
+              display: inline-block;
+              margin-top: 0.8rem;
+              padding: 0.85rem 1.2rem;
+              border-radius: 10px;
+              background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+              color: white;
+              text-decoration: none;
+              font-weight: 700;
+            }}
+            code {{
+              background: rgba(148, 163, 184, 0.12);
+              border: 1px solid rgba(148, 163, 184, 0.2);
+              border-radius: 6px;
+              padding: 0.15rem 0.5rem;
+            }}
+          </style>
+        </head>
+        <body>
+          <div class=\"card\">
+            <h1>JARVIS</h1>
+            <p>Remote access link validated.</p>
+            <p>Key: <code>{key or 'not provided'}</code></p>
+            <p>Opening the live dashboard…</p>
+            <a href=\"/dashboard\">Open dashboard</a>
+          </div>
+          <script>
+            setTimeout(() => {{ window.location.href = '/dashboard'; }}, 800);
+          </script>
+        </body>
+        </html>
+        """
+        return Response(html, mimetype="text/html")
+
     @app.get("/dashboard")
     def dashboard_index():
         dashboard_path = BASE_DIR / "dashboard" / "static" / "app.html"
