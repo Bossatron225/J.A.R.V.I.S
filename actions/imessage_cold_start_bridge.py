@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 from pathlib import Path
 
 
@@ -499,6 +500,61 @@ def _send_imessage(receiver: str, message_text: str) -> None:
         _log(f"ack send failed: {e}")
 
 
+def _refresh_remote_access_snapshot() -> tuple[str, str, str]:
+    def _read_config_url() -> str:
+        try:
+            cfg_path = BASE_DIR / "config" / "api_keys.json"
+            if cfg_path.exists():
+                with open(cfg_path, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                for key in ("public_remote_url", "JARVIS_PUBLIC_URL", "PUBLIC_ENTRY_URL"):
+                    value = str(data.get(key, "") or "").strip()
+                    if value:
+                        return value.rstrip("/")
+        except Exception:
+            pass
+        for key in ("JARVIS_PUBLIC_URL", "PUBLIC_ENTRY_URL"):
+            value = (os.getenv(key) or "").strip()
+            if value:
+                return value.rstrip("/")
+        return ""
+
+    def _generate_key() -> str:
+        alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        return "".join(__import__("secrets").choice(alphabet) for _ in range(6))
+
+    url = _read_config_url()
+    key = (os.getenv("JARVIS_REMOTE_KEY") or "").strip()
+    if not key:
+        key = _generate_key()
+    os.environ["JARVIS_REMOTE_KEY"] = key
+
+    if url:
+        for probe in (url, f"{url.rstrip('/')}/api/status", f"{url.rstrip('/')}/api/health"):
+            try:
+                req = urllib.request.Request(probe, headers={"User-Agent": "JARVIS-wake-bridge/1.0"})
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    payload = resp.read(2000)
+                if payload:
+                    try:
+                        parsed = json.loads(payload.decode("utf-8", errors="replace"))
+                    except Exception:
+                        parsed = {}
+                    if isinstance(parsed, dict):
+                        remote_url = str(parsed.get("public_entry") or parsed.get("url") or parsed.get("dashboard_url") or url).strip()
+                        if remote_url:
+                            url = remote_url.rstrip("/")
+                    break
+            except Exception:
+                continue
+
+    if not url:
+        url = "remote dashboard unavailable"
+
+    auto_login = f"{url}/auto-login?key={key}" if url and key and "remote dashboard unavailable" not in url else ""
+    return url, key, auto_login
+
+
 def _build_remote_wake_notice(url: str, key: str = "", auto_login: str = "") -> str:
     url = (url or os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "remote dashboard unavailable").strip()
     lines = [
@@ -619,14 +675,8 @@ def main() -> int:
                 if launched:
                     if not target:
                         target = sender_allowed
-                    public_url = (os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "").strip()
-                    key = ""
-                    if public_url:
-                        key = os.getenv("JARVIS_REMOTE_KEY") or ""
-                    auto = ""
-                    if public_url and key:
-                        auto = f"{public_url}/auto-login?key={key}"
-                    notice = _build_remote_wake_notice(public_url or "remote dashboard unavailable", key, auto)
+                    public_url, key, auto = _refresh_remote_access_snapshot()
+                    notice = _build_remote_wake_notice(public_url, key, auto)
                     _send_imessage(target, notice)
                 else:
                     _send_imessage(target, "Wake received, but I could not launch JARVIS.")
