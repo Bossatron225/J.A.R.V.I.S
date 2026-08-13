@@ -56,3 +56,9 @@ def test_vps_orchestrator_health_and_task_queue():
     dashboard = client.get('/dashboard')
     assert dashboard.status_code == 200
     assert b'JARVIS VPS Dashboard' in dashboard.data
+
+    remote_chat = client.post('/api/remote_chat', json={'text': 'hello from remote'})
+    assert remote_chat.status_code == 202
+    remote_payload = remote_chat.get_json()
+    assert remote_payload['accepted'] is True
+    assert remote_payload['text'] == 'hello from remote'
