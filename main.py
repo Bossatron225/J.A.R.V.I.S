@@ -2423,6 +2423,12 @@ class JarvisLive:
                 except Exception:
                     data = {}
                 if isinstance(data, dict) and data.get("ok") is not False:
+                    if hasattr(self.ui, "set_vps_status"):
+                        self.ui.set_vps_status(
+                            "VPS: connected • remote-only wake mode",
+                            "ok",
+                            "Remote VPS is active; local wake launch is intentionally skipped.",
+                        )
                     self.ui.write_log("SYS: VPS brain active; skipping local wake launch to keep sleep-mode wake remote-first.")
                     return False
             except Exception:
@@ -2542,6 +2548,12 @@ class JarvisLive:
                 except Exception:
                     data = {}
                 if isinstance(data, dict) and data.get("ok") is not False:
+                    if hasattr(self.ui, "set_vps_status"):
+                        self.ui.set_vps_status(
+                            "VPS: connected • remote voice active • local speech suppressed",
+                            "ok",
+                            "Remote VPS is authoritative; local speech is intentionally blocked.",
+                        )
                     self.ui.write_log("SYS: VPS healthy; local speech suppressed to keep remote voice authoritative.")
                     return
             except Exception:
