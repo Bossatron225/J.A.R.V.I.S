@@ -670,6 +670,24 @@ def main() -> int:
                     # Avoid chat spam while already running; cooldown above already records this wake.
                     continue
 
+                vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
+                if vps_url:
+                    try:
+                        health_url = f"{vps_url.rstrip('/')}/api/health"
+                        req = urllib.request.Request(health_url, headers={"User-Agent": "JARVIS-wake-bridge/1.0"})
+                        with urllib.request.urlopen(req, timeout=4) as resp:
+                            payload = resp.read(2048)
+                        data = json.loads(payload.decode("utf-8", errors="replace")) if payload else {}
+                        if isinstance(data, dict) and data.get("ok") is not False:
+                            _log(f"VPS active at {vps_url}; skipping local launch to keep wake remote-first")
+                            target = msg.get("sender") or msg.get("chat_name") or sender_allowed
+                            public_url, key, auto = _refresh_remote_access_snapshot()
+                            notice = _build_remote_wake_notice(public_url, key, auto)
+                            _send_imessage(target, notice)
+                            continue
+                    except Exception:
+                        pass
+
                 launched = _launch_jarvis(python_exec, target_script)
                 target = msg.get("sender") or msg.get("chat_name") or sender_allowed
                 if launched:
