@@ -77,3 +77,30 @@ def test_receive_audio_disconnect_does_not_print_traceback(monkeypatch) -> None:
 
     assert jarvis.session is None
     assert tracebacks == []
+
+
+def test_wake_message_includes_remote_url_and_access_key() -> None:
+    jarvis = JarvisLive(DummyUI())
+
+    class FakeDashboard:
+        def new_key(self):
+            return "REMOTE-KEY-123"
+
+        def get_remote_url(self):
+            return "https://remote.example.com"
+
+        def get_auto_login_url(self, key):
+            return f"https://remote.example.com/auto-login?key={key}"
+
+        def get_remote_security_status(self):
+            return "SECURITY: PUBLIC=ON | PIN=OFF"
+
+    jarvis._dashboard = FakeDashboard()
+    jarvis.session = None
+
+    message = jarvis._build_wake_remote_access_message()
+
+    assert "https://remote.example.com" in message
+    assert "REMOTE-KEY-123" in message
+    assert "auto-login" in message.lower()
+    assert "PUBLIC=ON" in message
