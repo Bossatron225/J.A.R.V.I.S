@@ -68,11 +68,6 @@
   "sessions": [
     {
       "date": "2026-08-11",
-      "summary": "James Lumsden reviewed top news headlines and his live camera feed with JARVIS, but repeatedly failed biometric verification attempts to clear system security protocols.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-11",
       "summary": "The user experienced biometric verification issues and then worked with JARVIS to update and calibrate the correct pronunciation of his girlfriend Nevaeh's name in the system memory.",
       "language": "English"
     },
@@ -84,6 +79,11 @@
     {
       "date": "2026-08-13",
       "summary": "James reviewed today's top news headlines and had JARVIS save a new project to his memory.",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-13",
+      "summary": "The user reviewed system diagnostics with JARVIS and discussed the operational status and shutdown behaviors of both the local application and the remote VPS server.",
       "language": "English"
     }
   ],
