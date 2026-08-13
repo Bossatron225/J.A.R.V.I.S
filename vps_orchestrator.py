@@ -6,12 +6,19 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 
 try:
     from dashboard.server import DashboardServer
 except Exception:  # pragma: no cover
     DashboardServer = None
+
+try:
+    from twilio.rest import Client
+    from twilio.twiml.voice_response import VoiceResponse
+except Exception:  # pragma: no cover
+    Client = None
+    VoiceResponse = None
 
 from memory.document_ingestion import index_codebase, ingest_document, search_document_index
 from memory.memory_manager import load_memory, save_memory, update_memory
@@ -247,6 +254,64 @@ def create_app() -> Flask:
             source="remote-chat",
         )
         return jsonify({"accepted": True, "text": text, **task}), 202
+
+    @app.post("/voice")
+    def voice_webhook():
+        if VoiceResponse is None:
+            return Response("<Response><Say>Twilio voice support is unavailable.</Say></Response>", mimetype="text/xml")
+
+        response = VoiceResponse()
+        from_number = str(request.form.get("From") or "")
+        allowed = [
+            str(item).strip() for item in (os.getenv("ALLOWED_NUMBERS") or os.getenv("MY_NUMBER") or "").split(",")
+            if item.strip()
+        ]
+        if allowed and from_number and from_number not in allowed:
+            response.reject()
+            return Response(str(response), mimetype="text/xml")
+
+        response.say("Welcome back, Sir. Remote Jarvis is online and ready. Please speak after the tone.", voice="alice")
+        response.gather(input="speech", action="/respond-to-command", timeout=5, speech_timeout="auto")
+        return Response(str(response), mimetype="text/xml")
+
+    @app.post("/respond-to-command")
+    def respond_to_command():
+        if VoiceResponse is None:
+            return Response("<Response><Say>Twilio voice support is unavailable.</Say></Response>", mimetype="text/xml")
+
+        response = VoiceResponse()
+        user_speech = (request.form.get("SpeechResult") or request.form.get("speechResult") or "").strip()
+
+        if not user_speech:
+            gather = response.gather(input="speech", action="/respond-to-command", timeout=5, speech_timeout="auto")
+            response.append(gather)
+            return Response(str(response), mimetype="text/xml")
+
+        orchestrator.enqueue_task(
+            action="remote_chat",
+            payload={"text": user_speech, "source": "twilio-voice"},
+            source="twilio-voice",
+        )
+        response.say("I have sent your request to Jarvis. Please hold while he responds through the active session.", voice="alice")
+        return Response(str(response), mimetype="text/xml")
+
+    @app.post("/api/remote_call")
+    def remote_call():
+        if Client is None:
+            return jsonify({"error": "Twilio is not configured. Set TWILIO_SID, TWILIO_AUTH_TOKEN, and TWILIO_NUMBER."}), 500
+
+        twilio_sid = (os.getenv("TWILIO_SID") or "").strip()
+        twilio_auth = (os.getenv("TWILIO_AUTH_TOKEN") or "").strip()
+        twilio_number = (os.getenv("TWILIO_NUMBER") or "+1").strip()
+        target = str((request.get_json(silent=True) or {}).get("to") or os.getenv("MY_NUMBER") or "").strip()
+        if not target:
+            return jsonify({"error": "to is required"}), 400
+
+        client = Client(twilio_sid, twilio_auth)
+        response = VoiceResponse()
+        response.say("Jarvis is calling you now.", voice="alice")
+        call = client.calls.create(twiml=str(response), to=target, from_=twilio_number)
+        return jsonify({"ok": True, "sid": call.sid, "to": target, "from": twilio_number})
 
     @app.post("/api/process")
     def process_queue():
