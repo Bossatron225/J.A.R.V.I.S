@@ -2401,7 +2401,10 @@ class JarvisLive:
             lines.append(f"Key: {key}")
         if auto:
             lines.append(f"Auto: {auto}")
-        lines.append(f"Status: {('online' if self.session is not None else 'remote only')}")
+        if self.session is not None:
+            lines.append("Status: local online")
+        else:
+            lines.append("Status: VPS remote voice active")
         lines.append(sec)
         return "\n".join(lines)
 
