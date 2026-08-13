@@ -8,6 +8,11 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request
 
+try:
+    from dashboard.server import DashboardServer
+except Exception:  # pragma: no cover
+    DashboardServer = None
+
 from memory.document_ingestion import index_codebase, ingest_document, search_document_index
 from memory.memory_manager import load_memory, save_memory, update_memory
 
@@ -22,6 +27,12 @@ class VPSOrchestrator:
         self.started_at = datetime.now(timezone.utc).isoformat()
         self.public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.internal"
         self.mode = "vps"
+        self.dashboard_server = None
+        if DashboardServer is not None:
+            try:
+                self.dashboard_server = DashboardServer()
+            except Exception:
+                self.dashboard_server = None
         self.status = {
             "service": "jarvis-vps-orchestrator",
             "mode": self.mode,
@@ -29,6 +40,7 @@ class VPSOrchestrator:
             "uptime_started": self.started_at,
             "queue_size": 0,
             "status": "online",
+            "dashboard": "vps-managed" if self.dashboard_server is not None else "disabled",
         }
 
     def enqueue_task(self, action: str, payload: dict | None = None, source: str = "system") -> dict:
@@ -61,11 +73,18 @@ class VPSOrchestrator:
             payload = deepcopy(self.status)
 
         uptime_seconds = max(0.0, (datetime.now(timezone.utc) - datetime.fromisoformat(self.started_at)).total_seconds())
+        dashboard_url = None
+        if self.dashboard_server is not None and hasattr(self.dashboard_server, "get_remote_url"):
+            try:
+                dashboard_url = self.dashboard_server.get_remote_url()
+            except Exception:
+                dashboard_url = None
         return {
             "service": "jarvis-vps-orchestrator",
             "mode": self.mode,
             "status": payload.get("status", "online"),
             "public_entry": self.public_entry,
+            "dashboard_url": dashboard_url,
             "uptime_started": self.started_at,
             "uptime_seconds": round(uptime_seconds, 2),
             "queue_size": len(queue_snapshot),
@@ -158,6 +177,21 @@ def create_app() -> Flask:
             "status": "online",
             "public_entry": orchestrator.public_entry,
             "queue_size": len(orchestrator.queue),
+        })
+
+    @app.get("/dashboard")
+    def dashboard_index():
+        return jsonify({
+            "ok": True,
+            "service": "jarvis-vps-orchestrator",
+            "mode": "vps",
+            "status": "online",
+            "title": "JARVIS VPS Dashboard",
+            "public_entry": orchestrator.public_entry,
+            "dashboard_url": (
+                orchestrator.dashboard_server.get_remote_url() if orchestrator.dashboard_server is not None and hasattr(orchestrator.dashboard_server, "get_remote_url") else None
+            ),
+            "message": "The dashboard runs on the VPS and remains active even if the Mac app shuts down.",
         })
 
     @app.get("/api/status")
