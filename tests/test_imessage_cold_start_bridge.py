@@ -18,3 +18,19 @@ def test_preferred_python_exec_prefers_repo_venv(monkeypatch, tmp_path):
     }
 
     assert bridge._preferred_python_exec(cfg) == str(venv_python)
+
+
+def test_cold_start_wake_notice_includes_live_remote_access(monkeypatch):
+    monkeypatch.setenv("JARVIS_PUBLIC_URL", "https://remote.example.com")
+
+    notice = bridge._build_remote_wake_notice(
+        url="https://remote.example.com",
+        key="REMOTE-KEY-123",
+        auto_login="https://remote.example.com/auto-login?key=REMOTE-KEY-123",
+    )
+
+    assert "https://remote.example.com" in notice
+    assert "REMOTE-KEY-123" in notice
+    assert "Open:" in notice
+    assert "Key:" in notice
+    assert "Auto:" in notice
