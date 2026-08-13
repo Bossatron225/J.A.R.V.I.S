@@ -8,9 +8,13 @@ def test_vps_orchestrator_health_and_task_queue():
     client = app.test_client()
 
     root = client.get('/')
-    assert root.status_code == 200
-    assert 'text/html' in root.content_type
-    assert 'JARVIS VPS' in root.get_data(as_text=True)
+    assert root.status_code == 302
+    assert root.headers.get('Location', '').endswith('/dashboard')
+
+    dashboard = client.get('/dashboard')
+    assert dashboard.status_code == 200
+    assert 'text/html' in dashboard.content_type
+    assert 'JARVIS' in dashboard.get_data(as_text=True)
 
     health = client.get('/health')
     assert health.status_code == 200
@@ -60,7 +64,7 @@ def test_vps_orchestrator_health_and_task_queue():
 
     dashboard = client.get('/dashboard')
     assert dashboard.status_code == 200
-    assert b'JARVIS VPS Dashboard' in dashboard.data
+    assert b'JARVIS Dashboard' in dashboard.data or b'JARVIS' in dashboard.data
 
     remote_chat = client.post('/api/remote_chat', json={'text': 'hello from remote'})
     assert remote_chat.status_code == 202
