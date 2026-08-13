@@ -183,6 +183,27 @@ def _phone_variants(value: str) -> set[str]:
     return {v for v in variants if v}
 
 
+def _resolve_vps_url() -> str:
+    env_value = (os.getenv("JARVIS_VPS_URL") or "").strip()
+    if env_value:
+        return env_value.rstrip("/")
+
+    try:
+        cfg_path = BASE_DIR / "config" / "api_keys.json"
+        if cfg_path.exists():
+            with open(cfg_path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            if isinstance(data, dict):
+                for key in ("JARVIS_VPS_URL", "JARVIS_VPS_BASE_URL", "JARVIS_PUBLIC_URL", "PUBLIC_ENTRY_URL"):
+                    value = str(data.get(key, "") or "").strip()
+                    if value:
+                        return value.rstrip("/")
+    except Exception:
+        pass
+
+    return ""
+
+
 def _messages_db_path() -> Path:
     return Path.home() / "Library" / "Messages" / "chat.db"
 
@@ -719,7 +740,7 @@ def main() -> int:
 
                 if match_remote_uplink:
                     target = msg.get("sender") or msg.get("chat_name") or sender_allowed
-                    vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
+                    vps_url = _resolve_vps_url()
                     if vps_url:
                         try:
                             health_url = f"{vps_url.rstrip('/')}/api/health"
@@ -748,7 +769,7 @@ def main() -> int:
                     # Avoid chat spam while already running; cooldown above already records this wake.
                     continue
 
-                vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
+                vps_url = _resolve_vps_url()
                 if vps_url:
                     try:
                         health_url = f"{vps_url.rstrip('/')}/api/health"
