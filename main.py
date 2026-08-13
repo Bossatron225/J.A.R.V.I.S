@@ -2406,9 +2406,24 @@ class JarvisLive:
         return "\n".join(lines)
 
     def _launch_local_jarvis_if_needed(self) -> bool:
-        """Launch the Mac-side app if it is not already active and a local runtime is available."""
+        """Launch the Mac-side app only when the VPS is not the active remote brain."""
         if self.session is not None:
             return True
+        vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
+        if vps_url:
+            try:
+                url = f"{vps_url.rstrip('/')}/api/health"
+                with urllib.request.urlopen(url, timeout=4) as resp:
+                    payload = resp.read(2048)
+                try:
+                    data = json.loads(payload.decode("utf-8", errors="replace"))
+                except Exception:
+                    data = {}
+                if isinstance(data, dict) and data.get("ok") is not False:
+                    self.ui.write_log("SYS: VPS brain active; skipping local wake launch to keep sleep-mode wake remote-first.")
+                    return False
+            except Exception:
+                pass
         if _platform.system() != "Darwin":
             return False
         try:
