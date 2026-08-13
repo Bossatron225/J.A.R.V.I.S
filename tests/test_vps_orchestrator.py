@@ -42,3 +42,13 @@ def test_vps_orchestrator_health_and_task_queue():
     reboot_payload = reboot.get_json()
     assert reboot_payload['status'] in {'restarting', 'accepted'}
     assert reboot_payload['service'] == 'jarvis-vps-orchestrator'
+
+    ops = client.get('/api/ops')
+    assert ops.status_code == 200
+    ops_payload = ops.get_json()
+    assert ops_payload['service'] == 'jarvis-vps-orchestrator'
+    assert ops_payload['status'] == 'online'
+    assert 'uptime_seconds' in ops_payload
+    assert 'queue_size' in ops_payload
+    assert 'queue' in ops_payload
+    assert 'public_entry' in ops_payload
