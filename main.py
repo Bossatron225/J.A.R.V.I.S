@@ -1317,6 +1317,27 @@ class JarvisLive:
         self._local_worker = None
         self._vps_link_established_said = False
 
+    def _print_startup_banner(self) -> None:
+        vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
+        public_url = (os.getenv("JARVIS_PUBLIC_URL") or "").strip()
+        tunnel_enabled = (os.getenv("JARVIS_ENABLE_TUNNEL") or "").strip().lower() in ("1", "true", "yes", "on")
+
+        print("\n" + "=" * 72)
+        print("JARVIS STARTUP STATUS")
+        print(f"VPS brain: {vps_url or 'not configured'}")
+        if public_url:
+            print(f"Remote/public URL: {public_url}")
+        elif tunnel_enabled:
+            print("Remote/public URL: tunnel enabled but URL not resolved yet")
+        else:
+            print("Remote/public URL: disabled")
+        print("=" * 72)
+
+        if vps_url:
+            self.ui.write_log(f"SYS: VPS link configured: {vps_url}")
+        if public_url:
+            self.ui.write_log(f"SYS: Public remote URL: {public_url}")
+
     @staticmethod
     def _load_runtime_config() -> dict:
         try:
@@ -4058,6 +4079,7 @@ class JarvisLive:
 
     async def run(self):
         self._loop = asyncio.get_event_loop()
+        self._print_startup_banner()
 
         self._run_macos_permission_preflight()
         self._configure_imessage_cold_start_bridge()
