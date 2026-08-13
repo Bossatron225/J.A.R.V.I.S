@@ -687,7 +687,20 @@ class DashboardServer:
         return f"{url}/auto-login?key={key}"
 
     def get_remote_security_status(self) -> str:
-        public_state = "ON" if bool(self._public_url) else "OFF"
+        public_url = (self._public_url or "").strip()
+        public_like_url = bool(public_url) and not public_url.startswith((
+            "http://127.0.0.1",
+            "http://localhost",
+            "http://10.",
+            "http://172.",
+            "http://192.168.",
+            "https://127.0.0.1",
+            "https://localhost",
+            "https://10.",
+            "https://172.",
+            "https://192.168.",
+        ))
+        public_state = "ON" if public_like_url else "OFF"
         pin_state = "REQUIRED" if self._remote_pin_required() else "OFF"
         ttl_hours = max(1, int(TOKEN_TTL_SECS // 3600))
         return f"SECURITY: PUBLIC={public_state}  |  PIN={pin_state}  |  TOKEN_TTL={ttl_hours}h"
