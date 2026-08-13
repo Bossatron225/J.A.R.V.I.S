@@ -119,8 +119,11 @@ def test_launch_local_jarvis_if_needed_uses_python_entry(monkeypatch) -> None:
         return DummyProc()
 
     class FakeSubprocess:
-        def __init__(self):
-            self.Popen = fake_popen
+        DEVNULL = None
+
+        @staticmethod
+        def Popen(*args, **kwargs):
+            return fake_popen(*args, **kwargs)
 
     monkeypatch.setattr(main_module, "_subprocess", FakeSubprocess())
     monkeypatch.setattr(main_module._platform, "system", lambda: "Darwin")
