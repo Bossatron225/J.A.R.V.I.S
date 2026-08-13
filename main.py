@@ -2407,15 +2407,15 @@ class JarvisLive:
         """Launch the Mac-side app if it is not already active and a local runtime is available."""
         if self.session is not None:
             return True
-        if platform.system() != "Darwin":
+        if _platform.system() != "Darwin":
             return False
         try:
-            subprocess.Popen(
+            _subprocess.Popen(
                 [sys.executable, str(BASE_DIR / "main.py")],
                 cwd=str(BASE_DIR),
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdin=_subprocess.DEVNULL,
+                stdout=_subprocess.DEVNULL,
+                stderr=_subprocess.DEVNULL,
                 start_new_session=True,
                 close_fds=True,
             )
