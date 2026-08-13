@@ -6,6 +6,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import main as main_module
 from main import JarvisLive
 
 
@@ -117,8 +118,8 @@ def test_launch_local_jarvis_if_needed_uses_python_entry(monkeypatch) -> None:
             pass
         return DummyProc()
 
-    monkeypatch.setattr("main.subprocess.Popen", fake_popen, raising=False)
-    monkeypatch.setattr("main.platform.system", lambda: "Darwin")
+    monkeypatch.setattr(main_module.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(main_module.platform, "system", lambda: "Darwin")
 
     launched = jarvis._launch_local_jarvis_if_needed()
 
