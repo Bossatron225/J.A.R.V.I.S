@@ -34,3 +34,20 @@ def test_cold_start_wake_notice_includes_live_remote_access(monkeypatch):
     assert "Open:" in notice
     assert "Key:" in notice
     assert "Auto:" in notice
+
+
+def test_refresh_remote_access_snapshot_uses_current_config(monkeypatch, tmp_path):
+    monkeypatch.setattr(bridge, "BASE_DIR", tmp_path)
+    cfg_path = tmp_path / "config" / "api_keys.json"
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text('{"public_remote_url": "https://cfg.example.com"}', encoding="utf-8")
+
+    monkeypatch.delenv("JARVIS_PUBLIC_URL", raising=False)
+    monkeypatch.delenv("PUBLIC_ENTRY_URL", raising=False)
+    monkeypatch.delenv("JARVIS_REMOTE_KEY", raising=False)
+
+    url, key, auto = bridge._refresh_remote_access_snapshot()
+
+    assert url == "https://cfg.example.com"
+    assert len(key) == 6
+    assert auto.startswith("https://cfg.example.com/auto-login?key=")
