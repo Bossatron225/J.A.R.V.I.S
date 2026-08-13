@@ -114,6 +114,17 @@ def test_remote_uplink_uses_vps_snapshot_without_local_launch(monkeypatch):
     assert "remote uplink" in msg["text"].lower()
 
 
+def test_vps_url_falls_back_to_config(monkeypatch, tmp_path):
+    monkeypatch.delenv("JARVIS_VPS_URL", raising=False)
+    monkeypatch.setattr(bridge, "BASE_DIR", tmp_path)
+
+    cfg_path = tmp_path / "config" / "api_keys.json"
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text('{"JARVIS_VPS_URL": "https://vps.example.com"}', encoding="utf-8")
+
+    assert bridge._resolve_vps_url() == "https://vps.example.com"
+
+
 def test_vps_active_skips_local_launch(monkeypatch):
     calls = []
 
