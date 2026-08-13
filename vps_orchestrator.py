@@ -137,6 +137,18 @@ def create_app() -> Flask:
     app = Flask(__name__)
     orchestrator = VPSOrchestrator()
 
+    @app.get("/")
+    def root():
+        return jsonify({
+            "ok": True,
+            "service": "jarvis-vps-orchestrator",
+            "mode": "vps",
+            "status": "online",
+            "public_entry": orchestrator.public_entry,
+            "queue_size": len(orchestrator.queue),
+            "message": "JARVIS VPS online",
+        })
+
     @app.get("/health")
     def health():
         return jsonify({
