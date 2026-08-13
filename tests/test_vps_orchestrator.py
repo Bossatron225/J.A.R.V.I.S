@@ -29,6 +29,19 @@ def test_vps_remote_access_security_reports_public_on_for_live_url(monkeypatch):
     assert 'PIN=OFF' in payload['security']
 
 
+def test_vps_auto_login_route_serves_page_for_live_key(monkeypatch):
+    monkeypatch.setenv("JARVIS_PUBLIC_URL", "http://161.35.38.152:8000")
+    app = create_app()
+    client = app.test_client()
+
+    response = client.get('/auto-login?key=TESTKEY')
+
+    assert response.status_code == 200
+    text = response.get_data(as_text=True)
+    assert 'JARVIS' in text
+    assert 'TESTKEY' in text
+
+
 def test_vps_orchestrator_health_and_task_queue():
     app = create_app()
     client = app.test_client()
