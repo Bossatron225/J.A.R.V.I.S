@@ -132,6 +132,9 @@ class VPSOrchestrator:
             memory = payload.get("memory") or {}
             save_memory(memory)
             return {"status": "completed", "result": {"saved": True}}
+        if action == "remote_chat":
+            text = str(payload.get("text") or payload.get("prompt") or "").strip()
+            return {"status": "accepted", "result": {"action": action, "text": text, "note": "queued for active local session"}}
         return {"status": "completed", "result": {"action": action, "payload": payload, "note": "queued for local execution"}}
 
     def drain_queue(self, limit: int = 20) -> list[dict]:
@@ -231,6 +234,19 @@ def create_app() -> Flask:
             source=str(data.get("source") or "command-api"),
         )
         return jsonify({"accepted": True, **response})
+
+    @app.post("/api/remote_chat")
+    def remote_chat():
+        data = request.get_json(silent=True) or {}
+        text = str(data.get("text") or data.get("prompt") or "").strip()
+        if not text:
+            return jsonify({"error": "text is required"}), 400
+        task = orchestrator.enqueue_task(
+            action="remote_chat",
+            payload={"text": text, "source": str(data.get("source") or "remote-web")},
+            source="remote-chat",
+        )
+        return jsonify({"accepted": True, "text": text, **task}), 202
 
     @app.post("/api/process")
     def process_queue():

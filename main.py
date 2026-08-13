@@ -4033,7 +4033,20 @@ class JarvisLive:
                     self.ui.write_log(f"SYS: Local worker processed {len(tasks)} queued task(s) from VPS.")
                     for task in tasks:
                         action = str(task.get("action") or "").strip().lower()
-                        result = worker.execute_local_action(action, task.get("payload") or {})
+                        payload = task.get("payload") or {}
+                        if action == "remote_chat":
+                            text = str(payload.get("text") or payload.get("prompt") or "").strip()
+                            if text and self.session:
+                                try:
+                                    await self.session.send_client_content(
+                                        turns={"parts": [{"text": text}]},
+                                        turn_complete=True,
+                                    )
+                                    self.ui.write_log(f"SYS: Remote chat prompt delivered: {text[:80]}")
+                                except Exception as exc:
+                                    self.ui.write_log(f"SYS: Remote chat failed: {exc}")
+                            continue
+                        result = worker.execute_local_action(action, payload)
                         print(f"[Local Worker] {action}: {result}")
                         if result.get("status") == "rejected":
                             self.ui.write_log(f"SYS: VPS task rejected on local worker: {action}")
