@@ -7,6 +7,11 @@ def test_vps_orchestrator_health_and_task_queue():
     app = create_app()
     client = app.test_client()
 
+    root = client.get('/')
+    assert root.status_code == 200
+    assert 'text/html' in root.content_type
+    assert 'JARVIS VPS' in root.get_data(as_text=True)
+
     health = client.get('/health')
     assert health.status_code == 200
     payload = health.get_json()
