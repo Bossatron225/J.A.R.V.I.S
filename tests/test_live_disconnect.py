@@ -118,8 +118,12 @@ def test_launch_local_jarvis_if_needed_uses_python_entry(monkeypatch) -> None:
             pass
         return DummyProc()
 
-    monkeypatch.setattr(main_module.subprocess, "Popen", fake_popen)
-    monkeypatch.setattr(main_module.platform, "system", lambda: "Darwin")
+    class FakeSubprocess:
+        def __init__(self):
+            self.Popen = fake_popen
+
+    monkeypatch.setattr(main_module, "_subprocess", FakeSubprocess())
+    monkeypatch.setattr(main_module._platform, "system", lambda: "Darwin")
 
     launched = jarvis._launch_local_jarvis_if_needed()
 
