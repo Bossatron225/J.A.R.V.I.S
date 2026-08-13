@@ -55,6 +55,29 @@ class VPSOrchestrator:
             payload["queue_size"] = len(self.queue)
             return payload
 
+    def get_ops_snapshot(self) -> dict:
+        with self.lock:
+            queue_snapshot = [deepcopy(item) for item in self.queue]
+            payload = deepcopy(self.status)
+
+        uptime_seconds = max(0.0, (datetime.now(timezone.utc) - datetime.fromisoformat(self.started_at)).total_seconds())
+        return {
+            "service": "jarvis-vps-orchestrator",
+            "mode": self.mode,
+            "status": payload.get("status", "online"),
+            "public_entry": self.public_entry,
+            "uptime_started": self.started_at,
+            "uptime_seconds": round(uptime_seconds, 2),
+            "queue_size": len(queue_snapshot),
+            "queue": queue_snapshot,
+            "backend": {
+                "python": "flask",
+                "worker_mode": "vps",
+                "remote_control": True,
+            },
+            "connected": True,
+        }
+
     def reboot(self) -> dict:
         with self.lock:
             self.status["status"] = "restarting"
@@ -186,6 +209,11 @@ def create_app() -> Flask:
             "status": "online",
             "public_entry": orchestrator.public_entry,
         })
+
+    @app.get("/api/ops")
+    def api_ops():
+        snapshot = orchestrator.get_ops_snapshot()
+        return jsonify(snapshot)
 
     @app.get("/api/memory")
     def memory_snapshot():
