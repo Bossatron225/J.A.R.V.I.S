@@ -885,6 +885,29 @@
       micBtn.classList.remove('recording');
     }
 
+    function _playRemoteAudioChunk(payload) {
+      if (!payload) return;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!(_audioCtx instanceof AudioContext || _audioCtx instanceof webkitAudioContext)) {
+        _audioCtx = new Ctx({ sampleRate: 16000 });
+      }
+      if (_audioCtx.state === 'suspended') {
+        _audioCtx.resume().catch(() => {});
+      }
+      const bytes = payload instanceof ArrayBuffer ? new Int16Array(payload) : new Int16Array(payload.buffer || payload);
+      if (!bytes.length) return;
+      const buffer = _audioCtx.createBuffer(1, bytes.length, 16000);
+      const out = buffer.getChannelData(0);
+      for (let i = 0; i < bytes.length; i++) {
+        out[i] = bytes[i] / 32768;
+      }
+      const src = _audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(_audioCtx.destination);
+      src.start();
+    }
+
     // Float32 PCM → resample to 16 kHz + convert to Int16
     function _f32toPcm16(f32, srcRate) {
       let s = f32;
