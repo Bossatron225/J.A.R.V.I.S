@@ -92,6 +92,38 @@ from memory.memory_manager import load_memory, save_memory, update_memory
 BASE_DIR = Path(__file__).resolve().parent
 
 
+def handle_dashboard_ws_message(payload, *, dashboard=None, token: str = "", queue=None, wake_callback=None):
+    if not isinstance(payload, dict):
+        return None
+    message_type = str(payload.get("type") or "").strip().lower()
+
+    if message_type == "ping":
+        return {"type": "pong"}
+
+    if message_type == "pong":
+        return {"type": "pong"}
+
+    if message_type == "command":
+        text = str(payload.get("text") or "").strip()
+        enc = str(payload.get("enc") or "")
+        if enc and dashboard is not None and hasattr(dashboard, "_decrypt"):
+            text = dashboard._decrypt(token, enc) or text
+        if text:
+            if queue is not None:
+                try:
+                    queue.put_nowait(text)
+                except Exception:
+                    pass
+            if callable(wake_callback):
+                try:
+                    wake_callback()
+                except Exception:
+                    pass
+        return {"type": "ack", "ok": True}
+
+    return None
+
+
 class VPSOrchestrator:
     def __init__(self):
         self.queue = deque()
@@ -351,26 +383,18 @@ def create_app() -> Flask:
                     data = json.loads(payload)
                 except Exception:
                     continue
-                if data.get("type") == "command":
-                    text = str(data.get("text") or "").strip()
-                    enc = str(data.get("enc") or "")
-                    if enc:
-                        dashboard = orchestrator.dashboard_server
-                        if dashboard is not None and hasattr(dashboard, "_decrypt"):
-                            text = dashboard._decrypt(tok, enc) or text
-                    if text:
-                        queue = getattr(orchestrator.dashboard_server, "_command_queue", None)
-                        if queue is not None:
-                            try:
-                                queue.put_nowait(text)
-                            except Exception:
-                                pass
-                        wake_callback = getattr(orchestrator.dashboard_server, "_wake_callback", None)
-                        if callable(wake_callback):
-                            try:
-                                wake_callback()
-                            except Exception:
-                                pass
+                response = handle_dashboard_ws_message(
+                    data,
+                    dashboard=orchestrator.dashboard_server,
+                    token=tok,
+                    queue=getattr(orchestrator.dashboard_server, "_command_queue", None),
+                    wake_callback=getattr(orchestrator.dashboard_server, "_wake_callback", None),
+                )
+                if response is not None:
+                    try:
+                        ws.send(json.dumps(response))
+                    except Exception:
+                        break
 
         @sock.route("/ws/phone-audio")
         def phone_audio_route(ws):
