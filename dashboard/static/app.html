@@ -964,6 +964,22 @@
         const rate = ctx.sampleRate;
         const src  = ctx.createMediaStreamSource(stream);
 
+        ws.onmessage = (e) => {
+          if (e.data instanceof ArrayBuffer) {
+            _playRemoteAudioChunk(e.data);
+            return;
+          }
+          try {
+            const m = JSON.parse(e.data);
+            if (m.type === 'ping') {
+              try { ws.send(JSON.stringify({ type: 'pong' })); } catch (_) {}
+              return;
+            }
+            if (m.type === 'pong') return;
+            if (m.type === 'sys') sys(m.text);
+          } catch (_) {}
+        };
+
         // AudioWorklet (modern) — runs in dedicated audio thread
         const wCode = `class J extends AudioWorkletProcessor{process(i){const c=i[0]?.[0];if(c)this.port.postMessage(c.slice());return true;}}registerProcessor('j',J);`;
         try {

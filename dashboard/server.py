@@ -412,6 +412,7 @@ class DashboardServer:
         self._aes_cache:  dict[str, bytes]= {}   # session_key → AES bytes
         self._public_url_callback = None
         self._clients: set[WebSocket]     = set()
+        self._audio_clients: set[WebSocket] = set()
         self._history: list[dict]         = []
         self._command_queue               = asyncio.Queue()
         self._wake_callback               = None
@@ -736,6 +737,17 @@ class DashboardServer:
                 dead.add(ws)
         self._clients -= dead
 
+    async def send_audio_to_clients(self, payload: bytes) -> None:
+        if not payload:
+            return
+        dead: set[WebSocket] = set()
+        for ws in list(self._audio_clients):
+            try:
+                await ws.send_bytes(payload)
+            except Exception:
+                dead.add(ws)
+        self._audio_clients -= dead
+
     # ── FastAPI app ───────────────────────────────────────────────────────
 
     def _build_app(self) -> "FastAPI":
@@ -925,6 +937,7 @@ class DashboardServer:
                 await websocket.close(code=4001)
                 return
             await websocket.accept()
+            self._audio_clients.add(websocket)
             asyncio.create_task(self.broadcast(
                 {"type": "sys", "text": "Phone microphone live."}
             ))
@@ -949,6 +962,7 @@ class DashboardServer:
             except WebSocketDisconnect:
                 pass
             finally:
+                self._audio_clients.discard(websocket)
                 asyncio.create_task(self.broadcast(
                     {"type": "sys", "text": "Phone microphone stopped."}
                 ))

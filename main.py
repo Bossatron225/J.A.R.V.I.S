@@ -3457,14 +3457,19 @@ class JarvisLive:
         print("[JARVIS] 🔊 Play started")
         reset_audio_output()
 
-        stream = sd.RawOutputStream(
-            samplerate=RECEIVE_SAMPLE_RATE,
-            channels=CHANNELS,
-            dtype="int16",
-            blocksize=int(self._audio_cfg.get("speaker_chunk_size", 960)),
-            latency=self._audio_cfg.get("output_latency", "low"),
-        )
-        stream.start()
+        have_local_audio = True
+        try:
+            stream = sd.RawOutputStream(
+                samplerate=RECEIVE_SAMPLE_RATE,
+                channels=CHANNELS,
+                dtype="int16",
+                blocksize=int(self._audio_cfg.get("speaker_chunk_size", 960)),
+                latency=self._audio_cfg.get("output_latency", "low"),
+            )
+            stream.start()
+        except Exception:
+            have_local_audio = False
+            stream = None
 
         try:
             while True:
@@ -3484,6 +3489,13 @@ class JarvisLive:
                     continue
 
                 self.set_speaking(True)
+
+                if self._dashboard and self._dashboard._audio_clients:
+                    try:
+                        await self._dashboard.send_audio_to_clients(chunk)
+                    except Exception:
+                        pass
+                    continue
 
                 # Batch all immediately-available chunks into one write to reduce
                 # thread-pool round-trips (was one asyncio.to_thread per 50ms slice).
