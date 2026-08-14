@@ -368,6 +368,25 @@ def create_app() -> Flask:
         token = issue_token_fn(session_key) if callable(issue_token_fn) else session_key
         return jsonify({"ok": True, "token": token, "key": session_key})
 
+    @app.post("/api/request-key")
+    def request_key_post():
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None:
+            return jsonify({"ok": False, "error": "remote access not initialized"}), 503
+        new_key = getattr(dashboard, "new_key", None)
+        if not callable(new_key):
+            return jsonify({"ok": False, "error": "key generation unavailable"}), 500
+        key = str(new_key()).strip().upper()
+        url = (os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or orchestrator.public_entry or "https://jarvis.jarvisyourdomain.com").strip().rstrip('/')
+        auto_login_url = f"{url}/auto-login?key={key}"
+        return jsonify({
+            "ok": True,
+            "key": key,
+            "url": url,
+            "auto_login_url": auto_login_url,
+            "security": "SECURITY: PUBLIC=ON | PIN=OFF",
+        })
+
     @app.get("/health")
     def health():
         return jsonify({
