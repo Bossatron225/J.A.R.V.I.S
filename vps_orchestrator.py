@@ -315,6 +315,17 @@ def create_app() -> Flask:
             "message": "The dashboard runs on the VPS and remains active even if the Mac app shuts down.",
         })
 
+    @app.get("/login")
+    def login():
+        login_path = BASE_DIR / "dashboard" / "static" / "login.html"
+        if login_path.exists():
+            return send_file(str(login_path), mimetype="text/html")
+        return jsonify({
+            "ok": False,
+            "error": "login page not available",
+            "service": "jarvis-vps-orchestrator",
+        }), 404
+
     @app.get("/health")
     def health():
         return jsonify({
