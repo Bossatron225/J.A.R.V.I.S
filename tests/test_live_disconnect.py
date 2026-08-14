@@ -233,7 +233,60 @@ def test_local_speech_is_blocked_when_vps_is_healthy(monkeypatch) -> None:
     assert "remote voice active" in jarvis.ui.vps_status[0].lower()
 
 
-def test_main_uses_headless_ui_when_vps_is_configured(monkeypatch) -> None:
+def test_main_keeps_gui_ui_by_default_when_vps_is_configured(monkeypatch) -> None:
+    created = []
+
+    class FakeHeadlessUI:
+        class Root:
+            def mainloop(self):
+                pass
+
+        def __init__(self):
+            created.append("headless")
+            self.root = self.Root()
+
+        def wait_for_api_key(self):
+            return None
+
+        def write_log(self, *_args, **_kwargs):
+            return None
+
+        def __getattr__(self, name):
+            def _noop(*_args, **_kwargs):
+                return None
+            return _noop
+
+    class FakeGuiUI:
+        def __init__(self, *args, **kwargs):
+            created.append("gui")
+            self.root = type("Root", (), {"mainloop": lambda self: None})()
+
+        def wait_for_api_key(self):
+            return None
+
+    monkeypatch.delenv("JARVIS_HEADLESS", raising=False)
+    monkeypatch.setenv("JARVIS_VPS_URL", "https://vps.example.com")
+    monkeypatch.setattr(main_module, "JarvisUI", FakeGuiUI)
+    monkeypatch.setattr(main_module, "_HeadlessUI", FakeHeadlessUI)
+
+    class FakeThread:
+        def __init__(self, target=None, daemon=False, **kwargs):
+            self.target = target
+            self.daemon = daemon
+            self.kwargs = kwargs
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(main_module.threading, "Thread", FakeThread)
+    monkeypatch.setattr(main_module.asyncio, "run", lambda coro: None)
+
+    main_module.main()
+
+    assert created == ["gui"]
+
+
+def test_main_uses_headless_ui_when_explicitly_requested(monkeypatch) -> None:
     created = []
 
     class FakeHeadlessUI:
@@ -265,6 +318,7 @@ def test_main_uses_headless_ui_when_vps_is_configured(monkeypatch) -> None:
             return None
 
     monkeypatch.setenv("JARVIS_VPS_URL", "https://vps.example.com")
+    monkeypatch.setenv("JARVIS_HEADLESS", "1")
     monkeypatch.setattr(main_module, "JarvisUI", FakeGuiUI)
     monkeypatch.setattr(main_module, "_HeadlessUI", FakeHeadlessUI)
 
