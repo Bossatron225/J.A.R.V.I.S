@@ -6,6 +6,21 @@ def test_dashboard_ws_ping_returns_pong():
     assert handle_dashboard_ws_message({"type": "ping"}) == {"type": "pong"}
 
 
+def test_dashboard_route_uses_live_template_not_placeholder():
+    app = create_app()
+    dashboard = DashboardServer()
+    app.orchestrator.dashboard_server = dashboard
+
+    client = app.test_client()
+    response = client.get('/dashboard')
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    body = response.get_data(as_text=True)
+    assert '__IP__' not in body
+    assert '__PORT__' not in body
+    assert 'JARVIS' in body
+
+
 def test_vps_login_post_accepts_one_time_key():
     app = create_app()
     dashboard = DashboardServer()
