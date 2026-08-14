@@ -229,6 +229,11 @@ def test_main_uses_headless_ui_when_vps_is_configured(monkeypatch) -> None:
         def write_log(self, *_args, **_kwargs):
             return None
 
+        def __getattr__(self, name):
+            def _noop(*_args, **_kwargs):
+                return None
+            return _noop
+
     class FakeGuiUI:
         def __init__(self, *args, **kwargs):
             created.append("gui")
@@ -242,15 +247,16 @@ def test_main_uses_headless_ui_when_vps_is_configured(monkeypatch) -> None:
     monkeypatch.setattr(main_module, "_HeadlessUI", FakeHeadlessUI)
 
     class FakeThread:
-        def __init__(self, target=None, daemon=False):
+        def __init__(self, target=None, daemon=False, **kwargs):
             self.target = target
             self.daemon = daemon
+            self.kwargs = kwargs
 
         def start(self):
-            if self.target is not None:
-                self.target()
+            return None
 
     monkeypatch.setattr(main_module.threading, "Thread", FakeThread)
+    monkeypatch.setattr(main_module.asyncio, "run", lambda coro: None)
 
     main_module.main()
 
