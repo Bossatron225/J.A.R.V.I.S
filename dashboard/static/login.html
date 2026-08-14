@@ -162,11 +162,14 @@
     <div class="logo"><em>J</em>ARVIS</div>
     <div class="sub">Remote Access</div>
     <p id="reconnecting">Reconnecting…</p>
-    <p class="hint">Press <strong style="color:var(--text)">Remote Control</strong> in the JARVIS desktop app to get a QR code or session key.</p>
+    <p class="hint">Request a fresh key from the VPS, or press <strong style="color:var(--text)">Remote Control</strong> in the JARVIS desktop app.</p>
     <div class="key-wrap">
       <input class="key-input" id="key" type="text" maxlength="6"
              autocomplete="off" autocorrect="off" spellcheck="false"
              placeholder="· · · · · ·">
+    </div>
+    <div class="request-row" style="margin: 0 0 12px;">
+      <button class="btn" type="button" onclick="requestFreshKey()" style="background: rgba(255,255,255,0.08); letter-spacing: 1px; margin-top: 4px;">REQUEST NEW KEY</button>
     </div>
     <div class="pin-wrap">
       <input class="pin-input" id="remote-pin" type="password" maxlength="32"
@@ -246,6 +249,32 @@
         inp.focus();
         document.getElementById('err').textContent = data?.error || 'Invalid or expired key';
         shake();
+      }
+    }
+
+    async function requestFreshKey() {
+      document.getElementById('err').textContent = 'Requesting fresh key…';
+      try {
+        const r = await fetch('/api/request-key', { method: 'POST' });
+        const data = await r.json();
+        if (!data.ok || !data.key) {
+          document.getElementById('err').textContent = data?.error || 'Unable to generate key';
+          return;
+        }
+        inp.value = data.key;
+        document.getElementById('err').textContent = 'Fresh key ready — use it now';
+        if (data.auto_login_url) {
+          const url = new URL(data.auto_login_url);
+          if (url.pathname.startsWith('/auto-login')) {
+            const keyField = inp.value.trim();
+            if (keyField) {
+              inp.focus();
+              inp.select();
+            }
+          }
+        }
+      } catch (e) {
+        document.getElementById('err').textContent = 'Connection error';
       }
     }
 
