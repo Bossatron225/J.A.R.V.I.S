@@ -300,11 +300,24 @@ class VPSOrchestrator:
 
 
 def create_app() -> Flask:
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        static_folder=str(BASE_DIR / "dashboard" / "static"),
+        static_url_path="/static",
+    )
     orchestrator = VPSOrchestrator()
     app.orchestrator = orchestrator
 
     sock = Sock(app) if Sock is not None else None
+
+    if sock is None:
+        @app.route("/ws")
+        def ws_fallback():
+            return jsonify({"ok": False, "error": "WebSocket support unavailable"}), 503
+
+        @app.route("/ws/phone-audio")
+        def phone_audio_fallback():
+            return jsonify({"ok": False, "error": "WebSocket support unavailable"}), 503
 
     def _valid_ws_token() -> str:
         token = str(request.args.get("token") or "").strip()
@@ -393,6 +406,23 @@ def create_app() -> Flask:
             ),
             "message": "The dashboard runs on the VPS and remains active even if the Mac app shuts down.",
         })
+
+    @app.get("/static/<path:filename>")
+    def static_files(filename: str):
+        static_dir = BASE_DIR / "dashboard" / "static"
+        safe_path = (static_dir / filename).resolve()
+        if not str(safe_path).startswith(str(static_dir.resolve())):
+            return jsonify({"ok": False, "error": "invalid path"}), 400
+        if not safe_path.exists():
+            return jsonify({"ok": False, "error": "not found"}), 404
+        return send_file(str(safe_path), conditional=True)
+
+    @app.get("/static/crypto.js")
+    def crypto_js_alias():
+        crypto_file = BASE_DIR / "dashboard" / "static" / "crypto-js.min.js"
+        if not crypto_file.exists():
+            return jsonify({"ok": False, "error": "crypto asset missing"}), 404
+        return send_file(str(crypto_file), mimetype="application/javascript")
 
     @app.get("/login")
     def login():

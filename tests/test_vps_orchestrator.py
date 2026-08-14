@@ -10,6 +10,16 @@ def test_vps_exposes_dashboard_websocket_route():
     assert '/ws' in routes
 
 
+def test_vps_serves_dashboard_static_assets():
+    app = create_app()
+    client = app.test_client()
+
+    resp = client.get('/static/crypto.js')
+
+    assert resp.status_code == 200
+    assert 'CryptoJS' in resp.get_data(as_text=True)
+
+
 def test_vps_remote_access_prefers_public_url_over_local_ip(monkeypatch):
     monkeypatch.setenv("JARVIS_PUBLIC_URL", "https://public.example.com")
     monkeypatch.setenv("PUBLIC_ENTRY_URL", "https://public.example.com")
