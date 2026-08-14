@@ -67,11 +67,6 @@
   },
   "sessions": [
     {
-      "date": "2026-08-13",
-      "summary": "The user had JARVIS confirm the operational status and shutdown protocols for local and remote systems, and then requested today's news regarding the 2026 World Cup final.",
-      "language": "English"
-    },
-    {
       "date": "2026-08-14",
       "summary": "The user addressed JARVIS, who then provided an update on current news, including a shift in U.S. foreign priorities.",
       "language": "English"
@@ -79,6 +74,11 @@
     {
       "date": "2026-08-14",
       "summary": "The user discussed turning on their legs to plug in their phone and engaged with JARVIS regarding news updates on the Iran conflict and a live camera feed.",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-14",
+      "summary": "The user greeted JARVIS and requested an additional action regarding the news updates after the assistant displayed the 2026 FIFA World Cup final match-up.",
       "language": "English"
     }
   ],
