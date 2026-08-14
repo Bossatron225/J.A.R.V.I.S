@@ -1312,7 +1312,7 @@ class JarvisLive:
         self._tool_optimizer = _ToolOptimizer(_CtxMgr(max_context_window=256))
         self._speech_recognizer: sr.Recognizer | None = None
         self._speech_mic: sr.Microphone | None = None
-        self._wake_phrases = ["jarvis", "jarvis wake", "wake up jarvis", "hey jarvis"]
+        self._wake_phrases = ["jarvis", "service", "jarvis service", "jarvis wake", "wake up jarvis", "hey jarvis"]
         self._speech_listener_running = False
         self._local_worker = None
         self._vps_link_established_said = False

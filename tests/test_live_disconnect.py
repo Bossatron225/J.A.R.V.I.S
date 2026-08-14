@@ -58,6 +58,28 @@ def test_wake_protocol_accepts_any_sender_when_sender_is_unset() -> None:
     assert jarvis._is_authorized_wake_sender("+3531234567", "James") is True
 
 
+def test_service_is_accepted_as_wake_phrase(monkeypatch) -> None:
+    jarvis = JarvisLive(DummyUI())
+    got = {"called": False}
+
+    def fake_on_text_command(text: str) -> None:
+        got["called"] = True
+        got["text"] = text
+
+    monkeypatch.setattr(jarvis, "_on_text_command", fake_on_text_command)
+
+    class FakeRecognizer:
+        @staticmethod
+        def recognize_google(audio, language):
+            return "service"
+
+    jarvis._wake_phrases = ["jarvis", "service", "jarvis wake", "wake up jarvis", "hey jarvis"]
+    jarvis._handle_speech_callback(FakeRecognizer(), object())
+
+    assert got["called"] is True
+    assert got["text"] == "service"
+
+
 def test_receive_audio_disconnect_does_not_print_traceback(monkeypatch) -> None:
     jarvis = JarvisLive(DummyUI())
 
