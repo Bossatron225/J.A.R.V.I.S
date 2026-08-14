@@ -12,7 +12,7 @@ from urllib.parse import quote_plus
 try:
     import pyautogui
     _PYAUTOGUI = True
-except ImportError:
+except Exception:
     _PYAUTOGUI = False
 
 try:
