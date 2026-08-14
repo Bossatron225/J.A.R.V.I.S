@@ -2,6 +2,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import os
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -138,7 +140,8 @@ def test_launch_local_jarvis_if_needed_uses_python_entry(monkeypatch) -> None:
     launched = jarvis._launch_local_jarvis_if_needed()
 
     assert launched is True
-    assert calls and calls[0][0][0].endswith("python")
+    assert calls
+    assert os.path.basename(calls[0][0][0]).startswith("python")
     assert str(calls[0][0][-1]).endswith("main.py")
 
 
@@ -221,6 +224,9 @@ def test_main_uses_headless_ui_when_vps_is_configured(monkeypatch) -> None:
             self.root = self.Root()
 
         def wait_for_api_key(self):
+            return None
+
+        def write_log(self, *_args, **_kwargs):
             return None
 
     class FakeGuiUI:
