@@ -261,3 +261,21 @@ def test_main_uses_headless_ui_when_vps_is_configured(monkeypatch) -> None:
     main_module.main()
 
     assert created == ["headless"]
+
+
+def test_vps_headless_mode_blocks_shutdown(monkeypatch) -> None:
+    jarvis = JarvisLive(DummyUI())
+    monkeypatch.setenv("JARVIS_VPS_URL", "https://vps.example.com")
+    monkeypatch.setenv("JARVIS_HEADLESS", "1")
+    seen = []
+
+    def fake_exit(code):
+        seen.append(code)
+        raise AssertionError("shutdown should be blocked in VPS mode")
+
+    monkeypatch.setattr(main_module.os, "_exit", fake_exit)
+
+    result = jarvis._schedule_shutdown("tool: shutdown_jarvis")
+
+    assert result is False
+    assert seen == []

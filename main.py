@@ -2052,6 +2052,12 @@ class JarvisLive:
         return self._is_authorized_imessage_sender(expected_sender, sender, chat_name)
 
     def _schedule_shutdown(self, reason: str) -> bool:
+        vps_mode = bool((os.getenv("JARVIS_VPS_URL") or "").strip())
+        headless_mode = bool((os.getenv("JARVIS_HEADLESS") or "").strip())
+        if vps_mode and headless_mode:
+            self.ui.write_log("SYS: VPS/headless mode blocks shutdown requests to keep the public brain alive.")
+            return False
+
         if self._shutdown_in_progress:
             self.ui.write_log("SYS: Shutdown in progress.")
             return False
