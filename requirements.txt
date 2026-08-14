@@ -37,4 +37,6 @@ pywin32; sys_platform == "win32"
 qrcode[pil]
 pywizlight
 Flask
+flask-sock
+
 twilio
