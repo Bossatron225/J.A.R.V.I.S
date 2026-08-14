@@ -417,7 +417,14 @@ def create_app() -> Flask:
     def index():
         dashboard_path = BASE_DIR / "dashboard" / "static" / "app.html"
         if dashboard_path.exists():
-            return send_file(str(dashboard_path), mimetype="text/html")
+            html = dashboard_path.read_text(encoding="utf-8")
+            host = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or orchestrator.public_entry or "https://jarvis.jarvisyourdomain.com"
+            html = html.replace("__IP__", "jarvis.jarvisyourdomain.com").replace("__PORT__", "443")
+            resp = Response(html, mimetype="text/html")
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+            return resp
         return jsonify({
             "ok": True,
             "service": "jarvis-vps-orchestrator",
@@ -607,7 +614,13 @@ def create_app() -> Flask:
     def dashboard_index():
         dashboard_path = BASE_DIR / "dashboard" / "static" / "app.html"
         if dashboard_path.exists():
-            return send_file(str(dashboard_path), mimetype="text/html")
+            html = dashboard_path.read_text(encoding="utf-8")
+            html = html.replace("__IP__", "jarvis.jarvisyourdomain.com").replace("__PORT__", "443")
+            resp = Response(html, mimetype="text/html")
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+            return resp
         return jsonify({
             "ok": True,
             "service": "jarvis-vps-orchestrator",
