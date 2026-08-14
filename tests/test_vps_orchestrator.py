@@ -58,6 +58,28 @@ def test_vps_auto_login_route_serves_page_for_live_key(monkeypatch):
     assert 'TESTKEY' in text
 
 
+def test_vps_public_dashboard_command_routes_accept_auth_and_queue_text():
+    app = create_app()
+    client = app.test_client()
+
+    key = next(iter(app.orchestrator.dashboard_server._pending_keys.keys())) if app.orchestrator.dashboard_server and app.orchestrator.dashboard_server._pending_keys else None
+    if key is None:
+        key = app.orchestrator.dashboard_server.new_key()
+
+    login = client.post('/login', json={'key': key})
+    assert login.status_code == 200, login.get_data(as_text=True)
+    token = login.get_json()['token']
+
+    cmd = client.post('/api/command', headers={'Authorization': f'Bearer {token}'}, json={'text': 'hello from browser'})
+    assert cmd.status_code == 200, cmd.get_data(as_text=True)
+    assert cmd.get_json()['ok'] is True
+    assert cmd.get_json()['text'] == 'hello from browser'
+
+    wake = client.post('/api/wake', headers={'Authorization': f'Bearer {token}'})
+    assert wake.status_code == 200, wake.get_data(as_text=True)
+    assert wake.get_json()['ok'] is True
+
+
 def test_vps_orchestrator_health_and_task_queue():
     app = create_app()
     client = app.test_client()

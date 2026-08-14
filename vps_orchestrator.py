@@ -672,6 +672,57 @@ def create_app() -> Flask:
         )
         return jsonify({"accepted": True, **response})
 
+    @app.post("/api/command")
+    def api_command():
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None or not hasattr(dashboard, "_command_queue"):
+            return jsonify({"error": "remote command queue unavailable"}), 503
+
+        tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+        if not tok or not dashboard._is_token_valid(tok):
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json(silent=True) or {}
+        enc = data.get("enc", "")
+        text = ""
+        if enc:
+            text = dashboard._decrypt(tok, enc) or ""
+        else:
+            text = str(data.get("text") or "").strip()
+
+        if not text:
+            return jsonify({"error": "text is required"}), 400
+
+        try:
+            dashboard._command_queue.put_nowait(text)
+        except Exception:
+            return jsonify({"error": "command queue full"}), 503
+
+        if getattr(dashboard, "_wake_callback", None):
+            try:
+                dashboard._wake_callback()
+            except Exception:
+                pass
+
+        return jsonify({"ok": True, "accepted": True, "text": text})
+
+    @app.post("/api/wake")
+    def api_wake():
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None:
+            return jsonify({"error": "remote dashboard unavailable"}), 503
+
+        tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+        if not tok or not dashboard._is_token_valid(tok):
+            return jsonify({"error": "Unauthorized"}), 401
+
+        if getattr(dashboard, "_wake_callback", None):
+            try:
+                dashboard._wake_callback()
+            except Exception:
+                pass
+        return jsonify({"ok": True})
+
     @app.post("/api/remote_chat")
     def remote_chat():
         data = request.get_json(silent=True) or {}
