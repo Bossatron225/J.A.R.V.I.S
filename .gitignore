@@ -11,3 +11,5 @@ __pycache__/
 
 # Auto-commit helper
 scripts/__pycache__/
+
+config/api_keys.json
