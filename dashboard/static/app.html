@@ -406,6 +406,13 @@
     const _authToken  = sessionStorage.getItem('jarvis_token');
     const _sessionKey = sessionStorage.getItem('jarvis_key');
 
+    function _invalidateSession(reason = 'auth expired') {
+      console.warn('[JARVIS] invalidating stale auth state:', reason);
+      sessionStorage.clear();
+      localStorage.removeItem('jarvis_device_token');
+      location.replace('/login');
+    }
+
     if (!_authToken) {
       location.replace('/login');
     }
@@ -492,10 +499,14 @@
           }
         }, 25000);
       };
-      ws.onclose = () => {
+      ws.onclose = (evt) => {
         if (_wsPingTimer) {
           clearInterval(_wsPingTimer);
           _wsPingTimer = null;
+        }
+        if (evt && (evt.code === 4001 || evt.code === 1008)) {
+          _invalidateSession('websocket auth rejected');
+          return;
         }
         sys('Connection lost — reconnecting…');
         if (!_wsReconnectTimer) {
@@ -505,7 +516,9 @@
           }, 2000);
         }
       };
-      ws.onerror = () => sys('Connection error.');
+      ws.onerror = () => {
+        sys('Connection error.');
+      };
       ws.onmessage = (e) => {
         let m;
         try { m = JSON.parse(e.data); }

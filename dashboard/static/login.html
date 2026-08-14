@@ -223,6 +223,11 @@
     });
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
+    function _clearStaleSession() {
+      sessionStorage.clear();
+      localStorage.removeItem('jarvis_device_token');
+    }
+
     async function doLogin() {
       const key = inp.value.trim();
       const remotePin = pinInp.value.trim();
@@ -236,14 +241,17 @@
         });
         data = await r.json();
       } catch (e) {
+        _clearStaleSession();
         document.getElementById('err').textContent = 'Connection error';
         shake(); return;
       }
       if (data.ok && data.token) {
+        _clearStaleSession();
         sessionStorage.setItem('jarvis_key', key);
         sessionStorage.setItem('jarvis_token', data.token);
         location.href = '/';
       } else {
+        _clearStaleSession();
         inp.value = '';
         pinInp.value = '';
         inp.focus();
@@ -253,6 +261,7 @@
     }
 
     async function requestFreshKey() {
+      _clearStaleSession();
       document.getElementById('err').textContent = 'Requesting fresh key…';
       try {
         const r = await fetch('/api/request-key', { method: 'POST' });
