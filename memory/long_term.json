@@ -68,17 +68,17 @@
   "sessions": [
     {
       "date": "2026-08-13",
-      "summary": "The user reviewed system diagnostics with JARVIS and discussed the operational status and shutdown behaviors of both the local application and the remote VPS server.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-13",
       "summary": "James Lumsden reviewed today's news and discussed system diagnostics with JARVIS. He also clarified and confirmed the operational behavior of the shutdown protocol regarding the local device versus the remote VPS server.",
       "language": "English"
     },
     {
       "date": "2026-08-13",
       "summary": "The user had JARVIS confirm the operational status and shutdown protocols for local and remote systems, and then requested today's news regarding the 2026 World Cup final.",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-14",
+      "summary": "The user addressed JARVIS, who then provided an update on current news, including a shift in U.S. foreign priorities.",
       "language": "English"
     }
   ],
