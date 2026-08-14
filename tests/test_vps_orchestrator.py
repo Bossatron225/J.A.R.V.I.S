@@ -4,6 +4,12 @@ import os
 from vps_orchestrator import create_app
 
 
+def test_vps_exposes_dashboard_websocket_route():
+    app = create_app()
+    routes = sorted(str(rule) for rule in app.url_map.iter_rules())
+    assert '/ws' in routes
+
+
 def test_vps_remote_access_prefers_public_url_over_local_ip(monkeypatch):
     monkeypatch.setenv("JARVIS_PUBLIC_URL", "https://public.example.com")
     monkeypatch.setenv("PUBLIC_ENTRY_URL", "https://public.example.com")

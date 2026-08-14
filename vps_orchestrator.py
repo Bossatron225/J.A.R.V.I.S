@@ -1,3 +1,4 @@
+import json
 import os
 import threading
 import time
@@ -7,6 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, jsonify, request, Response, redirect, send_file
+
+try:
+    from flask_sock import Sock
+except Exception:  # pragma: no cover
+    Sock = None
 
 def _build_root_page() -> str:
     public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.internal"
@@ -297,6 +303,78 @@ def create_app() -> Flask:
     app = Flask(__name__)
     orchestrator = VPSOrchestrator()
     app.orchestrator = orchestrator
+
+    sock = Sock(app) if Sock is not None else None
+
+    def _valid_ws_token() -> str:
+        token = str(request.args.get("token") or "").strip()
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None or not hasattr(dashboard, "_is_token_valid"):
+            return ""
+        return token if dashboard._is_token_valid(token) else ""
+
+    if sock is not None:
+        @sock.route("/ws")
+        def ws_route(ws):
+            tok = _valid_ws_token()
+            if not tok:
+                try:
+                    ws.close(code=4001)
+                except Exception:
+                    pass
+                return
+            try:
+                ws.send(json.dumps({"type": "sys", "text": "Remote session active."}))
+            except Exception:
+                pass
+            while True:
+                try:
+                    payload = ws.receive()
+                except Exception:
+                    break
+                if payload is None:
+                    break
+                try:
+                    data = json.loads(payload)
+                except Exception:
+                    continue
+                if data.get("type") == "command":
+                    text = str(data.get("text") or "").strip()
+                    enc = str(data.get("enc") or "")
+                    if enc:
+                        dashboard = orchestrator.dashboard_server
+                        if dashboard is not None and hasattr(dashboard, "_decrypt"):
+                            text = dashboard._decrypt(tok, enc) or text
+                    if text:
+                        queue = getattr(orchestrator.dashboard_server, "_command_queue", None)
+                        if queue is not None:
+                            try:
+                                queue.put_nowait(text)
+                            except Exception:
+                                pass
+                        wake_callback = getattr(orchestrator.dashboard_server, "_wake_callback", None)
+                        if callable(wake_callback):
+                            try:
+                                wake_callback()
+                            except Exception:
+                                pass
+
+        @sock.route("/ws/phone-audio")
+        def phone_audio_route(ws):
+            tok = _valid_ws_token()
+            if not tok:
+                try:
+                    ws.close(code=4001)
+                except Exception:
+                    pass
+                return
+            try:
+                while True:
+                    data = ws.receive()
+                    if data is None:
+                        break
+            except Exception:
+                pass
 
     @app.get("/")
     def index():
