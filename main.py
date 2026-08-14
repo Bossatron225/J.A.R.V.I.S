@@ -4412,8 +4412,51 @@ class JarvisLive:
             print(f"[JARVIS] Reconnecting in {delay}s...")
             await asyncio.sleep(delay)
 
+class _HeadlessUI:
+    """Minimal no-GUI UI for VPS-only deployments."""
+
+    class _Root:
+        def mainloop(self):
+            while True:
+                time.sleep(1)
+
+    def __init__(self):
+        self.root = self._Root()
+        self._muted = False
+
+    def __getattr__(self, name):
+        def _noop(*_args, **_kwargs):
+            return None
+        return _noop
+
+    @property
+    def muted(self):
+        return self._muted
+
+    @muted.setter
+    def muted(self, value):
+        self._muted = bool(value)
+
+    def wait_for_api_key(self):
+        return None
+
+    def set_state(self, *_args, **_kwargs):
+        return None
+
+    def write_log(self, *_args, **_kwargs):
+        return None
+
+    def notify_phone_connected(self):
+        return None
+
+
 def main():
-    ui = JarvisUI("face.png")
+    vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
+    if vps_url:
+        os.environ.setdefault("JARVIS_HEADLESS", "1")
+        ui = _HeadlessUI()
+    else:
+        ui = JarvisUI("face.png")
 
     def runner():
         ui.wait_for_api_key()

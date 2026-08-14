@@ -206,3 +206,46 @@ def test_local_speech_is_blocked_when_vps_is_healthy(monkeypatch) -> None:
     assert calls == []
     assert jarvis.ui.vps_status is not None
     assert "remote voice active" in jarvis.ui.vps_status[0].lower()
+
+
+def test_main_uses_headless_ui_when_vps_is_configured(monkeypatch) -> None:
+    created = []
+
+    class FakeHeadlessUI:
+        class Root:
+            def mainloop(self):
+                pass
+
+        def __init__(self):
+            created.append("headless")
+            self.root = self.Root()
+
+        def wait_for_api_key(self):
+            return None
+
+    class FakeGuiUI:
+        def __init__(self, *args, **kwargs):
+            created.append("gui")
+            self.root = type("Root", (), {"mainloop": lambda self: None})()
+
+        def wait_for_api_key(self):
+            return None
+
+    monkeypatch.setenv("JARVIS_VPS_URL", "https://vps.example.com")
+    monkeypatch.setattr(main_module, "JarvisUI", FakeGuiUI)
+    monkeypatch.setattr(main_module, "_HeadlessUI", FakeHeadlessUI)
+
+    class FakeThread:
+        def __init__(self, target=None, daemon=False):
+            self.target = target
+            self.daemon = daemon
+
+        def start(self):
+            if self.target is not None:
+                self.target()
+
+    monkeypatch.setattr(main_module.threading, "Thread", FakeThread)
+
+    main_module.main()
+
+    assert created == ["headless"]
