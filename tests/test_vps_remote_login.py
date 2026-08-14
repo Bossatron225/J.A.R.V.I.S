@@ -1,5 +1,9 @@
 from dashboard.server import DashboardServer
-from vps_orchestrator import create_app
+from vps_orchestrator import create_app, handle_dashboard_ws_message
+
+
+def test_dashboard_ws_ping_returns_pong():
+    assert handle_dashboard_ws_message({"type": "ping"}) == {"type": "pong"}
 
 
 def test_vps_login_post_accepts_one_time_key():

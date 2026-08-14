@@ -1057,7 +1057,13 @@ class DashboardServer:
             try:
                 while True:
                     data = await websocket.receive_json()
-                    if data.get("type") == "command":
+                    message_type = str(data.get("type") or "").strip().lower()
+                    if message_type == "ping":
+                        await websocket.send_json({"type": "pong"})
+                        continue
+                    if message_type == "pong":
+                        continue
+                    if message_type == "command":
                         enc = data.get("enc", "")
                         t   = self._decrypt(tok, enc) if enc else (data.get("text") or "").strip()
                         if t:
