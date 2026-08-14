@@ -4458,9 +4458,11 @@ class _HeadlessUI:
 
 def main():
     vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
-    if vps_url:
-        os.environ.setdefault("JARVIS_HEADLESS", "1")
+    headless_requested = str(os.getenv("JARVIS_HEADLESS") or "").strip().lower() in {"1", "true", "yes", "on"}
+    if headless_requested:
         ui = _HeadlessUI()
+    elif vps_url:
+        ui = JarvisUI("face.png")
     else:
         ui = JarvisUI("face.png")
 
