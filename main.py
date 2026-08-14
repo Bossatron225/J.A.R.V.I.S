@@ -3,6 +3,11 @@ import subprocess as _subprocess
 import sys
 import warnings 
 
+try:
+    import fcntl
+except Exception:  # pragma: no cover - Windows fallback
+    fcntl = None
+
 if sys.version_info < (3, 10):
     sys.stderr.write(
         "ERROR: MARK L requires Python 3.10 or newer.\n"
@@ -4456,26 +4461,59 @@ class _HeadlessUI:
         return None
 
 
+def _acquire_single_instance(lock_path: str | None = None):
+    if fcntl is None:
+        return object()
+
+    lock_file = Path(lock_path or (Path(__file__).resolve().parent / ".jarvis.lock"))
+    try:
+        handle = open(lock_file, "w", encoding="utf-8")
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[JARVIS] Could not create lock file: {exc}")
+        return None
+
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        print("[JARVIS] Another JARVIS instance is already running. Exiting.")
+        return None
+    return handle
+
+
 def main():
+    lock_handle = _acquire_single_instance()
+    if lock_handle is None:
+        raise SystemExit(1)
+
     vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
     headless_requested = str(os.getenv("JARVIS_HEADLESS") or "").strip().lower() in {"1", "true", "yes", "on"}
     if headless_requested:
         ui = _HeadlessUI()
-    elif vps_url:
-        ui = JarvisUI("face.png")
     else:
         ui = JarvisUI("face.png")
 
-    def runner():
-        ui.wait_for_api_key()
-        jarvis = JarvisLive(ui)
-        try:
-            asyncio.run(jarvis.run())
-        except KeyboardInterrupt:
-            print("\n🔴 Shutting down...")
+    try:
+        def runner():
+            ui.wait_for_api_key()
+            jarvis = JarvisLive(ui)
+            try:
+                asyncio.run(jarvis.run())
+            except KeyboardInterrupt:
+                print("\n🔴 Shutting down...")
 
-    threading.Thread(target=runner, daemon=True).start()
-    ui.root.mainloop()
+        threading.Thread(target=runner, daemon=True).start()
+        ui.root.mainloop()
+    finally:
+        if fcntl is not None:
+            try:
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+            try:
+                lock_handle.close()
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     main()
