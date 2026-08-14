@@ -296,6 +296,7 @@ class VPSOrchestrator:
 def create_app() -> Flask:
     app = Flask(__name__)
     orchestrator = VPSOrchestrator()
+    app.orchestrator = orchestrator
 
     @app.get("/")
     def index():
@@ -325,6 +326,47 @@ def create_app() -> Flask:
             "error": "login page not available",
             "service": "jarvis-vps-orchestrator",
         }), 404
+
+    @app.post("/login")
+    def login_post():
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None:
+            return jsonify({"ok": False, "error": "remote access not initialized"}), 503
+        data = request.get_json(silent=True) or {}
+        key = str(data.get("key") or data.get("pin") or "").strip().upper()
+        remote_pin = str(data.get("remote_pin") or "").strip()
+        pending = getattr(dashboard, "_pending_keys", {})
+        now = time.time()
+        key_ok = bool(key) and key in pending and pending[key] > now
+        if hasattr(dashboard, "_verify_remote_pin"):
+            pin_ok = dashboard._verify_remote_pin(remote_pin)
+        else:
+            pin_ok = True
+        if key_ok and pin_ok:
+            try:
+                del pending[key]
+            except Exception:
+                pass
+            issue_token_fn = getattr(dashboard, "_issue_token", None)
+            token = issue_token_fn(key) if callable(issue_token_fn) else key
+            return jsonify({"ok": True, "token": token, "key": key})
+        return jsonify({"ok": False, "error": "Invalid or expired key"}), 401
+
+    @app.post("/api/device-login")
+    def device_login_post():
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None:
+            return jsonify({"ok": False, "error": "remote access not initialized"}), 503
+        data = request.get_json(silent=True) or {}
+        device_token = str(data.get("device_token") or "").strip()
+        sessions = getattr(dashboard, "_device_sessions", {})
+        session = sessions.get(device_token, {}) if device_token else {}
+        session_key = str((session or {}).get("session_key") or "").strip()
+        if not device_token or not session_key:
+            return jsonify({"ok": False, "error": "device not paired"}), 401
+        issue_token_fn = getattr(dashboard, "_issue_token", None)
+        token = issue_token_fn(session_key) if callable(issue_token_fn) else session_key
+        return jsonify({"ok": True, "token": token, "key": session_key})
 
     @app.get("/health")
     def health():
