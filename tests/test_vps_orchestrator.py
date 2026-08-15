@@ -1,8 +1,11 @@
 import asyncio
 import json
 import os
+import sys
+import types
 from pathlib import Path
 
+import vps_orchestrator as vps_module
 from vps_orchestrator import VPSRuntimeBridge, create_app
 
 
@@ -22,6 +25,47 @@ def test_vps_runtime_bridge_keeps_input_and_output_in_one_process():
     assert outbound.get_nowait() == ('bytes', b'\x02\x03')
     bridge.unregister_client(client_id)
     assert bridge.has_clients() is False
+
+
+def test_vps_starts_one_embedded_brain_with_public_dashboard(monkeypatch):
+    monkeypatch.setenv('JARVIS_RUN_VPS_BRAIN', '1')
+    orchestrator = vps_module.VPSOrchestrator()
+    created = []
+
+    class FakeUI:
+        pass
+
+    class FakeBrain:
+        def __init__(self, ui, dashboard, remote_bridge):
+            created.append((ui, dashboard, remote_bridge))
+
+        async def run(self):
+            return None
+
+    class ImmediateThread:
+        def __init__(self, target=None, **_kwargs):
+            self._target = target
+            self._alive = False
+
+        def start(self):
+            self._alive = True
+            self._target()
+
+        def is_alive(self):
+            return self._alive
+
+    monkeypatch.setitem(sys.modules, 'main', types.SimpleNamespace(
+        JarvisLive=FakeBrain,
+        _HeadlessUI=FakeUI,
+    ))
+    monkeypatch.setattr(vps_module.threading, 'Thread', ImmediateThread)
+
+    assert orchestrator.ensure_brain_started() is True
+    assert orchestrator.ensure_brain_started() is True
+    assert len(created) == 1
+    _, dashboard, bridge = created[0]
+    assert dashboard is orchestrator.dashboard_server
+    assert bridge is orchestrator.runtime_bridge
 
 
 def test_login_success_keeps_session_tokens_for_dashboard_redirect():
