@@ -3897,6 +3897,8 @@ class JarvisLive:
 
     async def _run_imessage_monitor(self) -> None:
         """Poll new iMessages and alert via notifications + short spoken updates."""
+        if not (callable(poll_imessage_alerts) and callable(get_imessage_monitor_interval)):
+            return
         await asyncio.sleep(5)
         while True:
             try:
@@ -3938,6 +3940,8 @@ class JarvisLive:
 
     async def _run_mail_monitor(self) -> None:
         """Poll Apple Mail for new unread messages and announce new arrivals."""
+        if not (callable(poll_mail_alerts) and callable(get_mail_monitor_interval)):
+            return
         await asyncio.sleep(8)
         while True:
             try:
@@ -4474,8 +4478,10 @@ class JarvisLive:
                                 tg.create_task(self._play_audio())
                             tg.create_task(self._run_system_monitor())
                             tg.create_task(self._run_background_monitor())
-                            tg.create_task(self._run_imessage_monitor())
-                            tg.create_task(self._run_mail_monitor())
+                            if callable(poll_imessage_alerts) and callable(get_imessage_monitor_interval):
+                                tg.create_task(self._run_imessage_monitor())
+                            if callable(poll_mail_alerts) and callable(get_mail_monitor_interval):
+                                tg.create_task(self._run_mail_monitor())
                             tg.create_task(self._run_proactive_mode())
                             tg.create_task(self._run_predictive_automation())
                             tg.create_task(self._run_diagnostics_stream())
