@@ -87,10 +87,12 @@ def test_vps_runtime_decls_require_websocket_stack():
 
 def test_vps_systemd_service_runs_the_embedded_brain_with_gevent():
     service = (Path(__file__).resolve().parents[1] / 'deploy' / 'jarvis-vps.service').read_text(encoding='utf-8')
+    assert 'WorkingDirectory=/root/jarvis-vps-runtime' in service
     assert 'Environment=JARVIS_HEADLESS=1' in service
     assert 'Environment=JARVIS_RUN_VPS_BRAIN=1' in service
     assert 'Environment=JARVIS_DATA_DIR=/var/lib/jarvis' in service
     assert 'StateDirectory=jarvis' in service
+    assert 'ExecStart=/root/jarvis-vps-runtime/.venv/bin/gunicorn' in service
     assert '--workers 1 --worker-class gevent vps_orchestrator:app' in service
     assert 'geventwebsocket' not in service
 
