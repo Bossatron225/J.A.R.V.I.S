@@ -484,6 +484,7 @@
         return;
       }
       ws = new WebSocket(_wsUrl);
+      ws.binaryType = 'arraybuffer';
       ws.onopen = () => {
         sys('Remote session active.');
         toast('Connected to JARVIS');
@@ -520,6 +521,10 @@
         sys('Connection error.');
       };
       ws.onmessage = (e) => {
+        if (e.data instanceof ArrayBuffer) {
+          _playRemoteAudioChunk(e.data);
+          return;
+        }
         let m;
         try { m = JSON.parse(e.data); }
         catch { return; }
