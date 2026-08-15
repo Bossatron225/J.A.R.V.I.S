@@ -1,7 +1,9 @@
 import json
 import os
+import queue as thread_queue
 import threading
 import time
+import uuid
 from collections import deque
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -144,6 +146,88 @@ def enqueue_phone_audio_payload(dashboard, data) -> bool:
             return True
         except Exception:
             return False
+
+
+class VPSRuntimeBridge:
+    """Thread-safe handoff between the public web worker and the live brain."""
+
+    def __init__(self, *, command_limit: int = 128, audio_limit: int = 96, client_limit: int = 192):
+        self.command_queue: thread_queue.Queue[str] = thread_queue.Queue(maxsize=command_limit)
+        self.audio_queue: thread_queue.Queue[dict] = thread_queue.Queue(maxsize=audio_limit)
+        self._client_limit = client_limit
+        self._clients: dict[str, thread_queue.Queue[tuple[str, object]]] = {}
+        self._clients_lock = threading.Lock()
+
+    @staticmethod
+    def _offer(target: thread_queue.Queue, value: object) -> bool:
+        try:
+            target.put_nowait(value)
+            return True
+        except thread_queue.Full:
+            try:
+                target.get_nowait()
+            except thread_queue.Empty:
+                return False
+            try:
+                target.put_nowait(value)
+                return True
+            except thread_queue.Full:
+                return False
+
+    def enqueue_command(self, text: str) -> bool:
+        text = str(text or "").strip()
+        if not text:
+            return False
+        try:
+            self.command_queue.put_nowait(text)
+            return True
+        except thread_queue.Full:
+            return False
+
+    def enqueue_audio(self, payload: dict) -> bool:
+        if not isinstance(payload, dict) or not payload.get("data"):
+            return False
+        return self._offer(self.audio_queue, payload)
+
+    def get_command(self, timeout: float) -> str:
+        return self.command_queue.get(timeout=max(0.01, float(timeout)))
+
+    def get_audio(self, timeout: float) -> dict:
+        return self.audio_queue.get(timeout=max(0.01, float(timeout)))
+
+    def register_client(self) -> tuple[str, thread_queue.Queue[tuple[str, object]]]:
+        client_id = uuid.uuid4().hex
+        outbound: thread_queue.Queue[tuple[str, object]] = thread_queue.Queue(maxsize=self._client_limit)
+        with self._clients_lock:
+            self._clients[client_id] = outbound
+        return client_id, outbound
+
+    def unregister_client(self, client_id: str) -> None:
+        with self._clients_lock:
+            self._clients.pop(client_id, None)
+
+    def has_clients(self) -> bool:
+        with self._clients_lock:
+            return bool(self._clients)
+
+    def publish_to_client(self, client_id: str, message: dict) -> bool:
+        with self._clients_lock:
+            outbound = self._clients.get(client_id)
+        return bool(outbound) and self._offer(outbound, ("json", message))
+
+    def _publish(self, kind: str, payload: object) -> None:
+        with self._clients_lock:
+            clients = list(self._clients.values())
+        for outbound in clients:
+            self._offer(outbound, (kind, payload))
+
+    def publish_event(self, message: dict) -> None:
+        if isinstance(message, dict):
+            self._publish("json", message)
+
+    def publish_audio(self, payload: bytes) -> None:
+        if payload:
+            self._publish("bytes", bytes(payload))
 
 
 class VPSOrchestrator:
