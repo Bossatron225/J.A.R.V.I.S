@@ -114,6 +114,7 @@ def test_elevenlabs_streams_remote_pcm_at_24khz(monkeypatch):
     class FakeRequestsModule:
         @staticmethod
         def post(url, json, headers, timeout):
+            captured_request["url"] = url
             captured_request["payload"] = json
             return FakeResponse()
 
@@ -128,7 +129,8 @@ def test_elevenlabs_streams_remote_pcm_at_24khz(monkeypatch):
     )
     engine.speak("hello")
 
-    assert captured_request["payload"]["output_format"] == "pcm_24000"
+    assert captured_request["url"].endswith("?output_format=pcm_24000")
+    assert "output_format" not in captured_request["payload"]
     assert remote_audio == [b"remote-pcm"]
 
 
