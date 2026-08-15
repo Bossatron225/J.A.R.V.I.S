@@ -50,6 +50,14 @@
     .enc-badge.on  { display: block; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25); color: var(--green); }
     .enc-badge.off { display: block; background: rgba(255,100,100,0.08); border: 1px solid rgba(255,100,100,0.2); color: #f87171; }
     .url { font-size: 10px; font-family: monospace; color: var(--muted); padding: 4px 9px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+    .audio-toggle {
+      width: 30px; height: 30px; display: grid; place-items: center;
+      border: 1px solid rgba(245,158,11,0.45); border-radius: 8px;
+      background: rgba(245,158,11,0.1); color: #fbbf24;
+      font-size: 15px; cursor: pointer; flex-shrink: 0;
+    }
+    .audio-toggle.on { border-color: rgba(34,197,94,0.4); background: var(--gdim); color: var(--green); }
+    .audio-toggle:active { transform: scale(0.96); }
 
     /* ── LIVE DIAGNOSTICS ── */
     .diag-wrap {
@@ -362,6 +370,7 @@
     <div class="pill" id="pill"><span class="dot"></span><span id="st">Connecting</span></div>
     <div class="enc-badge" id="enc">AES-256</div>
     <div class="spacer"></div>
+    <button id="audio-toggle" class="audio-toggle" type="button" onclick="_ensureRemoteAudioReady()" title="Enable JARVIS voice">🔇</button>
     <div class="url">__IP__:__PORT__</div>
   </header>
   <section class="diag-wrap" aria-live="polite">
@@ -912,6 +921,9 @@
     let _audioNd  = null;
     let _remoteAudioCtx = null;
     let _remoteAudioNextTime = 0;
+    let _remoteAudioUnlocked = false;
+    const _remoteAudioPending = [];
+    const audioToggle = document.getElementById('audio-toggle');
 
     function _micIdle() {
       micBtn.innerHTML = '🎤';
@@ -919,17 +931,38 @@
       micBtn.classList.remove('recording');
     }
 
-    function _playRemoteAudioChunk(payload) {
-      if (!payload) return;
+    async function _ensureRemoteAudioReady() {
       const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
+      if (!Ctx) {
+        audioToggle.title = 'Audio playback is unavailable in this browser';
+        return false;
+      }
       if (!_remoteAudioCtx || !(_remoteAudioCtx instanceof Ctx)) {
         _remoteAudioCtx = new Ctx({ sampleRate: 24000 });
         _remoteAudioNextTime = 0;
+        _remoteAudioCtx.onstatechange = () => {
+          _remoteAudioUnlocked = _remoteAudioCtx.state === 'running';
+          audioToggle.textContent = _remoteAudioUnlocked ? '🔊' : '🔇';
+          audioToggle.classList.toggle('on', _remoteAudioUnlocked);
+          audioToggle.title = _remoteAudioUnlocked ? 'JARVIS voice enabled' : 'Tap to enable JARVIS voice';
+        };
       }
-      if (_remoteAudioCtx.state === 'suspended') {
-        _remoteAudioCtx.resume().catch(() => {});
+      if (_remoteAudioCtx.state !== 'running') {
+        try { await _remoteAudioCtx.resume(); }
+        catch (_) { return false; }
       }
+      _remoteAudioUnlocked = _remoteAudioCtx.state === 'running';
+      if (!_remoteAudioUnlocked) return false;
+      audioToggle.textContent = '🔊';
+      audioToggle.title = 'JARVIS voice enabled';
+      audioToggle.classList.add('on');
+      while (_remoteAudioPending.length) {
+        _scheduleRemoteAudioChunk(_remoteAudioPending.shift());
+      }
+      return true;
+    }
+
+    function _scheduleRemoteAudioChunk(payload) {
       const raw = payload instanceof ArrayBuffer ? payload : (payload.buffer || payload);
       const aligned = raw.byteLength % 2 === 0 ? raw : raw.slice(0, raw.byteLength - 1);
       const bytes = new Int16Array(aligned);
@@ -946,6 +979,25 @@
       _remoteAudioNextTime = startAt + buffer.duration;
       src.start(startAt);
     }
+
+    function _playRemoteAudioChunk(payload) {
+      if (!payload) return;
+      if (!_remoteAudioUnlocked || !_remoteAudioCtx || _remoteAudioCtx.state !== 'running') {
+        _remoteAudioPending.push(payload);
+        while (_remoteAudioPending.length > 12) _remoteAudioPending.shift();
+        audioToggle.textContent = '🔇';
+        audioToggle.title = 'Tap to enable JARVIS voice';
+        audioToggle.classList.remove('on');
+        return;
+      }
+      _scheduleRemoteAudioChunk(payload);
+    }
+
+    document.addEventListener('pointerdown', () => { _ensureRemoteAudioReady(); }, { capture: true });
+    document.addEventListener('keydown', () => { _ensureRemoteAudioReady(); }, { capture: true });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) _ensureRemoteAudioReady();
+    });
 
     // Float32 PCM → resample to 16 kHz + convert to Int16
     function _f32toPcm16(f32, srcRate) {

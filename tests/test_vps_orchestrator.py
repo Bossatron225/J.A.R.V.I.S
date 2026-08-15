@@ -173,6 +173,18 @@ def test_public_dashboard_websocket_accepts_assistant_audio_frames():
     assert 'src.start(startAt);' in html
 
 
+def test_public_dashboard_unlocks_and_buffers_remote_voice():
+    html = (Path(__file__).resolve().parents[1] / 'dashboard' / 'static' / 'app.html').read_text(encoding='utf-8')
+    assert 'onclick="_ensureRemoteAudioReady()"' in html
+    assert "_remoteAudioCtx.state === 'running'" in html
+    assert '_remoteAudioPending.push(payload);' in html
+    assert 'while (_remoteAudioPending.length > 12)' in html
+    assert "document.addEventListener('pointerdown'" in html
+    assert '_remoteAudioCtx.onstatechange' in html
+    assert "_remoteAudioCtx.state !== 'running'" in html
+    assert "document.addEventListener('visibilitychange'" in html
+
+
 def test_vps_serves_dashboard_static_assets():
     app = create_app()
     client = app.test_client()
