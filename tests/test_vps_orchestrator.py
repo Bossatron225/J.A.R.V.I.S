@@ -106,6 +106,12 @@ def test_vps_public_websocket_route_owns_outbound_delivery():
     assert '_start_outbound_sender' not in source
 
 
+def test_vps_public_websocket_replays_current_brain_status():
+    source = (Path(__file__).resolve().parents[1] / 'vps_orchestrator.py').read_text(encoding='utf-8')
+    assert 'event.get("type") == "status"' in source
+    assert '{"type": "status", "state": "active"}' in source
+
+
 def test_public_dashboard_websocket_accepts_assistant_audio_frames():
     html = (Path(__file__).resolve().parents[1] / 'dashboard' / 'static' / 'app.html').read_text(encoding='utf-8')
     assert "ws.binaryType = 'arraybuffer';" in html

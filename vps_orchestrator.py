@@ -554,6 +554,22 @@ def create_app() -> Flask:
                 client_id,
                 {"type": "sys", "text": session_text},
             )
+            history = getattr(orchestrator.dashboard_server, "_history", [])
+            current_status = next(
+                (
+                    event
+                    for event in reversed(history)
+                    if isinstance(event, dict) and event.get("type") == "status"
+                ),
+                None,
+            )
+            if current_status is not None:
+                orchestrator.runtime_bridge.publish_to_client(client_id, current_status)
+            elif brain_state == "running":
+                orchestrator.runtime_bridge.publish_to_client(
+                    client_id,
+                    {"type": "status", "state": "active"},
+                )
             try:
                 while True:
                     try:
