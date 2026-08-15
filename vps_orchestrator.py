@@ -410,6 +410,24 @@ def create_app() -> Flask:
                     data = ws.receive()
                     if data is None:
                         break
+                    if isinstance(data, (bytes, bytearray)) and data:
+                        try:
+                            orchestrator.dashboard_server._phone_audio_queue.put_nowait({
+                                "data": bytes(data),
+                                "mime_type": "audio/pcm",
+                            })
+                        except Exception:
+                            try:
+                                orchestrator.dashboard_server._phone_audio_queue.get_nowait()
+                            except Exception:
+                                pass
+                            try:
+                                orchestrator.dashboard_server._phone_audio_queue.put_nowait({
+                                    "data": bytes(data),
+                                    "mime_type": "audio/pcm",
+                                })
+                            except Exception:
+                                pass
             except Exception:
                 pass
 
