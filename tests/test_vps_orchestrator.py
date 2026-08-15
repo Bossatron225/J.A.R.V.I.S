@@ -5,6 +5,15 @@ from pathlib import Path
 from vps_orchestrator import create_app
 
 
+def test_login_success_keeps_session_tokens_for_dashboard_redirect():
+    html = (Path(__file__).resolve().parents[1] / 'dashboard' / 'static' / 'login.html').read_text(encoding='utf-8')
+    success_block = "if (data.ok && data.token) {"
+    assert success_block in html
+    assert "sessionStorage.setItem('jarvis_key', key);" in html
+    assert "sessionStorage.setItem('jarvis_token', data.token);" in html
+    assert "_clearStaleSession();\n        sessionStorage.setItem('jarvis_key', key);" not in html
+
+
 def test_vps_runtime_decls_require_websocket_stack():
     req_path = Path(__file__).resolve().parents[1] / 'requirements.txt'
     text = req_path.read_text(encoding='utf-8').lower()
