@@ -204,9 +204,20 @@ else:
     # Headless Linux still supports cloud/network and code capabilities. Import
     # these independently so one optional integration cannot disable all others.
     _HEADLESS_SAFE_ACTIONS = {
+        "open_app": ("actions.open_app", "open_app"),
         "weather_action": ("actions.weather_report", "weather_action"),
+        "send_message": ("actions.send_message", "send_message"),
+        "reminder": ("actions.reminder", "reminder"),
         "google_calendar": ("actions.google_calendar", "google_calendar"),
+        "computer_settings": ("actions.computer_settings", "computer_settings"),
         "wiz_lights": ("actions.wiz_lights", "wiz_lights"),
+        "youtube_video": ("actions.youtube_video", "youtube_video"),
+        "desktop_control": ("actions.desktop", "desktop_control"),
+        "browser_control": ("actions.browser_control", "browser_control"),
+        "file_controller": ("actions.file_controller", "file_controller"),
+        "enroll_biometric_profile": ("actions.file_controller", "enroll_biometric_profile"),
+        "get_authorized_profiles": ("actions.file_controller", "get_authorized_profiles"),
+        "verify_biometric_security": ("actions.file_controller", "verify_biometric_security"),
         "code_helper": ("actions.code_helper", "code_helper"),
         "dev_agent": ("actions.dev_agent", "dev_agent"),
         "REBOOT_MARKER": ("actions.dev_agent", "REBOOT_MARKER"),
@@ -214,6 +225,8 @@ else:
         "manage_interest_profile": ("actions.web_search", "manage_interest_profile"),
         "_fetch_news_sync": ("actions.web_search", "_news"),
         "workspace_agent": ("actions.workspace_agent", "workspace_agent"),
+        "computer_control": ("actions.computer_control", "computer_control"),
+        "game_updater": ("actions.game_updater", "game_updater"),
         "SystemMonitor": ("actions.system_monitor", "SystemMonitor"),
         "get_system_status": ("actions.system_monitor", "get_system_status"),
         "ProactiveEngine": ("actions.proactive", "ProactiveEngine"),
@@ -222,6 +235,10 @@ else:
         "remove_monitor": ("actions.background_monitor", "remove_monitor"),
         "list_monitors": ("actions.background_monitor", "list_monitors"),
         "monitor_check_all": ("actions.background_monitor", "check_all"),
+        "imessage_control": ("actions.imessage_integration", "imessage_control"),
+        "send_imessage": ("actions.imessage_integration", "send_imessage"),
+        "mail_control": ("actions.mail_integration", "mail_control"),
+        "find_my": ("actions.find_my", "find_my"),
         "alexa_routines": ("actions.alexa_routines", "alexa_routines"),
         "ifttt_webhooks": ("actions.alexa_routines", "ifttt_webhooks"),
     }
@@ -2920,6 +2937,16 @@ class JarvisLive:
 
         if name == "security_biometrics" and not callable(verify_biometric_security):
             result = "security_biometrics is unavailable on the headless VPS; biometric operations require the Mac."
+            return types.FunctionResponse(
+                id=fc.id,
+                name=name,
+                response={"result": result, "unavailable": True},
+            )
+
+        if name == "manage_monitor" and not all(
+            callable(handler) for handler in (add_monitor, remove_monitor, list_monitors)
+        ):
+            result = "manage_monitor is unavailable because the monitoring backend is not installed on this runtime."
             return types.FunctionResponse(
                 id=fc.id,
                 name=name,

@@ -72,6 +72,21 @@ def test_unavailable_headless_tool_returns_capability_message(monkeypatch) -> No
     assert 'headless VPS' in response.response['result']
 
 
+def test_headless_safe_capabilities_are_restored() -> None:
+    expected = (
+        main_module.weather_action,
+        main_module.web_search_action,
+        main_module.google_calendar,
+        main_module.send_message,
+        main_module.youtube_video,
+        main_module.code_helper,
+        main_module.workspace_agent,
+        main_module.get_system_status,
+    )
+
+    assert all(callable(handler) for handler in expected)
+
+
 def test_billing_error_is_not_treated_as_disconnect() -> None:
     jarvis = JarvisLive(DummyUI())
 
