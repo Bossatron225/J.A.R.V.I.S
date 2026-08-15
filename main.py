@@ -56,6 +56,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 from functools import lru_cache
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import sounddevice as sd
 import speech_recognition as sr
@@ -446,6 +447,15 @@ def _is_disconnect_error(err: Exception | BaseException) -> bool:
     ))
 
 TOOL_DECLARATIONS = [
+    {
+        "name": "get_current_time",
+        "description": (
+            "Returns the exact current date, local time, and timezone. "
+            "Always call this tool whenever the user asks what time or date it is; "
+            "never rely on the session startup time."
+        ),
+        "parameters": {"type": "OBJECT", "properties": {}, "required": []},
+    },
     {
         "name": "open_app",
         "description": (
@@ -2715,8 +2725,6 @@ class JarvisLive:
         self._schedule_shutdown("biometric verification failed")
 
     def _build_config(self) -> types.LiveConnectConfig:
-        from datetime import datetime
-
         # Load customization from config
         try:
             _cfg = json.loads(open(API_CONFIG_PATH, encoding="utf-8").read())
@@ -2729,12 +2737,11 @@ class JarvisLive:
         personal_context = build_personal_memory_context(memory, obsidian_mem)
         sys_prompt = _load_system_prompt()
 
-        now      = datetime.now()
-        time_str = now.strftime("%A, %B %d, %Y — %I:%M %p")
+        time_str = self._current_time_text()
         time_ctx = (
             f"[CURRENT DATE & TIME]\n"
-            f"Right now it is: {time_str}\n"
-            f"Use this to calculate exact times for reminders.\n\n"
+            f"Session started at: {time_str}\n"
+            "For any current date or time question, call get_current_time because this session may remain open for hours.\n\n"
         )
 
         # Identity injection — overrides any hardcoded name in prompt.txt
@@ -2774,6 +2781,24 @@ class JarvisLive:
                 )
             )
         return types.LiveConnectConfig(**cfg_kwargs)
+
+    @staticmethod
+    def _current_timezone_name() -> str:
+        configured = str(os.getenv("JARVIS_TIMEZONE") or "").strip()
+        if configured:
+            return configured
+        runtime_cfg = JarvisLive._load_runtime_config()
+        return str(runtime_cfg.get("timezone") or "Europe/Dublin").strip()
+
+    @classmethod
+    def _current_time_text(cls) -> str:
+        timezone_name = cls._current_timezone_name()
+        try:
+            now = datetime.now(ZoneInfo(timezone_name))
+        except ZoneInfoNotFoundError:
+            timezone_name = "UTC"
+            now = datetime.now(ZoneInfo("UTC"))
+        return f"{now.strftime('%A, %B %d, %Y at %I:%M:%S %p')} ({timezone_name})"
 
     def _block_live_model(self, model: str, seconds: int = 300) -> None:
         if not model:
@@ -2816,6 +2841,14 @@ class JarvisLive:
 
         print(f"[JARVIS] 🔧 {name}  {args}")
         self.ui.set_state("THINKING")
+
+        if name == "get_current_time":
+            result = self._current_time_text()
+            return types.FunctionResponse(
+                id=fc.id,
+                name=name,
+                response={"result": result},
+            )
 
         if name == "save_memory":
             category = args.get("category", "notes")
@@ -4417,9 +4450,17 @@ class JarvisLive:
                 runtime_cfg = self._load_runtime_config()
                 self._tts_player = None
                 self._use_external_tts = False
-                if self._remote_bridge is None and self._external_tts_enabled(runtime_cfg):
+                if self._external_tts_enabled(runtime_cfg):
                     try:
-                        self._tts_player = create_tts_player(runtime_cfg)
+                        audio_sink = (
+                            self._remote_bridge.publish_audio
+                            if self._remote_bridge is not None
+                            else None
+                        )
+                        self._tts_player = create_tts_player(
+                            runtime_cfg,
+                            audio_sink=audio_sink,
+                        )
                         self._use_external_tts = True
                         self.ui.write_log("SYS: Voice ready.")
                     except Exception as e:
