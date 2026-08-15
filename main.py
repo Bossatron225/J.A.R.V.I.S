@@ -46,6 +46,7 @@ if _platform.system() == "Windows":
 import asyncio
 import json
 import os
+import queue as thread_queue
 import re
 import sqlite3
 import threading
@@ -1372,7 +1373,7 @@ TOOL_DECLARATIONS = [
 
 class JarvisLive:
 
-    def __init__(self, ui: JarvisUI):
+    def __init__(self, ui: JarvisUI, dashboard=None, remote_bridge=None):
         self.ui             = ui
         self._asst_name     = "JARVIS"   # updated each session from config
         self.session              = None
@@ -1394,7 +1395,8 @@ class JarvisLive:
         self.ui.on_interrupt      = self.interrupt
         self.ui.on_biometric_failure = self._handle_biometric_failure
         self._turn_done_event: asyncio.Event | None = None
-        self._dashboard     = None
+        self._dashboard     = dashboard
+        self._remote_bridge = remote_bridge
         self._briefing_sent    = False          # morning briefing fires once per process
         self._last_public_url = None
         self._boot_remote_notice_sent = False
@@ -3614,11 +3616,21 @@ class JarvisLive:
 
                 self.set_speaking(True)
 
-                if self._dashboard and self._dashboard._audio_clients:
+                remote_audio_ready = (
+                    self._dashboard
+                    and (
+                        self._dashboard._audio_clients
+                        or getattr(self._dashboard, "has_remote_audio_sink", lambda: False)()
+                    )
+                )
+                if remote_audio_ready:
                     try:
                         await self._dashboard.send_audio_to_clients(chunk)
                     except Exception:
                         pass
+                    continue
+
+                if stream is None:
                     continue
 
                 # Batch all immediately-available chunks into one write to reduce
@@ -3642,8 +3654,9 @@ class JarvisLive:
             raise
         finally:
             self.set_speaking(False)
-            stream.stop()
-            stream.close()
+            if stream is not None:
+                stream.stop()
+                stream.close()
 
     # ── Morning briefing ────────────────────────────────────────────────────────
 
@@ -4149,7 +4162,11 @@ class JarvisLive:
                 await asyncio.sleep(interval)
                 if not self._dashboard:
                     continue
-                status = await asyncio.to_thread(get_system_status)
+                status = (
+                    await asyncio.to_thread(get_system_status)
+                    if callable(get_system_status)
+                    else {"status": "headless"}
+                )
                 payload = self._build_diagnostics_payload(status)
                 await self._dashboard.broadcast(
                     {
@@ -4219,12 +4236,15 @@ class JarvisLive:
 
     async def _relay_phone_audio(self) -> None:
         """Forward phone mic PCM chunks from dashboard queue into the Gemini Live session."""
-        q = self._dashboard._phone_audio_queue
         while True:
             try:
                 timeout = float(self._audio_cfg.get("phone_idle_timeout_seconds", 0.35))
-                chunk = await asyncio.wait_for(q.get(), timeout=timeout)
-            except asyncio.TimeoutError:
+                if self._remote_bridge is not None:
+                    chunk = await asyncio.to_thread(self._remote_bridge.get_audio, timeout)
+                else:
+                    q = self._dashboard._phone_audio_queue
+                    chunk = await asyncio.wait_for(q.get(), timeout=timeout)
+            except (asyncio.TimeoutError, thread_queue.Empty):
                 # Brief phone silence: release PC mic quickly for smoother handoff.
                 self._phone_active = False
                 continue
@@ -4257,9 +4277,12 @@ class JarvisLive:
     async def _process_dashboard_commands(self) -> None:
         while True:
             try:
-                text = await asyncio.wait_for(
-                    self._dashboard._command_queue.get(), timeout=0.5
-                )
+                if self._remote_bridge is not None:
+                    text = await asyncio.to_thread(self._remote_bridge.get_command, 0.5)
+                else:
+                    text = await asyncio.wait_for(
+                        self._dashboard._command_queue.get(), timeout=0.5
+                    )
                 if not text:
                     continue
                 # Wait up to 8s for session to become ready after a wake
@@ -4275,7 +4298,7 @@ class JarvisLive:
                     self.ui.write_log(f"[Web]: {text}")
                 else:
                     print(f"[Dashboard] Dropped command (no session): {text}")
-            except asyncio.TimeoutError:
+            except (asyncio.TimeoutError, thread_queue.Empty):
                 pass
             except Exception as e:
                 print(f"[Dashboard] Command error: {e}")
@@ -4343,12 +4366,12 @@ class JarvisLive:
         asyncio.create_task(self._run_audio_diagnostics())
         self.ui.write_log("SYS: Audio ready.")
 
-        if self._wake_protocol_cfg.get("autostart", True):
+        if self._wake_protocol_cfg.get("autostart", True) and callable(imessage_monitor_start):
             interval = int(self._wake_protocol_cfg.get("interval_seconds", 15) or 15)
             await asyncio.to_thread(imessage_monitor_start, interval)
             self.ui.write_log("SYS: Monitor ready.")
 
-        if self._mail_monitor_cfg.get("autostart", True):
+        if self._mail_monitor_cfg.get("autostart", True) and callable(mail_monitor_start):
             interval = int(self._mail_monitor_cfg.get("interval_seconds", 30) or 30)
             await asyncio.to_thread(mail_monitor_start, interval)
             self.ui.write_log("SYS: Monitor ready.")
@@ -4357,7 +4380,10 @@ class JarvisLive:
         # When a VPS brain is configured, keep the dashboard and public tunnel on the server instead,
         # so a local shutdown does not kill the remote JARVIS brain.
         vps_url = os.getenv("JARVIS_VPS_URL", "").strip()
-        if vps_url:
+        if self._dashboard is not None:
+            self._dashboard.set_connect_callback(self._on_phone_connected)
+            asyncio.create_task(self._process_dashboard_commands())
+        elif vps_url:
             self.ui.write_log("SYS: VPS brain configured; local dashboard disabled to keep remote access alive.")
             self._dashboard = None
         else:
@@ -4373,7 +4399,8 @@ class JarvisLive:
                 print(f"[Dashboard] Disabled: {e}")
                 self._dashboard = None
 
-        asyncio.create_task(self._run_vps_local_worker())
+        if self._remote_bridge is None:
+            asyncio.create_task(self._run_vps_local_worker())
 
         while True:
             try:
@@ -4382,7 +4409,7 @@ class JarvisLive:
                 runtime_cfg = self._load_runtime_config()
                 self._tts_player = None
                 self._use_external_tts = False
-                if self._external_tts_enabled(runtime_cfg):
+                if self._remote_bridge is None and self._external_tts_enabled(runtime_cfg):
                     try:
                         self._tts_player = create_tts_player(runtime_cfg)
                         self._use_external_tts = True
@@ -4435,9 +4462,9 @@ class JarvisLive:
                                 self._tts_sentence_queue = asyncio.Queue()
                                 tg.create_task(self._tts_worker())
                             tg.create_task(self._send_realtime())
-                            tg.create_task(self._listen_audio())
-                            self._start_speech_listener()
-                            self._start_speech_listener()
+                            if self._remote_bridge is None and not _HEADLESS_ENV:
+                                tg.create_task(self._listen_audio())
+                                self._start_speech_listener()
                             tg.create_task(self._receive_audio())
                             if not self._tts_player:
                                 tg.create_task(self._play_audio())
