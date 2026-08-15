@@ -108,6 +108,26 @@ def test_remote_apple_tool_returns_delegated_mac_result() -> None:
     assert 'two messages' in response.response['result']['result']
 
 
+def test_remote_camera_tool_requests_logged_in_device_frame() -> None:
+    events = []
+
+    class FakeBridge:
+        def publish_event(self, event):
+            events.append(event)
+
+    jarvis = JarvisLive(DummyUI(), remote_bridge=FakeBridge())
+    call = type('Call', (), {
+        'id': 'call-camera',
+        'name': 'screen_process',
+        'args': {'target_type': 'camera', 'text': 'Read the label in view.'},
+    })()
+
+    response = asyncio.run(jarvis._execute_tool(call))
+
+    assert response.response['pending'] is True
+    assert events == [{'type': 'camera_capture_request', 'prompt': 'Read the label in view.'}]
+
+
 def test_billing_error_is_not_treated_as_disconnect() -> None:
     jarvis = JarvisLive(DummyUI())
 
