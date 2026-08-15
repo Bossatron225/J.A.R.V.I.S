@@ -96,8 +96,8 @@ def test_elevenlabs_falls_back_to_default_voice(monkeypatch):
     engine.speak("hello")
 
     assert len(sys.modules["requests"].calls) == 2
-    assert sys.modules["requests"].calls[0][0].endswith("invalid-voice")
-    assert sys.modules["requests"].calls[1][0].endswith("pNInz6obpgDQGcFmaJgB")
+    assert "/invalid-voice?output_format=pcm_24000" in sys.modules["requests"].calls[0][0]
+    assert "/pNInz6obpgDQGcFmaJgB?output_format=pcm_24000" in sys.modules["requests"].calls[1][0]
     assert captured["payload"] == b"audio"
 
 
