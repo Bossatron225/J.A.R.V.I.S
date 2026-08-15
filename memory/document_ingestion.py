@@ -1,11 +1,13 @@
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-INDEX_PATH = BASE_DIR / "memory" / "document_index.json"
+DATA_DIR = Path(os.getenv("JARVIS_DATA_DIR") or (BASE_DIR / "memory")).expanduser()
+INDEX_PATH = DATA_DIR / "document_index.json"
 
 _TEXT_EXTENSIONS = {
     ".md", ".markdown", ".txt", ".rst", ".log",

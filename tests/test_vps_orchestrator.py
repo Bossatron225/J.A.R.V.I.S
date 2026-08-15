@@ -89,8 +89,19 @@ def test_vps_systemd_service_runs_the_embedded_brain_with_gevent():
     service = (Path(__file__).resolve().parents[1] / 'deploy' / 'jarvis-vps.service').read_text(encoding='utf-8')
     assert 'Environment=JARVIS_HEADLESS=1' in service
     assert 'Environment=JARVIS_RUN_VPS_BRAIN=1' in service
+    assert 'Environment=JARVIS_DATA_DIR=/var/lib/jarvis' in service
+    assert 'StateDirectory=jarvis' in service
     assert '--workers 1 --worker-class gevent vps_orchestrator:app' in service
     assert 'geventwebsocket' not in service
+
+
+def test_mutable_vps_memory_supports_external_data_directory():
+    root = Path(__file__).resolve().parents[1]
+    ingestion = (root / 'memory' / 'document_ingestion.py').read_text(encoding='utf-8')
+    manager = (root / 'memory' / 'memory_manager.py').read_text(encoding='utf-8')
+
+    assert 'os.getenv("JARVIS_DATA_DIR")' in ingestion
+    assert 'os.getenv("JARVIS_DATA_DIR")' in manager
 
 
 def test_vps_exposes_dashboard_websocket_route():
