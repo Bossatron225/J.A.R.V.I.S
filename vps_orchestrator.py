@@ -15,7 +15,7 @@ except Exception:  # pragma: no cover
     Sock = None
 
 def _build_root_page() -> str:
-    public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.internal"
+    public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.jarvisyourdomain.com"
     return f"""
 <!doctype html>
 <html lang=\"en\">
@@ -151,7 +151,7 @@ class VPSOrchestrator:
         self.queue = deque()
         self.lock = threading.Lock()
         self.started_at = datetime.now(timezone.utc).isoformat()
-        self.public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.internal"
+        self.public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.jarvisyourdomain.com"
         self.mode = "vps"
         self.dashboard_server = None
         if DashboardServer is not None:
