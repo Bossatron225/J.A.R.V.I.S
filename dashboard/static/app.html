@@ -883,6 +883,8 @@
     let _audioCtx = null;
     let _micStm   = null;
     let _audioNd  = null;
+    let _remoteAudioCtx = null;
+    let _remoteAudioNextTime = 0;
 
     function _micIdle() {
       micBtn.innerHTML = '🎤';
@@ -894,23 +896,28 @@
       if (!payload) return;
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
-      if (!_audioCtx || !(_audioCtx instanceof Ctx)) {
-        _audioCtx = new Ctx({ sampleRate: 16000 });
+      if (!_remoteAudioCtx || !(_remoteAudioCtx instanceof Ctx)) {
+        _remoteAudioCtx = new Ctx({ sampleRate: 24000 });
+        _remoteAudioNextTime = 0;
       }
-      if (_audioCtx.state === 'suspended') {
-        _audioCtx.resume().catch(() => {});
+      if (_remoteAudioCtx.state === 'suspended') {
+        _remoteAudioCtx.resume().catch(() => {});
       }
-      const bytes = payload instanceof ArrayBuffer ? new Int16Array(payload) : new Int16Array(payload.buffer || payload);
+      const raw = payload instanceof ArrayBuffer ? payload : (payload.buffer || payload);
+      const aligned = raw.byteLength % 2 === 0 ? raw : raw.slice(0, raw.byteLength - 1);
+      const bytes = new Int16Array(aligned);
       if (!bytes.length) return;
-      const buffer = _audioCtx.createBuffer(1, bytes.length, 24000);
+      const buffer = _remoteAudioCtx.createBuffer(1, bytes.length, 24000);
       const out = buffer.getChannelData(0);
       for (let i = 0; i < bytes.length; i++) {
         out[i] = bytes[i] / 32768;
       }
-      const src = _audioCtx.createBufferSource();
+      const src = _remoteAudioCtx.createBufferSource();
       src.buffer = buffer;
-      src.connect(_audioCtx.destination);
-      src.start();
+      src.connect(_remoteAudioCtx.destination);
+      const startAt = Math.max(_remoteAudioCtx.currentTime + 0.02, _remoteAudioNextTime);
+      _remoteAudioNextTime = startAt + buffer.duration;
+      src.start(startAt);
     }
 
     // Float32 PCM → resample to 16 kHz + convert to Int16
