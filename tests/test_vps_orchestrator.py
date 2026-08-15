@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -43,6 +44,12 @@ def test_vps_exposes_dashboard_websocket_route():
     app = create_app()
     routes = sorted(str(rule) for rule in app.url_map.iter_rules())
     assert '/ws' in routes
+
+
+def test_public_dashboard_websocket_accepts_assistant_audio_frames():
+    html = (Path(__file__).resolve().parents[1] / 'dashboard' / 'static' / 'app.html').read_text(encoding='utf-8')
+    assert "ws.binaryType = 'arraybuffer';" in html
+    assert '_playRemoteAudioChunk(e.data);' in html
 
 
 def test_vps_serves_dashboard_static_assets():
@@ -109,6 +116,7 @@ def test_vps_public_dashboard_command_routes_accept_auth_and_queue_text():
     assert cmd.status_code == 200, cmd.get_data(as_text=True)
     assert cmd.get_json()['ok'] is True
     assert cmd.get_json()['text'] == 'hello from browser'
+    assert app.orchestrator.runtime_bridge.get_command(0.01) == 'hello from browser'
 
     wake = client.post('/api/wake', headers={'Authorization': f'Bearer {token}'})
     assert wake.status_code == 200, wake.get_data(as_text=True)
@@ -117,19 +125,39 @@ def test_vps_public_dashboard_command_routes_accept_auth_and_queue_text():
 
 def test_vps_phone_audio_websocket_forwards_pcm_to_dashboard_queue():
     app = create_app()
-    queue = app.orchestrator.dashboard_server._phone_audio_queue
+    queue = app.orchestrator.runtime_bridge.audio_queue
     while not queue.empty():
         queue.get_nowait()
 
     from vps_orchestrator import enqueue_phone_audio_payload
     payload = b'\x00\x01\x02\x03'
-    ok = enqueue_phone_audio_payload(app.orchestrator.dashboard_server, payload)
+    ok = enqueue_phone_audio_payload(
+        app.orchestrator.dashboard_server,
+        payload,
+        queue=queue,
+    )
 
     assert ok is True
     assert queue.qsize() == 1
     item = queue.get_nowait()
     assert item['mime_type'] == 'audio/pcm'
     assert item['data'] == payload
+
+
+def test_vps_dashboard_output_is_forwarded_to_public_runtime_bridge():
+    app = create_app()
+    client_id, outbound = app.orchestrator.runtime_bridge.register_client()
+
+    asyncio.run(app.orchestrator.dashboard_server.broadcast({
+        'type': 'log', 'speaker': 'jarvis', 'text': 'Bridge confirmed.',
+    }))
+    asyncio.run(app.orchestrator.dashboard_server.send_audio_to_clients(b'\x04\x05'))
+
+    assert outbound.get_nowait() == (
+        'json', {'type': 'log', 'speaker': 'jarvis', 'text': 'Bridge confirmed.'},
+    )
+    assert outbound.get_nowait() == ('bytes', b'\x04\x05')
+    app.orchestrator.runtime_bridge.unregister_client(client_id)
 
 
 def test_vps_orchestrator_health_and_task_queue():
