@@ -151,6 +151,19 @@ def _save_state(state: dict) -> None:
         _log(f"state save error: {e}")
 
 
+def _fence_startup_cursor(state: dict, latest_rowid: int | None) -> bool:
+    """Ignore messages that predate this bridge process."""
+    if latest_rowid is None:
+        return False
+    previous = state.get("last_seen_rowid")
+    previous_value = int(previous) if previous is not None else 0
+    latest_value = int(latest_rowid)
+    if latest_value <= previous_value:
+        return False
+    state["last_seen_rowid"] = latest_value
+    return True
+
+
 def _digits_only(value: str) -> str:
     return re.sub(r"\D+", "", value or "")
 
@@ -654,9 +667,10 @@ def main() -> int:
         mode = str(_read_config().get("imessage_cold_start_mode", "db") or "db").strip().lower()
         if mode not in {"db", "apple"}:
             mode = "db"
-        if state.get("last_seen_rowid") is None:
-            state["last_seen_rowid"] = _peek_latest_rowid_apple() if mode == "apple" else _peek_latest_rowid()
+        latest_rowid = _peek_latest_rowid_apple() if mode == "apple" else _peek_latest_rowid()
+        if _fence_startup_cursor(state, latest_rowid):
             _save_state(state)
+            _log(f"startup cursor fenced at rowid {latest_rowid}; older messages ignored")
     except Exception as e:
         _log(f"initial rowid read failed: {e}")
 
