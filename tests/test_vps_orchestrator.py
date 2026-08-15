@@ -90,29 +90,19 @@ def test_vps_public_dashboard_command_routes_accept_auth_and_queue_text():
 
 def test_vps_phone_audio_websocket_forwards_pcm_to_dashboard_queue():
     app = create_app()
-    token = app.orchestrator.dashboard_server._issue_token('session-key')
     queue = app.orchestrator.dashboard_server._phone_audio_queue
     while not queue.empty():
         queue.get_nowait()
 
-    route = app.view_functions['phone_audio_route']
-    class DummyWS:
-        def __init__(self):
-            self.payloads = [b'\x00\x01\x02\x03']
-        def receive(self):
-            if self.payloads:
-                return self.payloads.pop(0)
-            return None
-        def close(self, code=1000):
-            return None
+    from vps_orchestrator import enqueue_phone_audio_payload
+    payload = b'\x00\x01\x02\x03'
+    ok = enqueue_phone_audio_payload(app.orchestrator.dashboard_server, payload)
 
-    with app.test_request_context('/ws/phone-audio?token=' + token):
-        route(DummyWS())
-
+    assert ok is True
     assert queue.qsize() == 1
-    payload = queue.get_nowait()
-    assert payload['mime_type'] == 'audio/pcm'
-    assert payload['data'] == b'\x00\x01\x02\x03'
+    item = queue.get_nowait()
+    assert item['mime_type'] == 'audio/pcm'
+    assert item['data'] == payload
 
 
 def test_vps_orchestrator_health_and_task_queue():

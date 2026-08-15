@@ -124,6 +124,28 @@ def handle_dashboard_ws_message(payload, *, dashboard=None, token: str = "", que
     return None
 
 
+def enqueue_phone_audio_payload(dashboard, data) -> bool:
+    if dashboard is None or not isinstance(data, (bytes, bytearray)) or not data:
+        return False
+    queue = getattr(dashboard, "_phone_audio_queue", None)
+    if queue is None:
+        return False
+    payload = {"data": bytes(data), "mime_type": "audio/pcm"}
+    try:
+        queue.put_nowait(payload)
+        return True
+    except Exception:
+        try:
+            queue.get_nowait()
+        except Exception:
+            pass
+        try:
+            queue.put_nowait(payload)
+            return True
+        except Exception:
+            return False
+
+
 class VPSOrchestrator:
     def __init__(self):
         self.queue = deque()
@@ -410,24 +432,7 @@ def create_app() -> Flask:
                     data = ws.receive()
                     if data is None:
                         break
-                    if isinstance(data, (bytes, bytearray)) and data:
-                        try:
-                            orchestrator.dashboard_server._phone_audio_queue.put_nowait({
-                                "data": bytes(data),
-                                "mime_type": "audio/pcm",
-                            })
-                        except Exception:
-                            try:
-                                orchestrator.dashboard_server._phone_audio_queue.get_nowait()
-                            except Exception:
-                                pass
-                            try:
-                                orchestrator.dashboard_server._phone_audio_queue.put_nowait({
-                                    "data": bytes(data),
-                                    "mime_type": "audio/pcm",
-                                })
-                            except Exception:
-                                pass
+                    enqueue_phone_audio_payload(orchestrator.dashboard_server, data)
             except Exception:
                 pass
 
