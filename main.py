@@ -4274,6 +4274,9 @@ class JarvisLive:
 
     # ── dashboard command relay ─────────────────────────────────────────────
 
+    def _dashboard_session_wait_steps(self) -> int:
+        return 300 if self._remote_bridge is not None else 80
+
     async def _process_dashboard_commands(self) -> None:
         while True:
             try:
@@ -4287,8 +4290,7 @@ class JarvisLive:
                     continue
                 # The embedded VPS brain can need a little longer to establish
                 # its first Gemini session than a warmed-up local runtime.
-                session_wait_steps = 300 if self._remote_bridge is not None else 80
-                for _ in range(session_wait_steps):
+                for _ in range(self._dashboard_session_wait_steps()):
                     if self.session:
                         break
                     await asyncio.sleep(0.1)
