@@ -43,9 +43,11 @@ def test_disconnect_error_is_detected() -> None:
 
 
 def test_embedded_vps_brain_waits_longer_for_first_live_session() -> None:
-    jarvis = JarvisLive(DummyUI(), remote_bridge=object())
+    local = JarvisLive(DummyUI())
+    embedded = JarvisLive(DummyUI(), remote_bridge=object())
 
-    assert jarvis._remote_bridge is not None
+    assert local._dashboard_session_wait_steps() == 80
+    assert embedded._dashboard_session_wait_steps() == 300
 
 
 def test_billing_error_is_not_treated_as_disconnect() -> None:
