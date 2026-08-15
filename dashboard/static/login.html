@@ -224,7 +224,8 @@
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
     function _clearStaleSession() {
-      sessionStorage.clear();
+      sessionStorage.removeItem('jarvis_token');
+      sessionStorage.removeItem('jarvis_key');
       localStorage.removeItem('jarvis_device_token');
     }
 
@@ -246,7 +247,6 @@
         shake(); return;
       }
       if (data.ok && data.token) {
-        _clearStaleSession();
         sessionStorage.setItem('jarvis_key', key);
         sessionStorage.setItem('jarvis_token', data.token);
         location.href = '/';
