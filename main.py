@@ -4285,8 +4285,10 @@ class JarvisLive:
                     )
                 if not text:
                     continue
-                # Wait up to 8s for session to become ready after a wake
-                for _ in range(80):
+                # The embedded VPS brain can need a little longer to establish
+                # its first Gemini session than a warmed-up local runtime.
+                session_wait_steps = 300 if self._remote_bridge is not None else 80
+                for _ in range(session_wait_steps):
                     if self.session:
                         break
                     await asyncio.sleep(0.1)

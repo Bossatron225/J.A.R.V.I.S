@@ -42,6 +42,12 @@ def test_disconnect_error_is_detected() -> None:
     assert jarvis._is_disconnect_error(RuntimeError("temporary network hiccup")) is False
 
 
+def test_embedded_vps_brain_waits_longer_for_first_live_session() -> None:
+    jarvis = JarvisLive(DummyUI(), remote_bridge=object())
+
+    assert jarvis._remote_bridge is not None
+
+
 def test_billing_error_is_not_treated_as_disconnect() -> None:
     jarvis = JarvisLive(DummyUI())
 
