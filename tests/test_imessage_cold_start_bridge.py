@@ -4,6 +4,24 @@ from pathlib import Path
 import actions.imessage_cold_start_bridge as bridge
 
 
+def test_startup_cursor_skips_messages_received_before_bridge_restart():
+    state = {"last_seen_rowid": 41, "last_wake_rowid": 0, "last_wake_ts": 0.0}
+
+    changed = bridge._fence_startup_cursor(state, 57)
+
+    assert changed is True
+    assert state["last_seen_rowid"] == 57
+
+
+def test_startup_cursor_never_moves_backwards():
+    state = {"last_seen_rowid": 57, "last_wake_rowid": 0, "last_wake_ts": 0.0}
+
+    changed = bridge._fence_startup_cursor(state, 55)
+
+    assert changed is False
+    assert state["last_seen_rowid"] == 57
+
+
 def test_preferred_python_exec_prefers_repo_venv(monkeypatch, tmp_path):
     venv_python = tmp_path / ".venv-1" / "bin" / "python"
     venv_python.parent.mkdir(parents=True)
