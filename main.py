@@ -4492,7 +4492,7 @@ class JarvisLive:
                             ]},
                             turn_complete=True,
                         )
-                        self.ui.write_log(f"[iPhone Camera]: {prompt}")
+                        self.ui.write_log(f"[Device Camera]: {prompt}")
                     else:
                         command_text = str(text).strip()
                         await self.session.send_client_content(

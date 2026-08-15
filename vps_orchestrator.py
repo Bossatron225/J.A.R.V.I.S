@@ -1050,7 +1050,7 @@ def create_app() -> Flask:
             "text": prompt,
             "image_b64": image_b64,
             "mime_type": mime_type,
-            "source": "iphone_camera",
+            "source": "device_camera",
         }
         if not orchestrator.runtime_bridge.enqueue_command(command):
             return jsonify({"error": "command queue full"}), 503
