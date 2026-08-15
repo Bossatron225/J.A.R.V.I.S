@@ -36,8 +36,9 @@ def test_login_success_keeps_session_tokens_for_dashboard_redirect():
 def test_vps_runtime_decls_require_websocket_stack():
     req_path = Path(__file__).resolve().parents[1] / 'requirements.txt'
     text = req_path.read_text(encoding='utf-8').lower()
-    for package in ('flask-sock', 'gunicorn', 'gevent-websocket', 'gevent'):
+    for package in ('flask-sock', 'gunicorn', 'gevent'):
         assert package in text
+    assert 'gevent-websocket' not in text
 
 
 def test_vps_exposes_dashboard_websocket_route():
