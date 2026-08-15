@@ -16,6 +16,13 @@ try:
 except Exception:  # pragma: no cover
     Sock = None
 
+try:
+    from gevent import sleep as _gevent_sleep
+    from gevent import spawn as _gevent_spawn
+except Exception:  # pragma: no cover
+    _gevent_sleep = None
+    _gevent_spawn = None
+
 def _build_root_page() -> str:
     public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.jarvisyourdomain.com"
     return f"""
@@ -126,23 +133,23 @@ def handle_dashboard_ws_message(payload, *, dashboard=None, token: str = "", que
     return None
 
 
-def enqueue_phone_audio_payload(dashboard, data) -> bool:
+def enqueue_phone_audio_payload(dashboard, data, *, queue=None) -> bool:
     if dashboard is None or not isinstance(data, (bytes, bytearray)) or not data:
         return False
-    queue = getattr(dashboard, "_phone_audio_queue", None)
-    if queue is None:
+    target_queue = queue if queue is not None else getattr(dashboard, "_phone_audio_queue", None)
+    if target_queue is None:
         return False
     payload = {"data": bytes(data), "mime_type": "audio/pcm"}
     try:
-        queue.put_nowait(payload)
+        target_queue.put_nowait(payload)
         return True
     except Exception:
         try:
-            queue.get_nowait()
+            target_queue.get_nowait()
         except Exception:
             pass
         try:
-            queue.put_nowait(payload)
+            target_queue.put_nowait(payload)
             return True
         except Exception:
             return False
@@ -234,6 +241,11 @@ class VPSOrchestrator:
     def __init__(self):
         self.queue = deque()
         self.lock = threading.Lock()
+        self.runtime_bridge = VPSRuntimeBridge()
+        self._brain_lock = threading.Lock()
+        self._brain_thread = None
+        self._brain_state = "stopped"
+        self._brain_error = ""
         self.started_at = datetime.now(timezone.utc).isoformat()
         self.public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.jarvisyourdomain.com"
         self.mode = "vps"
@@ -243,6 +255,12 @@ class VPSOrchestrator:
                 self.dashboard_server = DashboardServer()
             except Exception:
                 self.dashboard_server = None
+        if self.dashboard_server is not None and hasattr(self.dashboard_server, "set_remote_output_sinks"):
+            self.dashboard_server.set_remote_output_sinks(
+                event_sink=self.runtime_bridge.publish_event,
+                audio_sink=self.runtime_bridge.publish_audio,
+                audio_available=self.runtime_bridge.has_clients,
+            )
         self.status = {
             "service": "jarvis-vps-orchestrator",
             "mode": self.mode,
@@ -252,6 +270,51 @@ class VPSOrchestrator:
             "status": "online",
             "dashboard": "vps-managed" if self.dashboard_server is not None else "disabled",
         }
+
+    @staticmethod
+    def _vps_brain_enabled() -> bool:
+        return str(os.getenv("JARVIS_RUN_VPS_BRAIN") or "").strip().lower() in {
+            "1", "true", "yes", "on",
+        }
+
+    def ensure_brain_started(self) -> bool:
+        """Start one headless live session inside this one-worker Gunicorn process."""
+        if not self._vps_brain_enabled() or self.dashboard_server is None:
+            return False
+        with self._brain_lock:
+            if self._brain_thread and self._brain_thread.is_alive():
+                return True
+            self._brain_state = "starting"
+            self._brain_error = ""
+            self._brain_thread = threading.Thread(
+                target=self._run_vps_brain,
+                name="jarvis-vps-brain",
+                daemon=True,
+            )
+            self._brain_thread.start()
+            return True
+
+    def _run_vps_brain(self) -> None:
+        try:
+            # main.py decides which optional desktop integrations to import at module load.
+            os.environ["JARVIS_HEADLESS"] = "1"
+            import asyncio
+            from main import JarvisLive, _HeadlessUI
+
+            ui = _HeadlessUI()
+            jarvis = JarvisLive(
+                ui,
+                dashboard=self.dashboard_server,
+                remote_bridge=self.runtime_bridge,
+            )
+            self._brain_state = "running"
+            asyncio.run(jarvis.run())
+        except BaseException as exc:  # pragma: no cover - depends on live credentials
+            self._brain_error = str(exc)
+            self._brain_state = "error"
+            print(f"[VPS Brain] Stopped: {exc}")
+        else:  # pragma: no cover - run() is intentionally long-lived
+            self._brain_state = "stopped"
 
     def enqueue_task(self, action: str, payload: dict | None = None, source: str = "system") -> dict:
         task = {
@@ -376,6 +439,13 @@ class VPSOrchestrator:
                 "worker_mode": "vps",
                 "remote_control": True,
             },
+            "brain": {
+                "state": self._brain_state,
+                "thread_alive": bool(self._brain_thread and self._brain_thread.is_alive()),
+                "error": self._brain_error,
+                "command_queue": self.runtime_bridge.command_queue.qsize(),
+                "audio_queue": self.runtime_bridge.audio_queue.qsize(),
+            },
             "connected": True,
         }
 
@@ -448,6 +518,34 @@ def create_app() -> Flask:
 
     sock = Sock(app) if Sock is not None else None
 
+    @app.before_request
+    def ensure_vps_brain():
+        orchestrator.ensure_brain_started()
+
+    def _start_outbound_sender(ws, outbound):
+        stopped = threading.Event()
+
+        def sender() -> None:
+            while not stopped.is_set():
+                try:
+                    kind, payload = outbound.get_nowait()
+                except thread_queue.Empty:
+                    if _gevent_sleep is not None:
+                        _gevent_sleep(0.02)
+                    else:
+                        time.sleep(0.02)
+                    continue
+                try:
+                    ws.send(json.dumps(payload) if kind == "json" else payload)
+                except Exception:
+                    break
+
+        if _gevent_spawn is not None:
+            return stopped, _gevent_spawn(sender)
+        thread = threading.Thread(target=sender, name="jarvis-public-ws-sender", daemon=True)
+        thread.start()
+        return stopped, thread
+
     if sock is None:
         @app.route("/ws")
         def ws_fallback():
@@ -467,6 +565,7 @@ def create_app() -> Flask:
     if sock is not None:
         @sock.route("/ws")
         def ws_route(ws):
+            orchestrator.ensure_brain_started()
             tok = _valid_ws_token()
             if not tok:
                 try:
@@ -474,36 +573,45 @@ def create_app() -> Flask:
                 except Exception:
                     pass
                 return
+            client_id, outbound = orchestrator.runtime_bridge.register_client()
+            stopped, sender = _start_outbound_sender(ws, outbound)
+            orchestrator.runtime_bridge.publish_to_client(
+                client_id,
+                {"type": "sys", "text": "Remote session active."},
+            )
             try:
-                ws.send(json.dumps({"type": "sys", "text": "Remote session active."}))
-            except Exception:
-                pass
-            while True:
-                try:
-                    payload = ws.receive()
-                except Exception:
-                    break
-                if payload is None:
-                    break
-                try:
-                    data = json.loads(payload)
-                except Exception:
-                    continue
-                response = handle_dashboard_ws_message(
-                    data,
-                    dashboard=orchestrator.dashboard_server,
-                    token=tok,
-                    queue=getattr(orchestrator.dashboard_server, "_command_queue", None),
-                    wake_callback=getattr(orchestrator.dashboard_server, "_wake_callback", None),
-                )
-                if response is not None:
+                while True:
                     try:
-                        ws.send(json.dumps(response))
+                        payload = ws.receive()
                     except Exception:
                         break
+                    if payload is None:
+                        break
+                    try:
+                        data = json.loads(payload)
+                    except Exception:
+                        continue
+                    response = handle_dashboard_ws_message(
+                        data,
+                        dashboard=orchestrator.dashboard_server,
+                        token=tok,
+                        queue=orchestrator.runtime_bridge.command_queue,
+                        wake_callback=getattr(orchestrator.dashboard_server, "_wake_callback", None),
+                    )
+                    if response is not None:
+                        orchestrator.runtime_bridge.publish_to_client(client_id, response)
+            finally:
+                stopped.set()
+                orchestrator.runtime_bridge.unregister_client(client_id)
+                if hasattr(sender, "kill"):
+                    try:
+                        sender.kill()
+                    except Exception:
+                        pass
 
         @sock.route("/ws/phone-audio")
         def phone_audio_route(ws):
+            orchestrator.ensure_brain_started()
             tok = _valid_ws_token()
             if not tok:
                 try:
@@ -516,7 +624,11 @@ def create_app() -> Flask:
                     data = ws.receive()
                     if data is None:
                         break
-                    enqueue_phone_audio_payload(orchestrator.dashboard_server, data)
+                    enqueue_phone_audio_payload(
+                        orchestrator.dashboard_server,
+                        data,
+                        queue=orchestrator.runtime_bridge.audio_queue,
+                    )
             except Exception:
                 pass
 
@@ -782,7 +894,7 @@ def create_app() -> Flask:
     @app.post("/api/command")
     def api_command():
         dashboard = orchestrator.dashboard_server
-        if dashboard is None or not hasattr(dashboard, "_command_queue"):
+        if dashboard is None:
             return jsonify({"error": "remote command queue unavailable"}), 503
 
         tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
@@ -800,9 +912,7 @@ def create_app() -> Flask:
         if not text:
             return jsonify({"error": "text is required"}), 400
 
-        try:
-            dashboard._command_queue.put_nowait(text)
-        except Exception:
+        if not orchestrator.runtime_bridge.enqueue_command(text):
             return jsonify({"error": "command queue full"}), 503
 
         if getattr(dashboard, "_wake_callback", None):
