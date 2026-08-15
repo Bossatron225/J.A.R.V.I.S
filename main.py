@@ -2884,6 +2884,31 @@ class JarvisLive:
         args = dict(fc.args or {})
         self._predictive_daemon.record_tool_call(name, args)
 
+        mac_delegated_tools = {
+            "open_app",
+            "browser_control",
+            "computer_control",
+            "computer_settings",
+            "desktop_control",
+            "file_controller",
+            "find_my",
+            "imessage_control",
+            "mail_control",
+            "reminder",
+            "security_biometrics",
+            "send_message",
+            "youtube_video",
+        }
+        request_local_action = getattr(self._remote_bridge, "request_local_action", None)
+        if callable(request_local_action) and name in mac_delegated_tools:
+            result = await asyncio.to_thread(
+            request_local_action,
+                name,
+                args,
+                45.0,
+            )
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": result})
+
         unavailable_handlers = {
             "open_app": open_app,
             "weather_report": weather_action,
@@ -4453,11 +4478,28 @@ class JarvisLive:
                         break
                     await asyncio.sleep(0.1)
                 if self.session:
-                    await self.session.send_client_content(
-                        turns={"parts": [{"text": text}]},
-                        turn_complete=True,
-                    )
-                    self.ui.write_log(f"[Web]: {text}")
+                    if isinstance(text, dict) and text.get("image_b64"):
+                        prompt = str(text.get("text") or "Analyze this image clearly.").strip()
+                        await self.session.send_client_content(
+                            turns={"parts": [
+                                {
+                                    "inline_data": {
+                                        "mime_type": str(text.get("mime_type") or "image/jpeg"),
+                                        "data": str(text["image_b64"]),
+                                    }
+                                },
+                                {"text": prompt},
+                            ]},
+                            turn_complete=True,
+                        )
+                        self.ui.write_log(f"[iPhone Camera]: {prompt}")
+                    else:
+                        command_text = str(text).strip()
+                        await self.session.send_client_content(
+                            turns={"parts": [{"text": command_text}]},
+                            turn_complete=True,
+                        )
+                        self.ui.write_log(f"[Web]: {command_text}")
                 else:
                     print(f"[Dashboard] Dropped command (no session): {text}")
             except (asyncio.TimeoutError, thread_queue.Empty):
@@ -4477,42 +4519,14 @@ class JarvisLive:
             try:
                 worker = self._local_worker or LocalWorker(vps_url)
                 self._local_worker = worker
-
-                try:
-                    with urllib.request.urlopen(f"{vps_url.rstrip('/')}/api/ops", timeout=8) as resp:
-                        payload = json.loads(resp.read().decode("utf-8"))
-                except Exception:
-                    payload = {}
-
-                if bool(payload.get("connected", False)) and not self._vps_link_established_said:
+                completed = await asyncio.to_thread(worker.poll_for_tasks, 5.0, 5)
+                if not self._vps_link_established_said:
                     self._vps_link_established_said = True
-                    if self.session:
-                        self.speak("Server link established.")
-                    self.ui.write_log("SYS: Server link established.")
-
-                tasks = worker.poll_for_tasks(limit=5)
-                if tasks:
-                    self.ui.write_log(f"SYS: Local worker processed {len(tasks)} queued task(s) from VPS.")
-                    for task in tasks:
-                        action = str(task.get("action") or "").strip().lower()
-                        payload = task.get("payload") or {}
-                        if action == "remote_chat":
-                            text = str(payload.get("text") or payload.get("prompt") or "").strip()
-                            if text and self.session:
-                                try:
-                                    await self.session.send_client_content(
-                                        turns={"parts": [{"text": text}]},
-                                        turn_complete=True,
-                                    )
-                                    self.ui.write_log(f"SYS: Remote chat prompt delivered: {text[:80]}")
-                                except Exception as exc:
-                                    self.ui.write_log(f"SYS: Remote chat failed: {exc}")
-                            continue
-                        result = worker.execute_local_action(action, payload)
-                        print(f"[Local Worker] {action}: {result}")
-                        if result.get("status") == "rejected":
-                            self.ui.write_log(f"SYS: VPS task rejected on local worker: {action}")
+                    self.ui.write_log("SYS: VPS local worker link established.")
+                for task in completed:
+                    print(f"[Local Worker] {task.get('action')}: {task.get('local_result')}")
             except Exception as e:
+                self._vps_link_established_said = False
                 print(f"[Local Worker] Poll error: {e}")
             await asyncio.sleep(5)
 
