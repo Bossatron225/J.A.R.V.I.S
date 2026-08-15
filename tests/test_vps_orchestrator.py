@@ -103,6 +103,8 @@ def test_public_dashboard_websocket_accepts_assistant_audio_frames():
     html = (Path(__file__).resolve().parents[1] / 'dashboard' / 'static' / 'app.html').read_text(encoding='utf-8')
     assert "ws.binaryType = 'arraybuffer';" in html
     assert '_playRemoteAudioChunk(e.data);' in html
+    assert 'if (!_audioCtx || !(_audioCtx instanceof Ctx)) {' in html
+    assert 'instanceof webkitAudioContext' not in html
 
 
 def test_vps_serves_dashboard_static_assets():

@@ -894,7 +894,7 @@
       if (!payload) return;
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
-      if (!(_audioCtx instanceof AudioContext || _audioCtx instanceof webkitAudioContext)) {
+      if (!_audioCtx || !(_audioCtx instanceof Ctx)) {
         _audioCtx = new Ctx({ sampleRate: 16000 });
       }
       if (_audioCtx.state === 'suspended') {
