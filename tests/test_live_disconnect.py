@@ -87,6 +87,27 @@ def test_headless_safe_capabilities_are_restored() -> None:
     assert all(callable(handler) for handler in expected)
 
 
+def test_remote_apple_tool_returns_delegated_mac_result() -> None:
+    class FakeBridge:
+        def request_local_action(self, action, payload, timeout):
+            assert action == 'imessage_control'
+            assert payload == {'action': 'read_unread', 'limit': 2}
+            assert timeout == 45.0
+            return {'status': 'completed', 'result': 'Unread iMessages: two messages'}
+
+    jarvis = JarvisLive(DummyUI(), remote_bridge=FakeBridge())
+    call = type('Call', (), {
+        'id': 'call-imessage',
+        'name': 'imessage_control',
+        'args': {'action': 'read_unread', 'limit': 2},
+    })()
+
+    response = asyncio.run(jarvis._execute_tool(call))
+
+    assert response.response['result']['status'] == 'completed'
+    assert 'two messages' in response.response['result']['result']
+
+
 def test_billing_error_is_not_treated_as_disconnect() -> None:
     jarvis = JarvisLive(DummyUI())
 

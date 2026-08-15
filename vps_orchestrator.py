@@ -4,6 +4,9 @@ import queue as thread_queue
 import threading
 import time
 import uuid
+import base64
+import hashlib
+import secrets
 from collections import deque
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -157,6 +160,9 @@ class VPSRuntimeBridge:
         self._client_limit = client_limit
         self._clients: dict[str, thread_queue.Queue[tuple[str, object]]] = {}
         self._clients_lock = threading.Lock()
+        self._local_tasks: dict[str, dict] = {}
+        self._local_tasks_lock = threading.Lock()
+        self._local_worker_last_seen = 0.0
 
     @staticmethod
     def _offer(target: thread_queue.Queue, value: object) -> bool:
@@ -174,12 +180,13 @@ class VPSRuntimeBridge:
             except thread_queue.Full:
                 return False
 
-    def enqueue_command(self, text: str) -> bool:
-        text = str(text or "").strip()
-        if not text:
+    def enqueue_command(self, command) -> bool:
+        if isinstance(command, str):
+            command = command.strip()
+        if not command:
             return False
         try:
-            self.command_queue.put_nowait(text)
+            self.command_queue.put_nowait(command)
             return True
         except thread_queue.Full:
             return False
@@ -229,6 +236,75 @@ class VPSRuntimeBridge:
         if payload:
             self._publish("bytes", bytes(payload))
 
+    def request_local_action(self, action: str, payload: dict, timeout: float = 20.0) -> dict:
+        task_id = uuid.uuid4().hex
+        done = threading.Event()
+        task = {
+            "id": task_id,
+            "action": str(action or "").strip(),
+            "payload": payload if isinstance(payload, dict) else {},
+            "status": "queued",
+            "created_at": time.time(),
+            "done": done,
+            "result": None,
+        }
+        with self._local_tasks_lock:
+            self._local_tasks[task_id] = task
+        if not done.wait(timeout=max(1.0, float(timeout))):
+            with self._local_tasks_lock:
+                self._local_tasks.pop(task_id, None)
+            return {
+                "status": "mac_offline",
+                "action": action,
+                "message": "The Mac worker did not respond. Wake the Mac and retry this action.",
+            }
+        with self._local_tasks_lock:
+            completed = self._local_tasks.pop(task_id, task)
+        result = completed.get("result")
+        return result if isinstance(result, dict) else {"status": "error", "result": result}
+
+    def claim_local_tasks(self, limit: int = 5) -> list[dict]:
+        now = time.time()
+        self._local_worker_last_seen = now
+        claimed = []
+        with self._local_tasks_lock:
+            for task in self._local_tasks.values():
+                if (
+                    task.get("status") == "claimed"
+                    and now - float(task.get("claimed_at") or now) > 45
+                ):
+                    task["status"] = "queued"
+                if task.get("status") != "queued":
+                    continue
+                task["status"] = "claimed"
+                task["claimed_at"] = now
+                claimed.append({
+                    "id": task["id"],
+                    "action": task["action"],
+                    "payload": task["payload"],
+                })
+                if len(claimed) >= max(1, min(int(limit), 20)):
+                    break
+        return claimed
+
+    def complete_local_task(self, task_id: str, result: dict) -> bool:
+        self._local_worker_last_seen = time.time()
+        with self._local_tasks_lock:
+            task = self._local_tasks.get(task_id)
+            if task is None:
+                return False
+            task["status"] = "completed"
+            task["result"] = result
+            task["done"].set()
+            return True
+
+    def local_worker_status(self) -> dict:
+        age = time.time() - self._local_worker_last_seen if self._local_worker_last_seen else None
+        return {
+            "connected": age is not None and age < 20,
+            "last_seen_seconds": round(age, 1) if age is not None else None,
+        }
+
 
 class VPSOrchestrator:
     def __init__(self):
@@ -269,6 +345,21 @@ class VPSOrchestrator:
         return str(os.getenv("JARVIS_RUN_VPS_BRAIN") or "").strip().lower() in {
             "1", "true", "yes", "on",
         }
+
+    @staticmethod
+    def worker_token() -> str:
+        explicit = str(os.getenv("JARVIS_WORKER_TOKEN") or "").strip()
+        if explicit:
+            return explicit
+        try:
+            config = json.loads((BASE_DIR / "config" / "api_keys.json").read_text(encoding="utf-8"))
+            explicit = str(config.get("local_worker_token") or "").strip()
+            if explicit:
+                return explicit
+            seed = str(config.get("gemini_api_key") or "").strip()
+        except Exception:
+            seed = ""
+        return hashlib.sha256(f"jarvis-local-worker-v1:{seed}".encode("utf-8")).hexdigest() if seed else ""
 
     def ensure_brain_started(self) -> bool:
         """Start one headless live session inside this one-worker Gunicorn process."""
@@ -439,6 +530,7 @@ class VPSOrchestrator:
                 "command_queue": self.runtime_bridge.command_queue.qsize(),
                 "audio_queue": self.runtime_bridge.audio_queue.qsize(),
             },
+            "local_worker": self.runtime_bridge.local_worker_status(),
             "connected": True,
         }
 
@@ -530,6 +622,11 @@ def create_app() -> Flask:
         if dashboard is None or not hasattr(dashboard, "_is_token_valid"):
             return ""
         return token if dashboard._is_token_valid(token) else ""
+
+    def _valid_worker_token() -> bool:
+        expected = orchestrator.worker_token()
+        supplied = str(request.headers.get("x-jarvis-worker-token") or "").strip()
+        return bool(expected and supplied and secrets.compare_digest(expected, supplied))
 
     if sock is not None:
         @sock.route("/ws")
@@ -925,6 +1022,55 @@ def create_app() -> Flask:
                 pass
 
         return jsonify({"ok": True, "accepted": True, "text": text})
+
+    @app.post("/api/camera/analyze")
+    def api_camera_analyze():
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None:
+            return jsonify({"error": "remote dashboard unavailable"}), 503
+
+        tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+        if not tok or not dashboard._is_token_valid(tok):
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json(silent=True) or {}
+        image_b64 = str(data.get("image_b64") or "").strip()
+        mime_type = str(data.get("mime_type") or "image/jpeg").strip().lower()
+        prompt = str(data.get("prompt") or "Analyze the iPhone camera image clearly.").strip()
+        if mime_type not in {"image/jpeg", "image/png", "image/webp"}:
+            return jsonify({"error": "unsupported image type"}), 400
+        try:
+            image_bytes = base64.b64decode(image_b64, validate=True)
+        except Exception:
+            return jsonify({"error": "invalid image data"}), 400
+        if not image_bytes or len(image_bytes) > 6 * 1024 * 1024:
+            return jsonify({"error": "image must be between 1 byte and 6 MB"}), 400
+
+        command = {
+            "text": prompt,
+            "image_b64": image_b64,
+            "mime_type": mime_type,
+            "source": "iphone_camera",
+        }
+        if not orchestrator.runtime_bridge.enqueue_command(command):
+            return jsonify({"error": "command queue full"}), 503
+        return jsonify({"ok": True, "accepted": True, "bytes": len(image_bytes)})
+
+    @app.get("/api/local-worker/tasks")
+    def local_worker_tasks():
+        if not _valid_worker_token():
+            return jsonify({"error": "Unauthorized"}), 401
+        limit = int(request.args.get("limit") or 5)
+        return jsonify({"ok": True, "tasks": orchestrator.runtime_bridge.claim_local_tasks(limit)})
+
+    @app.post("/api/local-worker/results/<task_id>")
+    def local_worker_result(task_id: str):
+        if not _valid_worker_token():
+            return jsonify({"error": "Unauthorized"}), 401
+        result = request.get_json(silent=True) or {}
+        if not orchestrator.runtime_bridge.complete_local_task(task_id, result):
+            return jsonify({"error": "task not found"}), 404
+        return jsonify({"ok": True})
 
     @app.post("/api/wake")
     def api_wake():

@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import os
 import sys
@@ -25,6 +26,42 @@ def test_vps_runtime_bridge_keeps_input_and_output_in_one_process():
     assert outbound.get_nowait() == ('bytes', b'\x02\x03')
     bridge.unregister_client(client_id)
     assert bridge.has_clients() is False
+
+
+def test_vps_runtime_bridge_returns_real_local_worker_result():
+    bridge = VPSRuntimeBridge()
+    result_box = {}
+
+    def request_action():
+        result_box['value'] = bridge.request_local_action('imessage_control', {'action': 'read'}, timeout=2)
+
+    requester = __import__('threading').Thread(target=request_action)
+    requester.start()
+    tasks = []
+    for _ in range(20):
+        tasks = bridge.claim_local_tasks()
+        if tasks:
+            break
+        __import__('time').sleep(0.01)
+    assert tasks[0]['action'] == 'imessage_control'
+    assert bridge.complete_local_task(tasks[0]['id'], {'status': 'completed', 'result': 'message list'})
+    requester.join(timeout=2)
+
+    assert result_box['value']['result'] == 'message list'
+
+
+def test_local_worker_endpoints_require_shared_token(monkeypatch):
+    monkeypatch.setenv('JARVIS_WORKER_TOKEN', 'worker-secret')
+    app = create_app()
+    client = app.test_client()
+
+    assert client.get('/api/local-worker/tasks').status_code == 401
+    authorized = client.get(
+        '/api/local-worker/tasks',
+        headers={'X-Jarvis-Worker-Token': 'worker-secret'},
+    )
+    assert authorized.status_code == 200
+    assert authorized.get_json()['tasks'] == []
 
 
 def test_vps_starts_one_embedded_brain_with_public_dashboard(monkeypatch):
@@ -205,6 +242,29 @@ def test_vps_public_dashboard_command_routes_accept_auth_and_queue_text():
     wake = client.post('/api/wake', headers={'Authorization': f'Bearer {token}'})
     assert wake.status_code == 200, wake.get_data(as_text=True)
     assert wake.get_json()['ok'] is True
+
+
+def test_vps_camera_analysis_queues_authenticated_image():
+    app = create_app()
+    client = app.test_client()
+    key = app.orchestrator.dashboard_server.new_key()
+    token = client.post('/login', json={'key': key}).get_json()['token']
+    image_b64 = base64.b64encode(b'jpeg-image').decode('ascii')
+
+    response = client.post(
+        '/api/camera/analyze',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'image_b64': image_b64,
+            'mime_type': 'image/jpeg',
+            'prompt': 'Analyze this iPhone camera frame.',
+        },
+    )
+
+    assert response.status_code == 200
+    command = app.orchestrator.runtime_bridge.get_command(0.01)
+    assert command['source'] == 'iphone_camera'
+    assert command['image_b64'] == image_b64
 
 
 def test_vps_phone_audio_websocket_forwards_pcm_to_dashboard_queue():

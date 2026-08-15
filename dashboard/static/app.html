@@ -862,10 +862,37 @@
 
     async function analyzeCameraNow() {
       if (!_camStream) await startPhoneCamera();
-      const cmd = 'Analyze what you can see in the camera right now and summarize it clearly.';
-      _sendCommandText(cmd, true);
-      camState.textContent = 'Analysis request sent. Jarvis is inspecting the camera now.';
-      toast('Camera analysis requested');
+      if (!_camStream || !camVideo.videoWidth || !camVideo.videoHeight) {
+        camState.textContent = 'Camera frame is not ready yet.';
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      const maxWidth = 1280;
+      const scale = Math.min(1, maxWidth / camVideo.videoWidth);
+      canvas.width = Math.max(1, Math.round(camVideo.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(camVideo.videoHeight * scale));
+      canvas.getContext('2d').drawImage(camVideo, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      const prompt = 'Analyze what you can see in the iPhone camera right now and summarize it clearly.';
+      append('user', prompt);
+      camState.textContent = 'Uploading camera frame for analysis…';
+      try {
+        const response = await _authFetch('/api/camera/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image_b64: dataUrl.split(',', 2)[1],
+            mime_type: 'image/jpeg',
+            prompt,
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || 'camera upload failed');
+        camState.textContent = 'Frame sent. Jarvis is analyzing the iPhone camera.';
+        toast('Camera frame sent');
+      } catch (error) {
+        camState.textContent = 'Camera analysis failed: ' + (error?.message || 'connection error');
+      }
     }
 
     // ── Toast ─────────────────────────────────────────────────────────────────
