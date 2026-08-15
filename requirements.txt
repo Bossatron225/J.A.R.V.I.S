@@ -38,5 +38,8 @@ qrcode[pil]
 pywizlight
 Flask
 flask-sock
+gevent
+gevent-websocket
+gunicorn
 
 twilio
