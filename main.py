@@ -83,63 +83,187 @@ from memory.document_ingestion import (
     search_document_index,
 )
 
-from actions.file_processor import file_processor
-from actions.flight_finder     import flight_finder
-from actions.open_app          import open_app
-from actions.weather_report    import weather_action
-from actions.send_message      import send_message
-from actions.reminder          import reminder
-from actions.google_calendar   import google_calendar
-from actions.computer_settings import computer_settings
-from actions.wiz_lights        import wiz_lights
-from actions.screen_processor  import _capture_camera, _capture_screen
-from actions.screen_processor  import _capture_targeted_visual
-from actions.youtube_video     import youtube_video
-from actions.desktop           import desktop_control
-from actions.browser_control   import browser_control
-from actions.file_controller   import (
-    file_controller,
-    enroll_biometric_profile,
-    get_authorized_profiles,
-    verify_biometric_security,
-)
-from actions.code_helper       import code_helper
-from actions.dev_agent         import dev_agent
-from actions.dev_agent         import REBOOT_MARKER
-from actions.web_search        import (
-    web_search as web_search_action,
-    manage_interest_profile,
-)
-from actions.workspace_agent   import workspace_agent
-from actions.computer_control  import computer_control
-from actions.game_updater      import game_updater
-from actions.system_monitor    import SystemMonitor, get_system_status
-from actions.proactive         import ProactiveEngine
-from actions.predictive_automation import PredictiveAutomationDaemon
-from actions.visual_monitor import VisualMonitorRegistry
-from actions.background_monitor import (
-    add_monitor, remove_monitor, list_monitors, check_all as monitor_check_all,
-)
-from actions.web_search        import _news as _fetch_news_sync
-from actions.imessage_integration import (
-    imessage_control,
-    poll_imessage_alerts,
-    get_imessage_monitor_interval,
-    imessage_monitor_start,
-    send_imessage,
-)
-from actions.mail_integration import (
-    mail_control,
-    poll_mail_alerts,
-    get_mail_monitor_interval,
-    mail_monitor_start,
-)
-from actions.find_my import find_my
-from actions.alexa_routines import alexa_routines, ifttt_webhooks
+_HEADLESS_ENV = str(os.getenv("JARVIS_HEADLESS") or "").strip().lower() in {"1", "true", "yes", "on"}
+_NO_DESKTOP = _platform.system() == "Linux" and not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY")
+_GUI_IMPORTS_ALLOWED = not (_HEADLESS_ENV or _NO_DESKTOP)
+
+try:
+    from actions.file_processor import file_processor
+except Exception:  # pragma: no cover - headless / missing optional deps
+    file_processor = None
+
+try:
+    from actions.flight_finder import flight_finder
+except Exception:  # pragma: no cover - headless / missing optional deps
+    flight_finder = None
+
+if _GUI_IMPORTS_ALLOWED:
+    from actions.open_app import open_app
+    from actions.weather_report import weather_action
+    from actions.send_message import send_message
+    from actions.reminder import reminder
+    from actions.google_calendar import google_calendar
+    from actions.computer_settings import computer_settings
+    from actions.wiz_lights import wiz_lights
+    from actions.screen_processor import _capture_camera, _capture_screen
+    from actions.screen_processor import _capture_targeted_visual
+    from actions.youtube_video import youtube_video
+    from actions.desktop import desktop_control
+    from actions.browser_control import browser_control
+    from actions.file_controller import (
+        file_controller,
+        enroll_biometric_profile,
+        get_authorized_profiles,
+        verify_biometric_security,
+    )
+    from actions.code_helper import code_helper
+    from actions.dev_agent import dev_agent
+    from actions.dev_agent import REBOOT_MARKER
+    from actions.web_search import (
+        web_search as web_search_action,
+        manage_interest_profile,
+    )
+    from actions.workspace_agent import workspace_agent
+    from actions.computer_control import computer_control
+    from actions.game_updater import game_updater
+    from actions.system_monitor import SystemMonitor, get_system_status
+    from actions.proactive import ProactiveEngine
+    from actions.predictive_automation import PredictiveAutomationDaemon
+    from actions.visual_monitor import VisualMonitorRegistry
+    from actions.background_monitor import (
+        add_monitor, remove_monitor, list_monitors, check_all as monitor_check_all,
+    )
+    from actions.web_search import _news as _fetch_news_sync
+    from actions.imessage_integration import (
+        imessage_control,
+        poll_imessage_alerts,
+        get_imessage_monitor_interval,
+        imessage_monitor_start,
+        send_imessage,
+    )
+    from actions.mail_integration import (
+        mail_control,
+        poll_mail_alerts,
+        get_mail_monitor_interval,
+        mail_monitor_start,
+    )
+    from actions.find_my import find_my
+    from actions.alexa_routines import alexa_routines, ifttt_webhooks
+else:
+    open_app = None
+    weather_action = None
+    send_message = None
+    reminder = None
+    google_calendar = None
+    computer_settings = None
+    wiz_lights = None
+    _capture_camera = None
+    _capture_screen = None
+    _capture_targeted_visual = None
+    youtube_video = None
+    desktop_control = None
+    browser_control = None
+    file_controller = None
+    enroll_biometric_profile = None
+    get_authorized_profiles = None
+    verify_biometric_security = None
+    code_helper = None
+    dev_agent = None
+    REBOOT_MARKER = None
+    web_search_action = None
+    manage_interest_profile = None
+    workspace_agent = None
+    computer_control = None
+    game_updater = None
+    SystemMonitor = None
+    get_system_status = None
+    ProactiveEngine = None
+    PredictiveAutomationDaemon = None
+    VisualMonitorRegistry = None
+    add_monitor = None
+    remove_monitor = None
+    list_monitors = None
+    monitor_check_all = None
+    _fetch_news_sync = None
+    imessage_control = None
+    poll_imessage_alerts = None
+    get_imessage_monitor_interval = None
+    imessage_monitor_start = None
+    send_imessage = None
+    mail_control = None
+    poll_mail_alerts = None
+    get_mail_monitor_interval = None
+    mail_monitor_start = None
+    find_my = None
+    alexa_routines = None
+    ifttt_webhooks = None
 from memory.config_manager     import get_brief_enabled
 from core.tts import create_tts_player, reset_audio_output
 from core.context_optimizer.context import ContextManager as _CtxMgr
 from core.context_optimizer.optimizer import ToolExecutionOptimizer as _ToolOptimizer
+
+
+class _HeadlessSystemMonitor:
+    def __init__(self, *args, **kwargs):
+        self.last = None
+
+    def check(self, *args, **kwargs):
+        return {"ok": True, "status": "headless"}
+
+
+class _HeadlessProactiveEngine:
+    def should_trigger(self, *args, **kwargs):
+        return False
+
+    def mark_triggered(self, *args, **kwargs):
+        return None
+
+    def build_prompt(self, *args, **kwargs):
+        return ""
+
+
+class _HeadlessPredictiveAutomationDaemon:
+    def __init__(self, *args, **kwargs):
+        self._empty = []
+
+    def record_text_command(self, *args, **kwargs):
+        return None
+
+    def record_tool_call(self, *args, **kwargs):
+        return None
+
+    def generate_suggestions(self, *args, **kwargs):
+        return []
+
+
+class _HeadlessVisualMonitorRegistry:
+    def __init__(self, *args, **kwargs):
+        self._targets = []
+
+    def add_target(self, *args, **kwargs):
+        return None
+
+    def list_targets(self, *args, **kwargs):
+        return []
+
+    def remove_target(self, *args, **kwargs):
+        return False
+
+    def clear(self, *args, **kwargs):
+        return None
+
+    def poll_once(self, *args, **kwargs):
+        return []
+
+
+if SystemMonitor is None:
+    SystemMonitor = _HeadlessSystemMonitor
+if ProactiveEngine is None:
+    ProactiveEngine = _HeadlessProactiveEngine
+if PredictiveAutomationDaemon is None:
+    PredictiveAutomationDaemon = _HeadlessPredictiveAutomationDaemon
+if VisualMonitorRegistry is None:
+    VisualMonitorRegistry = _HeadlessVisualMonitorRegistry
 
 
 def get_base_dir():
