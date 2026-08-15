@@ -1,0 +1,22 @@
+[Unit]
+Description=JARVIS VPS remote brain
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/Mark-L-main
+Environment=JARVIS_PUBLIC_URL=https://jarvis.jarvisyourdomain.com
+Environment=PUBLIC_ENTRY_URL=https://jarvis.jarvisyourdomain.com
+Environment=JARVIS_HEADLESS=1
+Environment=JARVIS_RUN_VPS_BRAIN=1
+Environment=JARVIS_ENABLE_TUNNEL=0
+Environment=PORT=8000
+ExecStart=/root/Mark-L-main/.venv/bin/gunicorn --chdir /root/Mark-L-main --bind 0.0.0.0:8000 --workers 1 --worker-class gevent vps_orchestrator:app
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
