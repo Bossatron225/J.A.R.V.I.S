@@ -902,7 +902,7 @@
       }
       const bytes = payload instanceof ArrayBuffer ? new Int16Array(payload) : new Int16Array(payload.buffer || payload);
       if (!bytes.length) return;
-      const buffer = _audioCtx.createBuffer(1, bytes.length, 16000);
+      const buffer = _audioCtx.createBuffer(1, bytes.length, 24000);
       const out = buffer.getChannelData(0);
       for (let i = 0; i < bytes.length; i++) {
         out[i] = bytes[i] / 32768;

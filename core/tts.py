@@ -455,11 +455,17 @@ class ElevenLabsTTSEngine:
         "JBFqnCBsd6RMkjVDRZzb",
     )
 
-    def __init__(self, api_key: str, voice_id: str = "pNInz6obpgDQGcFmaJgB"):
+    def __init__(
+        self,
+        api_key: str,
+        voice_id: str = "pNInz6obpgDQGcFmaJgB",
+        audio_sink: Optional[Callable[[bytes], None]] = None,
+    ):
         if not (api_key or "").strip():
             raise ValueError("Missing elevenlabs_api_key in config/api_keys.json")
         self.api_key  = api_key
         self.voice_id = (voice_id or "").strip() or "pNInz6obpgDQGcFmaJgB"
+        self.audio_sink = audio_sink
 
     def _voice_candidates(self) -> list[str]:
         seen: set[str] = set()
@@ -480,7 +486,7 @@ class ElevenLabsTTSEngine:
         payload = {
             "text":     text,
             "model_id": "eleven_multilingual_v2",
-            "output_format": "pcm_16000",
+            "output_format": "pcm_24000",
             "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
         }
 
@@ -495,7 +501,10 @@ class ElevenLabsTTSEngine:
                 )
                 resp.raise_for_status()
                 self.voice_id = voice_id
-                _play_audio_bytes(resp.content, sample_rate=16000)
+                if self.audio_sink is not None:
+                    self.audio_sink(resp.content)
+                else:
+                    _play_audio_bytes(resp.content, sample_rate=24000)
                 return
             except Exception as exc:
                 last_error = exc
@@ -557,7 +566,11 @@ class TTSPlayer:
 # Factory
 # ---------------------------------------------------------------------------
 
-def create_tts_player(config: dict) -> TTSPlayer:
+def create_tts_player(
+    config: dict,
+    *,
+    audio_sink: Optional[Callable[[bytes], None]] = None,
+) -> TTSPlayer:
     engine_name = config.get("tts_engine", "edgetts").lower()
     if engine_name == "kokoro":
         voice  = config.get("tts_voice", "af_heart")
@@ -566,7 +579,11 @@ def create_tts_player(config: dict) -> TTSPlayer:
     elif engine_name == "elevenlabs":
         api_key  = config.get("elevenlabs_api_key", "")
         voice_id = config.get("tts_voice", "pNInz6obpgDQGcFmaJgB")
-        engine   = ElevenLabsTTSEngine(api_key=api_key, voice_id=voice_id)
+        engine   = ElevenLabsTTSEngine(
+            api_key=api_key,
+            voice_id=voice_id,
+            audio_sink=audio_sink,
+        )
     else:   # edgetts (default)
         voice  = config.get("tts_voice", "en-US-GuyNeural")
         engine = EdgeTTSEngine(voice=voice)

@@ -101,6 +101,37 @@ def test_elevenlabs_falls_back_to_default_voice(monkeypatch):
     assert captured["payload"] == b"audio"
 
 
+def test_elevenlabs_streams_remote_pcm_at_24khz(monkeypatch):
+    class FakeResponse:
+        content = b"remote-pcm"
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+    captured_request = {}
+
+    class FakeRequestsModule:
+        @staticmethod
+        def post(url, json, headers, timeout):
+            captured_request["payload"] = json
+            return FakeResponse()
+
+    remote_audio = []
+    monkeypatch.setitem(sys.modules, "requests", FakeRequestsModule())
+    monkeypatch.setattr(tts, "_play_audio_bytes", lambda *_args, **_kwargs: pytest.fail("local playback used"))
+
+    engine = tts.ElevenLabsTTSEngine(
+        api_key="abc",
+        voice_id="voice-id",
+        audio_sink=remote_audio.append,
+    )
+    engine.speak("hello")
+
+    assert captured_request["payload"]["output_format"] == "pcm_24000"
+    assert remote_audio == [b"remote-pcm"]
+
+
 def test_play_audio_bytes_handles_raw_pcm_bytes(monkeypatch):
     pcm_bytes = struct.pack("<4h", 0, 16384, -16384, 0)
     captured = {}

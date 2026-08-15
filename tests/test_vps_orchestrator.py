@@ -118,6 +118,7 @@ def test_public_dashboard_websocket_accepts_assistant_audio_frames():
     assert '_playRemoteAudioChunk(e.data);' in html
     assert 'if (!_audioCtx || !(_audioCtx instanceof Ctx)) {' in html
     assert 'instanceof webkitAudioContext' not in html
+    assert 'createBuffer(1, bytes.length, 24000)' in html
 
 
 def test_vps_serves_dashboard_static_assets():
