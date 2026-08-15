@@ -575,9 +575,16 @@ def create_app() -> Flask:
                 return
             client_id, outbound = orchestrator.runtime_bridge.register_client()
             stopped, sender = _start_outbound_sender(ws, outbound)
+            brain_state = orchestrator._brain_state
+            if brain_state == "error":
+                session_text = "VPS brain failed to start. Check /api/ops for its error."
+            elif brain_state == "starting":
+                session_text = "VPS brain is starting. Your first command will wait for it."
+            else:
+                session_text = "Remote session active."
             orchestrator.runtime_bridge.publish_to_client(
                 client_id,
-                {"type": "sys", "text": "Remote session active."},
+                {"type": "sys", "text": session_text},
             )
             try:
                 while True:
