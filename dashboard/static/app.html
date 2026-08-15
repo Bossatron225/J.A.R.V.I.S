@@ -882,7 +882,7 @@
       canvas.height = Math.max(1, Math.round(camVideo.videoHeight * scale));
       canvas.getContext('2d').drawImage(camVideo, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-      const prompt = 'Analyze what you can see in the iPhone camera right now and summarize it clearly.';
+      const prompt = 'Analyze what you can see through this logged-in device camera right now and summarize it clearly.';
       append('user', prompt);
       camState.textContent = 'Uploading camera frame for analysis…';
       try {
@@ -897,7 +897,7 @@
         });
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || 'camera upload failed');
-        camState.textContent = 'Frame sent. Jarvis is analyzing the iPhone camera.';
+        camState.textContent = 'Frame sent. Jarvis is analyzing this device camera.';
         toast('Camera frame sent');
       } catch (error) {
         camState.textContent = 'Camera analysis failed: ' + (error?.message || 'connection error');

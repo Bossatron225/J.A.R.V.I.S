@@ -275,8 +275,14 @@ def test_vps_camera_analysis_queues_authenticated_image():
 
     assert response.status_code == 200
     command = app.orchestrator.runtime_bridge.get_command(0.01)
-    assert command['source'] == 'iphone_camera'
+    assert command['source'] == 'device_camera'
     assert command['image_b64'] == image_b64
+
+
+def test_dashboard_camera_copy_is_device_agnostic():
+    html = (Path(__file__).resolve().parents[1] / 'dashboard' / 'static' / 'app.html').read_text(encoding='utf-8')
+    assert 'logged-in device camera' in html
+    assert 'iPhone camera' not in html
 
 
 def test_vps_phone_audio_websocket_forwards_pcm_to_dashboard_queue():
