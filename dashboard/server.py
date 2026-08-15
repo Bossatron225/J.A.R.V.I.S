@@ -417,6 +417,9 @@ class DashboardServer:
         self._command_queue               = asyncio.Queue()
         self._wake_callback               = None
         self._connect_callback            = None
+        self._event_sink                  = None
+        self._audio_sink                  = None
+        self._audio_available              = None
         self._pending_keys: dict[str, float] = {}
         self._device_sessions: dict[str, dict] = {}  # device_token → {session_key}
         self._phone_audio_queue: asyncio.Queue    = asyncio.Queue(maxsize=PHONE_AUDIO_QUEUE_MAX)
@@ -723,12 +726,33 @@ class DashboardServer:
     def set_connect_callback(self, fn) -> None:
         self._connect_callback = fn
 
+    def set_remote_output_sinks(self, *, event_sink=None, audio_sink=None, audio_available=None) -> None:
+        """Forward live output when this dashboard is embedded in the VPS worker."""
+        self._event_sink = event_sink
+        self._audio_sink = audio_sink
+        self._audio_available = audio_available
+
+    def has_remote_audio_sink(self) -> bool:
+        if not callable(self._audio_sink):
+            return False
+        if not callable(self._audio_available):
+            return True
+        try:
+            return bool(self._audio_available())
+        except Exception:
+            return False
+
     # ── broadcast ────────────────────────────────────────────────────────
 
     async def broadcast(self, msg: dict) -> None:
         self._history.append(msg)
         if len(self._history) > 300:
             self._history = self._history[-300:]
+        if callable(self._event_sink):
+            try:
+                self._event_sink(msg)
+            except Exception:
+                pass
         dead: set[WebSocket] = set()
         for ws in list(self._clients):
             try:
@@ -740,6 +764,11 @@ class DashboardServer:
     async def send_audio_to_clients(self, payload: bytes) -> None:
         if not payload:
             return
+        if callable(self._audio_sink):
+            try:
+                self._audio_sink(payload)
+            except Exception:
+                pass
         dead: set[WebSocket] = set()
         for ws in list(self._audio_clients):
             try:

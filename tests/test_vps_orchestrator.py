@@ -2,7 +2,25 @@ import json
 import os
 from pathlib import Path
 
-from vps_orchestrator import create_app
+from vps_orchestrator import VPSRuntimeBridge, create_app
+
+
+def test_vps_runtime_bridge_keeps_input_and_output_in_one_process():
+    bridge = VPSRuntimeBridge(command_limit=1, audio_limit=1, client_limit=2)
+    client_id, outbound = bridge.register_client()
+
+    assert bridge.enqueue_command('hello from browser') is True
+    assert bridge.get_command(0.01) == 'hello from browser'
+    assert bridge.enqueue_audio({'data': b'\x00\x01', 'mime_type': 'audio/pcm'}) is True
+    assert bridge.get_audio(0.01)['data'] == b'\x00\x01'
+
+    bridge.publish_event({'type': 'log', 'speaker': 'jarvis', 'text': 'Online.'})
+    bridge.publish_audio(b'\x02\x03')
+
+    assert outbound.get_nowait() == ('json', {'type': 'log', 'speaker': 'jarvis', 'text': 'Online.'})
+    assert outbound.get_nowait() == ('bytes', b'\x02\x03')
+    bridge.unregister_client(client_id)
+    assert bridge.has_clients() is False
 
 
 def test_login_success_keeps_session_tokens_for_dashboard_redirect():
