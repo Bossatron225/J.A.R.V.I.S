@@ -61,6 +61,17 @@ def test_headless_optional_message_monitors_exit_without_callbacks(monkeypatch) 
     asyncio.run(jarvis._run_mail_monitor())
 
 
+def test_unavailable_headless_tool_returns_capability_message(monkeypatch) -> None:
+    jarvis = JarvisLive(DummyUI(), remote_bridge=object())
+    monkeypatch.setattr(main_module, 'open_app', None)
+
+    call = type('Call', (), {'id': 'call-1', 'name': 'open_app', 'args': {'app_name': 'Safari'}})()
+    response = asyncio.run(jarvis._execute_tool(call))
+
+    assert response.response['unavailable'] is True
+    assert 'headless VPS' in response.response['result']
+
+
 def test_billing_error_is_not_treated_as_disconnect() -> None:
     jarvis = JarvisLive(DummyUI())
 

@@ -44,6 +44,7 @@ if _platform.system() == "Windows":
 # ─────────────────────────────────────────────────────────────────────────────
 
 import asyncio
+import importlib
 import json
 import os
 import queue as thread_queue
@@ -199,6 +200,40 @@ else:
     find_my = None
     alexa_routines = None
     ifttt_webhooks = None
+
+    # Headless Linux still supports cloud/network and code capabilities. Import
+    # these independently so one optional integration cannot disable all others.
+    _HEADLESS_SAFE_ACTIONS = {
+        "weather_action": ("actions.weather_report", "weather_action"),
+        "google_calendar": ("actions.google_calendar", "google_calendar"),
+        "wiz_lights": ("actions.wiz_lights", "wiz_lights"),
+        "code_helper": ("actions.code_helper", "code_helper"),
+        "dev_agent": ("actions.dev_agent", "dev_agent"),
+        "REBOOT_MARKER": ("actions.dev_agent", "REBOOT_MARKER"),
+        "web_search_action": ("actions.web_search", "web_search"),
+        "manage_interest_profile": ("actions.web_search", "manage_interest_profile"),
+        "_fetch_news_sync": ("actions.web_search", "_news"),
+        "workspace_agent": ("actions.workspace_agent", "workspace_agent"),
+        "SystemMonitor": ("actions.system_monitor", "SystemMonitor"),
+        "get_system_status": ("actions.system_monitor", "get_system_status"),
+        "ProactiveEngine": ("actions.proactive", "ProactiveEngine"),
+        "PredictiveAutomationDaemon": ("actions.predictive_automation", "PredictiveAutomationDaemon"),
+        "add_monitor": ("actions.background_monitor", "add_monitor"),
+        "remove_monitor": ("actions.background_monitor", "remove_monitor"),
+        "list_monitors": ("actions.background_monitor", "list_monitors"),
+        "monitor_check_all": ("actions.background_monitor", "check_all"),
+        "alexa_routines": ("actions.alexa_routines", "alexa_routines"),
+        "ifttt_webhooks": ("actions.alexa_routines", "ifttt_webhooks"),
+    }
+    for _target_name, (_module_name, _attribute_name) in _HEADLESS_SAFE_ACTIONS.items():
+        try:
+            _module = importlib.import_module(_module_name)
+            globals()[_target_name] = getattr(_module, _attribute_name)
+        except Exception as _headless_import_error:
+            print(
+                f"[Headless] Optional capability {_target_name} unavailable: "
+                f"{_headless_import_error}"
+            )
 from memory.config_manager     import get_brief_enabled
 from core.tts import create_tts_player, reset_audio_output
 from core.context_optimizer.context import ContextManager as _CtxMgr
@@ -2831,6 +2866,65 @@ class JarvisLive:
         name = fc.name
         args = dict(fc.args or {})
         self._predictive_daemon.record_tool_call(name, args)
+
+        unavailable_handlers = {
+            "open_app": open_app,
+            "weather_report": weather_action,
+            "browser_control": browser_control,
+            "file_controller": file_controller,
+            "send_message": send_message,
+            "imessage_control": imessage_control,
+            "mail_control": mail_control,
+            "find_my": find_my,
+            "ifttt_webhooks": ifttt_webhooks,
+            "alexa_routines": alexa_routines,
+            "reminder": reminder,
+            "google_calendar": google_calendar,
+            "youtube_video": youtube_video,
+            "computer_settings": computer_settings,
+            "wiz_lights": wiz_lights,
+            "desktop_control": desktop_control,
+            "code_helper": code_helper,
+            "dev_agent": dev_agent,
+            "workspace_agent": workspace_agent,
+            "web_search": web_search_action,
+            "manage_interest_profile": manage_interest_profile,
+            "file_processor": file_processor,
+            "computer_control": computer_control,
+            "game_updater": game_updater,
+            "flight_finder": flight_finder,
+            "system_status": get_system_status,
+        }
+        if name in unavailable_handlers and not callable(unavailable_handlers[name]):
+            result = (
+                f"{name} is unavailable on the headless VPS. "
+                "This capability requires the Mac local worker or an installed server integration."
+            )
+            self.ui.write_log(f"SYS: {result}")
+            return types.FunctionResponse(
+                id=fc.id,
+                name=name,
+                response={"result": result, "unavailable": True},
+            )
+
+        if name == "screen_process" and not any(
+            callable(handler)
+            for handler in (_capture_camera, _capture_screen, _capture_targeted_visual)
+        ):
+            result = "screen_process is unavailable on the headless VPS; wake the Mac local worker for visual capture."
+            return types.FunctionResponse(
+                id=fc.id,
+                name=name,
+                response={"result": result, "unavailable": True},
+            )
+
+        if name == "security_biometrics" and not callable(verify_biometric_security):
+            result = "security_biometrics is unavailable on the headless VPS; biometric operations require the Mac."
+            return types.FunctionResponse(
+                id=fc.id,
+                name=name,
+                response={"result": result, "unavailable": True},
+            )
 
         if self._shutdown_in_progress or self._reboot_in_progress:
             return types.FunctionResponse(
