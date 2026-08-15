@@ -16,13 +16,6 @@ try:
 except Exception:  # pragma: no cover
     Sock = None
 
-try:
-    from gevent import sleep as _gevent_sleep
-    from gevent import spawn as _gevent_spawn
-except Exception:  # pragma: no cover
-    _gevent_sleep = None
-    _gevent_spawn = None
-
 def _build_root_page() -> str:
     public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.jarvisyourdomain.com"
     return f"""
@@ -522,30 +515,6 @@ def create_app() -> Flask:
     def ensure_vps_brain():
         orchestrator.ensure_brain_started()
 
-    def _start_outbound_sender(ws, outbound):
-        stopped = threading.Event()
-
-        def sender() -> None:
-            while not stopped.is_set():
-                try:
-                    kind, payload = outbound.get_nowait()
-                except thread_queue.Empty:
-                    if _gevent_sleep is not None:
-                        _gevent_sleep(0.02)
-                    else:
-                        time.sleep(0.02)
-                    continue
-                try:
-                    ws.send(json.dumps(payload) if kind == "json" else payload)
-                except Exception:
-                    break
-
-        if _gevent_spawn is not None:
-            return stopped, _gevent_spawn(sender)
-        thread = threading.Thread(target=sender, name="jarvis-public-ws-sender", daemon=True)
-        thread.start()
-        return stopped, thread
-
     if sock is None:
         @app.route("/ws")
         def ws_fallback():
@@ -574,7 +543,6 @@ def create_app() -> Flask:
                     pass
                 return
             client_id, outbound = orchestrator.runtime_bridge.register_client()
-            stopped, sender = _start_outbound_sender(ws, outbound)
             brain_state = orchestrator._brain_state
             if brain_state == "error":
                 session_text = "VPS brain failed to start. Check /api/ops for its error."
@@ -589,11 +557,29 @@ def create_app() -> Flask:
             try:
                 while True:
                     try:
-                        payload = ws.receive()
-                    except Exception:
+                        kind, outbound_payload = outbound.get_nowait()
+                    except thread_queue.Empty:
+                        pass
+                    else:
+                        try:
+                            ws.send(
+                                json.dumps(outbound_payload)
+                                if kind == "json"
+                                else outbound_payload
+                            )
+                        except Exception as exc:
+                            print(f"[Public WS] Send ended: {type(exc).__name__}: {exc}")
+                            break
+
+                    try:
+                        payload = ws.receive(timeout=0.05)
+                    except Exception as exc:
+                        print(f"[Public WS] Receive ended: {type(exc).__name__}: {exc}")
                         break
                     if payload is None:
-                        break
+                        if not getattr(ws, "connected", True):
+                            break
+                        continue
                     try:
                         data = json.loads(payload)
                     except Exception:
@@ -608,13 +594,7 @@ def create_app() -> Flask:
                     if response is not None:
                         orchestrator.runtime_bridge.publish_to_client(client_id, response)
             finally:
-                stopped.set()
                 orchestrator.runtime_bridge.unregister_client(client_id)
-                if hasattr(sender, "kill"):
-                    try:
-                        sender.kill()
-                    except Exception:
-                        pass
 
         @sock.route("/ws/phone-audio")
         def phone_audio_route(ws):
