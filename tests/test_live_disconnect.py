@@ -50,6 +50,17 @@ def test_embedded_vps_brain_waits_longer_for_first_live_session() -> None:
     assert embedded._dashboard_session_wait_steps() == 300
 
 
+def test_headless_optional_message_monitors_exit_without_callbacks(monkeypatch) -> None:
+    jarvis = JarvisLive(DummyUI(), remote_bridge=object())
+    monkeypatch.setattr(main_module, 'poll_imessage_alerts', None)
+    monkeypatch.setattr(main_module, 'get_imessage_monitor_interval', None)
+    monkeypatch.setattr(main_module, 'poll_mail_alerts', None)
+    monkeypatch.setattr(main_module, 'get_mail_monitor_interval', None)
+
+    asyncio.run(jarvis._run_imessage_monitor())
+    asyncio.run(jarvis._run_mail_monitor())
+
+
 def test_billing_error_is_not_treated_as_disconnect() -> None:
     jarvis = JarvisLive(DummyUI())
 
