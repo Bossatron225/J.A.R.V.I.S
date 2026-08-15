@@ -839,6 +839,7 @@ TOOL_DECLARATIONS = [
         "description": (
             "Captures a full screen, a specific window/app, a specific browser tab, or a webcam image and lets you analyze it. "
             "Use this when the user asks what is on screen, what you see, look at camera, inspect a browser tab, inspect a window, or analyze a specific app. "
+            "In a remote VPS session, target_type=camera requests a frame from the currently logged-in webpage device camera; it does not require the Mac. "
             "You have NO visual ability without this tool. "
             "When using camera: the live view stays open until user says close it or calls close_camera."
         ),
@@ -2902,12 +2903,29 @@ class JarvisLive:
         request_local_action = getattr(self._remote_bridge, "request_local_action", None)
         if callable(request_local_action) and name in mac_delegated_tools:
             result = await asyncio.to_thread(
-            request_local_action,
+                request_local_action,
                 name,
                 args,
                 45.0,
             )
             return types.FunctionResponse(id=fc.id, name=name, response={"result": result})
+
+        if name == "screen_process" and self._remote_bridge is not None:
+            target_type = str(args.get("target_type") or args.get("angle") or "screen").strip().lower()
+            if target_type in {"camera", "webcam", "device_camera"}:
+                prompt = str(args.get("text") or "Analyze the logged-in device camera clearly.").strip()
+                self._remote_bridge.publish_event({
+                    "type": "camera_capture_request",
+                    "prompt": prompt,
+                })
+                return types.FunctionResponse(
+                    id=fc.id,
+                    name=name,
+                    response={
+                        "result": "Requested a fresh frame from the logged-in device camera. Analysis will follow when the frame arrives.",
+                        "pending": True,
+                    },
+                )
 
         unavailable_handlers = {
             "open_app": open_app,

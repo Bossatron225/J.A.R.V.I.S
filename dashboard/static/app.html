@@ -550,6 +550,7 @@
         if (m.type === 'diagnostics')   _renderDiagnostics(m.payload || {});
         if (m.type === 'predictive_suggestion') _renderPredictive(m.payload || {});
         if (m.type === 'visual_watch')   _renderVisualWatch(m.state || 'steady', m.payload || {});
+        if (m.type === 'camera_capture_request') analyzeCameraNow(m.prompt || '', false);
       };
     }
     _openWs();
@@ -869,7 +870,7 @@
       camState.textContent = 'Camera is off. Start the feed when you want to inspect the scene.';
     }
 
-    async function analyzeCameraNow() {
+    async function analyzeCameraNow(requestPrompt = '', echoUser = true) {
       if (!_camStream) await startPhoneCamera();
       if (!_camStream || !camVideo.videoWidth || !camVideo.videoHeight) {
         camState.textContent = 'Camera frame is not ready yet.';
@@ -882,8 +883,8 @@
       canvas.height = Math.max(1, Math.round(camVideo.videoHeight * scale));
       canvas.getContext('2d').drawImage(camVideo, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-      const prompt = 'Analyze what you can see through this logged-in device camera right now and summarize it clearly.';
-      append('user', prompt);
+      const prompt = (requestPrompt || 'Analyze what you can see through this logged-in device camera right now and summarize it clearly.').trim();
+      if (echoUser) append('user', prompt);
       camState.textContent = 'Uploading camera frame for analysis…';
       try {
         const response = await _authFetch('/api/camera/analyze', {
