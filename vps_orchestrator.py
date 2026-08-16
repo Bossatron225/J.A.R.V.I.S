@@ -206,7 +206,10 @@ class VPSRuntimeBridge:
         client_id = uuid.uuid4().hex
         outbound: thread_queue.Queue[tuple[str, object]] = thread_queue.Queue(maxsize=self._client_limit)
         with self._clients_lock:
-            self._clients[client_id] = outbound
+            self._clients[client_id] = {
+                "outbound": outbound,
+                "registered_at": time.time(),
+            }
         return client_id, outbound
 
     def unregister_client(self, client_id: str) -> None:
@@ -219,12 +222,27 @@ class VPSRuntimeBridge:
 
     def publish_to_client(self, client_id: str, message: dict) -> bool:
         with self._clients_lock:
-            outbound = self._clients.get(client_id)
+            client = self._clients.get(client_id)
+            outbound = client.get("outbound") if isinstance(client, dict) else client
         return bool(outbound) and self._offer(outbound, ("json", message))
+
+    def publish_to_latest_client(self, message: dict) -> str | None:
+        with self._clients_lock:
+            if not self._clients:
+                return None
+            client_id, client = max(
+                self._clients.items(),
+                key=lambda item: float(item[1].get("registered_at") or 0.0),
+            )
+            outbound = client["outbound"]
+        return client_id if self._offer(outbound, ("json", message)) else None
 
     def _publish(self, kind: str, payload: object) -> None:
         with self._clients_lock:
-            clients = list(self._clients.values())
+            clients = [
+                client.get("outbound") if isinstance(client, dict) else client
+                for client in self._clients.values()
+            ]
         for outbound in clients:
             self._offer(outbound, (kind, payload))
 
@@ -1051,6 +1069,7 @@ def create_app() -> Flask:
             "image_b64": image_b64,
             "mime_type": mime_type,
             "source": "device_camera",
+            "request_id": str(data.get("request_id") or "").strip(),
         }
         if not orchestrator.runtime_bridge.enqueue_command(command):
             return jsonify({"error": "command queue full"}), 503
