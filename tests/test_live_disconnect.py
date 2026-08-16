@@ -112,8 +112,9 @@ def test_remote_camera_tool_requests_logged_in_device_frame() -> None:
     events = []
 
     class FakeBridge:
-        def publish_event(self, event):
+        def publish_to_latest_client(self, event):
             events.append(event)
+            return 'client-1'
 
     jarvis = JarvisLive(DummyUI(), remote_bridge=FakeBridge())
     call = type('Call', (), {
@@ -125,7 +126,11 @@ def test_remote_camera_tool_requests_logged_in_device_frame() -> None:
     response = asyncio.run(jarvis._execute_tool(call))
 
     assert response.response['pending'] is True
-    assert events == [{'type': 'camera_capture_request', 'prompt': 'Read the label in view.'}]
+    assert events == [{
+        'type': 'camera_capture_request',
+        'prompt': 'Read the label in view.',
+        'request_id': 'camera-call-camera',
+    }]
 
 
 def test_billing_error_is_not_treated_as_disconnect() -> None:

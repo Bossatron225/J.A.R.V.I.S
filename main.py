@@ -2914,10 +2914,21 @@ class JarvisLive:
             target_type = str(args.get("target_type") or args.get("angle") or "screen").strip().lower()
             if target_type in {"camera", "webcam", "device_camera"}:
                 prompt = str(args.get("text") or "Analyze the logged-in device camera clearly.").strip()
-                self._remote_bridge.publish_event({
+                request_id = f"camera-{fc.id}"
+                client_id = self._remote_bridge.publish_to_latest_client({
                     "type": "camera_capture_request",
                     "prompt": prompt,
+                    "request_id": request_id,
                 })
+                if client_id is None:
+                    return types.FunctionResponse(
+                        id=fc.id,
+                        name=name,
+                        response={
+                            "result": "No logged-in webpage is connected to provide a camera frame.",
+                            "unavailable": True,
+                        },
+                    )
                 return types.FunctionResponse(
                     id=fc.id,
                     name=name,

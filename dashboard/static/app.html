@@ -484,6 +484,8 @@
     const camVideo = document.getElementById('cam-preview');
     const camState = document.getElementById('cam-status');
     let _camStream = null;
+    let _cameraAnalysisInFlight = false;
+    const _handledCameraRequests = new Set();
     let ws = null;
     let _wsReconnectTimer = null;
     let _wsPingTimer = null;
@@ -550,7 +552,13 @@
         if (m.type === 'diagnostics')   _renderDiagnostics(m.payload || {});
         if (m.type === 'predictive_suggestion') _renderPredictive(m.payload || {});
         if (m.type === 'visual_watch')   _renderVisualWatch(m.state || 'steady', m.payload || {});
-        if (m.type === 'camera_capture_request') analyzeCameraNow(m.prompt || '', false);
+        if (m.type === 'camera_capture_request') {
+          const requestId = m.request_id || '';
+          if (!requestId || !_handledCameraRequests.has(requestId)) {
+            if (requestId) _handledCameraRequests.add(requestId);
+            analyzeCameraNow(m.prompt || '', false, requestId);
+          }
+        }
       };
     }
     _openWs();
@@ -870,23 +878,25 @@
       camState.textContent = 'Camera is off. Start the feed when you want to inspect the scene.';
     }
 
-    async function analyzeCameraNow(requestPrompt = '', echoUser = true) {
-      if (!_camStream) await startPhoneCamera();
-      if (!_camStream || !camVideo.videoWidth || !camVideo.videoHeight) {
-        camState.textContent = 'Camera frame is not ready yet.';
-        return;
-      }
-      const canvas = document.createElement('canvas');
-      const maxWidth = 1280;
-      const scale = Math.min(1, maxWidth / camVideo.videoWidth);
-      canvas.width = Math.max(1, Math.round(camVideo.videoWidth * scale));
-      canvas.height = Math.max(1, Math.round(camVideo.videoHeight * scale));
-      canvas.getContext('2d').drawImage(camVideo, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-      const prompt = (requestPrompt || 'Analyze what you can see through this logged-in device camera right now and summarize it clearly.').trim();
-      if (echoUser) append('user', prompt);
-      camState.textContent = 'Uploading camera frame for analysis…';
+    async function analyzeCameraNow(requestPrompt = '', echoUser = true, requestId = '') {
+      if (_cameraAnalysisInFlight) return;
+      _cameraAnalysisInFlight = true;
       try {
+        if (!_camStream) await startPhoneCamera();
+        if (!_camStream || !camVideo.videoWidth || !camVideo.videoHeight) {
+          camState.textContent = 'Camera frame is not ready yet.';
+          return;
+        }
+        const canvas = document.createElement('canvas');
+        const maxWidth = 1280;
+        const scale = Math.min(1, maxWidth / camVideo.videoWidth);
+        canvas.width = Math.max(1, Math.round(camVideo.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(camVideo.videoHeight * scale));
+        canvas.getContext('2d').drawImage(camVideo, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        const prompt = (requestPrompt || 'Analyze what you can see through this logged-in device camera right now and summarize it clearly.').trim();
+        if (echoUser) append('user', prompt);
+        camState.textContent = 'Uploading camera frame for analysis…';
         const response = await _authFetch('/api/camera/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -894,6 +904,7 @@
             image_b64: dataUrl.split(',', 2)[1],
             mime_type: 'image/jpeg',
             prompt,
+            request_id: requestId,
           }),
         });
         const result = await response.json();
@@ -902,6 +913,8 @@
         toast('Camera frame sent');
       } catch (error) {
         camState.textContent = 'Camera analysis failed: ' + (error?.message || 'connection error');
+      } finally {
+        _cameraAnalysisInFlight = false;
       }
     }
 

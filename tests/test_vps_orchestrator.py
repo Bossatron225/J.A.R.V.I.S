@@ -28,6 +28,20 @@ def test_vps_runtime_bridge_keeps_input_and_output_in_one_process():
     assert bridge.has_clients() is False
 
 
+def test_camera_request_targets_only_latest_dashboard_client():
+    bridge = VPSRuntimeBridge()
+    first_id, first = bridge.register_client()
+    second_id, second = bridge.register_client()
+
+    selected = bridge.publish_to_latest_client({'type': 'camera_capture_request', 'request_id': 'one-frame'})
+
+    assert selected == second_id
+    assert first.empty()
+    assert second.get_nowait() == ('json', {'type': 'camera_capture_request', 'request_id': 'one-frame'})
+    bridge.unregister_client(first_id)
+    bridge.unregister_client(second_id)
+
+
 def test_vps_runtime_bridge_returns_real_local_worker_result():
     bridge = VPSRuntimeBridge()
     result_box = {}
@@ -284,7 +298,9 @@ def test_dashboard_camera_copy_is_device_agnostic():
     assert 'logged-in device camera' in html
     assert 'iPhone camera' not in html
     assert "m.type === 'camera_capture_request'" in html
-    assert "analyzeCameraNow(m.prompt || '', false)" in html
+    assert "analyzeCameraNow(m.prompt || '', false, requestId)" in html
+    assert '_handledCameraRequests.has(requestId)' in html
+    assert 'if (_cameraAnalysisInFlight) return;' in html
 
 
 def test_vps_phone_audio_websocket_forwards_pcm_to_dashboard_queue():
