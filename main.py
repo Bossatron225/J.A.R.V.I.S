@@ -322,6 +322,8 @@ API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
 PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
 LIVE_MODELS = (
     "models/gemini-2.5-flash-native-audio-preview-12-2025",
+    "models/gemini-live-2.5-flash-preview",
+    "models/gemini-2.5-flash-live",
 )
 SESSION_SUMMARY_MODELS = (
     "models/gemini-flash-lite-latest",
