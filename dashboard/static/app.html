@@ -501,6 +501,7 @@
       ws.onopen = () => {
         sys('Remote session active.');
         toast('Connected to JARVIS');
+        try { ws.send(JSON.stringify({ type: 'status_request' })); } catch (_) {}
         if (_wsReconnectTimer) {
           clearTimeout(_wsReconnectTimer);
           _wsReconnectTimer = null;
