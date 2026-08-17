@@ -125,11 +125,15 @@ class _HeadlessVisualMonitorRegistry:
     def poll_once(self, *args, **kwargs):
         return []
 
+def get_system_status_headless():
+    return {"status": "headless"}
+
 # Initialize with headless versions
 SystemMonitor = _HeadlessSystemMonitor
 ProactiveEngine = _HeadlessProactiveEngine
 PredictiveAutomationDaemon = _HeadlessPredictiveAutomationDaemon
 VisualMonitorRegistry = _HeadlessVisualMonitorRegistry
+get_system_status = get_system_status_headless
 
 _HEADLESS_ENV = str(os.getenv("JARVIS_HEADLESS") or "").strip().lower() in {"1", "true", "yes", "on"}
 _NO_DESKTOP = _platform.system() == "Linux" and not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY")
@@ -321,62 +325,6 @@ from memory.config_manager     import get_brief_enabled
 from core.tts import create_tts_player, reset_audio_output
 from core.context_optimizer.context import ContextManager as _CtxMgr
 from core.context_optimizer.optimizer import ToolExecutionOptimizer as _ToolOptimizer
-
-
-class _HeadlessSystemMonitor:
-    def __init__(self, *args, **kwargs):
-        self.last = None
-
-    def check(self, *args, **kwargs):
-        return {"ok": True, "status": "headless"}
-
-
-class _HeadlessProactiveEngine:
-    def should_trigger(self, *args, **kwargs):
-        return False
-
-    def mark_triggered(self, *args, **kwargs):
-        return None
-
-    def build_prompt(self, *args, **kwargs):
-        return ""
-
-
-class _HeadlessPredictiveAutomationDaemon:
-    def __init__(self, *args, **kwargs):
-        self._empty = []
-
-    def record_text_command(self, *args, **kwargs):
-        return None
-
-    def record_tool_call(self, *args, **kwargs):
-        return None
-
-    def generate_suggestions(self, *args, **kwargs):
-        return []
-
-
-class _HeadlessVisualMonitorRegistry:
-    def __init__(self, *args, **kwargs):
-        self._targets = []
-
-    def add_target(self, *args, **kwargs):
-        return None
-
-    def list_targets(self, *args, **kwargs):
-        return []
-
-    def remove_target(self, *args, **kwargs):
-        return False
-
-    def clear(self, *args, **kwargs):
-        return None
-
-    def poll_once(self, *args, **kwargs):
-        return []
-
-
-
 
 
 def get_base_dir():
@@ -4580,6 +4528,21 @@ class JarvisLive:
     def _dashboard_session_wait_steps(self) -> int:
         return 300 if self._remote_bridge is not None else 80
 
+    def _on_dashboard_wake(self) -> None:
+        self._conn_backoff = 3
+        if hasattr(self, "_wake_event") and self._wake_event:
+            self._wake_event.set()
+        if self._dashboard:
+            try:
+                loop = getattr(self, "_loop", None)
+                if loop and loop.is_running():
+                    asyncio.run_coroutine_threadsafe(
+                        self._dashboard.broadcast({"type": "status", "state": "active"}),
+                        loop,
+                    )
+            except Exception:
+                pass
+
     async def _process_dashboard_commands(self) -> None:
         while True:
             try:
@@ -4591,9 +4554,23 @@ class JarvisLive:
                     )
                 if not text:
                     continue
-                # The embedded VPS brain can need a little longer to establish
-                # its first Gemini session than a warmed-up local runtime.
-                for _ in range(self._dashboard_session_wait_steps()):
+                self._conn_backoff = 3
+                if hasattr(self, "_wake_event") and self._wake_event:
+                    self._wake_event.set()
+                if self._dashboard:
+                    await self._dashboard.broadcast({"type": "status", "state": "active"})
+                await self._pending_commands.put(text)
+            except (asyncio.TimeoutError, thread_queue.Empty):
+                pass
+            except Exception as e:
+                print(f"[Dashboard] Command queue error: {e}")
+                await asyncio.sleep(0.5)
+
+    async def _flush_pending_commands(self) -> None:
+        while True:
+            try:
+                text = await self._pending_commands.get()
+                for _ in range(300):
                     if self.session:
                         break
                     await asyncio.sleep(0.1)
@@ -4601,7 +4578,7 @@ class JarvisLive:
                     if isinstance(text, dict) and text.get("image_b64"):
                         prompt = str(text.get("text") or "Analyze this image clearly.").strip()
                         await self.session.send_client_content(
-                            turns={"parts": [
+                            turns={"role": "user", "parts": [
                                 {
                                     "inline_data": {
                                         "mime_type": str(text.get("mime_type") or "image/jpeg"),
@@ -4616,16 +4593,15 @@ class JarvisLive:
                     else:
                         command_text = str(text).strip()
                         await self.session.send_client_content(
-                            turns={"parts": [{"text": command_text}]},
+                            turns={"role": "user", "parts": [{"text": command_text}]},
                             turn_complete=True,
                         )
                         self.ui.write_log(f"[Web]: {command_text}")
                 else:
-                    print(f"[Dashboard] Dropped command (no session): {text}")
-            except (asyncio.TimeoutError, thread_queue.Empty):
-                pass
+                    print(f"[Dashboard] Dropped command (session timeout): {text}")
+                    self.ui.write_log(f"[Web]: Command dropped (Jarvis offline): {text}")
             except Exception as e:
-                print(f"[Dashboard] Command error: {e}")
+                print(f"[Dashboard] Flush command error: {e}")
                 await asyncio.sleep(0.5)
 
     async def _run_vps_local_worker(self) -> None:
@@ -4691,6 +4667,7 @@ class JarvisLive:
         vps_url = os.getenv("JARVIS_VPS_URL", "").strip()
         if self._dashboard is not None:
             self._dashboard.set_connect_callback(self._on_phone_connected)
+            self._dashboard.set_wake_callback(self._on_dashboard_wake)
             asyncio.create_task(self._process_dashboard_commands())
         elif vps_url:
             self.ui.write_log("SYS: VPS brain configured; local dashboard disabled to keep remote access alive.")
@@ -4700,6 +4677,7 @@ class JarvisLive:
                 from dashboard.server import DashboardServer
                 self._dashboard = DashboardServer()
                 self._dashboard.set_connect_callback(self._on_phone_connected)
+                self._dashboard.set_wake_callback(self._on_dashboard_wake)
                 self._dashboard.set_public_url_callback(self._on_public_url_changed)
                 asyncio.create_task(self._dashboard.serve())
                 # Runs for the whole lifetime, not just inside an active session
@@ -4797,6 +4775,7 @@ class JarvisLive:
                             tg.create_task(self._run_visual_monitor())
                             if self._dashboard:
                                 tg.create_task(self._relay_phone_audio())
+                            tg.create_task(self._flush_pending_commands())
 
                             # Morning briefing — fires once per process launch (if enabled)
                             if not self._briefing_sent and get_brief_enabled():
@@ -4903,7 +4882,12 @@ class JarvisLive:
 
             delay = getattr(self, "_conn_backoff", 3)
             print(f"[JARVIS] Reconnecting in {delay}s...")
-            await asyncio.sleep(delay)
+            try:
+                await asyncio.wait_for(self._wake_event.wait(), timeout=delay)
+                self._wake_event.clear()
+                print("[JARVIS] Wake signal received, reconnecting immediately...")
+            except asyncio.TimeoutError:
+                pass
 
 class _HeadlessUI:
     """Minimal no-GUI UI for VPS-only deployments."""
