@@ -949,7 +949,10 @@ class DashboardServer:
             if text:
                 await self._command_queue.put(text)
                 if self._wake_callback:
-                    self._wake_callback()
+                    try:
+                        self._wake_callback()
+                    except Exception:
+                        pass
             return JSONResponse({"ok": True})
 
         @app.post("/api/wake")
@@ -957,7 +960,11 @@ class DashboardServer:
             if not _auth(req):
                 return JSONResponse({"error": "Unauthorized"}, status_code=401)
             if self._wake_callback:
-                self._wake_callback()
+                try:
+                    self._wake_callback()
+                except Exception:
+                    pass
+            asyncio.create_task(self.broadcast({"type": "wake"}))
             return JSONResponse({"ok": True})
 
         # ── Phone mic real-time audio → Gemini Live ──────────────────────────
