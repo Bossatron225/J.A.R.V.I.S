@@ -392,11 +392,17 @@ class KokoroTTSEngine:
     the first real speak() call has zero compilation overhead.
     """
 
-    def __init__(self, voice: str = "af_heart", speed: float = 1.0):
-        self.voice     = voice
-        self.speed     = speed
-        self._pipeline = None
-        self._lock     = threading.Lock()
+    def __init__(
+        self,
+        voice: str = "af_heart",
+        speed: float = 1.0,
+        audio_sink: Optional[Callable[[bytes], None]] = None,
+    ):
+        self.voice      = voice
+        self.speed      = speed
+        self.audio_sink = audio_sink
+        self._pipeline  = None
+        self._lock      = threading.Lock()
         self._init()   # blocking, but called from background thread
 
     @property
