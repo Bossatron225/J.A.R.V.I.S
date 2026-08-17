@@ -311,7 +311,10 @@ class _HeadlessVisualMonitorRegistry:
 
 
 if SystemMonitor is None:
+    print(f"[DEBUG] SystemMonitor is None, assigning _HeadlessSystemMonitor")
     SystemMonitor = _HeadlessSystemMonitor
+else:
+    print(f"[DEBUG] SystemMonitor is not None: {SystemMonitor}")
 if ProactiveEngine is None:
     ProactiveEngine = _HeadlessProactiveEngine
 if PredictiveAutomationDaemon is None:
