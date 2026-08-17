@@ -4581,6 +4581,19 @@ class JarvisLive:
             await asyncio.to_thread(mail_monitor_start, interval)
             self.ui.write_log("SYS: Monitor ready.")
 
+        # Start auto-commit watcher to sync memory to GitHub and VPS
+        auto_commit_script = BASE_DIR / "scripts" / "auto_commit.py"
+        if auto_commit_script.exists():
+            _subprocess.Popen(
+                [sys.executable, str(auto_commit_script)],
+                cwd=str(BASE_DIR),
+                stdin=_subprocess.DEVNULL,
+                stdout=_subprocess.DEVNULL,
+                stderr=_subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            self.ui.write_log("SYS: Auto-commit watcher started.")
+
         # Start the local dashboard only when this Mac is intended to be the public entrypoint.
         # When a VPS brain is configured, keep the dashboard and public tunnel on the server instead,
         # so a local shutdown does not kill the remote JARVIS brain.
