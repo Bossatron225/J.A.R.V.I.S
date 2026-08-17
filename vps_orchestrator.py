@@ -557,11 +557,22 @@ class VPSOrchestrator:
         with self.lock:
             self.status["status"] = "restarting"
             self.status["reboot_requested_at"] = datetime.now(timezone.utc).isoformat()
-        return {
+        result = {
             "status": "restarting",
             "service": "jarvis-vps-orchestrator",
             "reboot_requested_at": self.status.get("reboot_requested_at"),
         }
+        if self._vps_brain_enabled():
+            # Kill this gunicorn worker so the arbiter spawns a fresh one with a
+            # clean brain thread. Previously this only flipped the status label,
+            # so a stuck brain stayed stuck forever and /api/status stayed on
+            # "restarting" permanently.
+            def _exit_soon() -> None:
+                time.sleep(0.5)
+                os._exit(1)
+
+            threading.Thread(target=_exit_soon, daemon=True).start()
+        return result
 
     def process_task(self, task: dict) -> dict:
         action = str(task.get("action", "")).strip().lower()
