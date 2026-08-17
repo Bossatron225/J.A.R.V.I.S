@@ -4774,8 +4774,7 @@ class JarvisLive:
                                 tg.create_task(self._listen_audio())
                                 self._start_speech_listener()
                             tg.create_task(self._receive_audio())
-                            if not self._tts_player:
-                                tg.create_task(self._play_audio())
+                            tg.create_task(self._play_audio())
                             tg.create_task(self._run_system_monitor())
                             tg.create_task(self._run_background_monitor())
                             if callable(poll_imessage_alerts) and callable(get_imessage_monitor_interval):
