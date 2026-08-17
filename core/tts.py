@@ -256,8 +256,13 @@ def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> Non
 class EdgeTTSEngine:
     """Microsoft EdgeTTS – free, requires internet."""
 
-    def __init__(self, voice: str = "en-US-GuyNeural"):
+    def __init__(
+        self,
+        voice: str = "en-US-GuyNeural",
+        audio_sink: Optional[Callable[[bytes], None]] = None,
+    ):
         self.voice = voice
+        self.audio_sink = audio_sink
 
     def speak(self, text: str) -> None:
         loop = asyncio.new_event_loop()
@@ -266,7 +271,20 @@ class EdgeTTSEngine:
         finally:
             loop.close()
         if audio_bytes:
-            _play_audio_bytes(audio_bytes)
+            if self.audio_sink is not None:
+                try:
+                    import miniaudio
+                    decoded = miniaudio.decode(
+                        audio_bytes,
+                        output_format=miniaudio.SampleFormat.SIGNED16,
+                        nchannels=1,
+                    )
+                    # miniaudio.decode returns a DecodedAudio object with .samples
+                    self.audio_sink(decoded.samples.tobytes())
+                except Exception:
+                    _play_audio_bytes(audio_bytes)
+            else:
+                _play_audio_bytes(audio_bytes)
 
     async def _synth(self, text: str) -> bytes:
         import edge_tts
