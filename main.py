@@ -142,15 +142,26 @@ try:
 except Exception:
     file_processor = None
 
-# ... [KEEP EXISTING _HEADLESS_SAFE_ACTIONS LOOP HERE] ...
+    # ... (imports) ...
+    for _target_name, (_module_name, _attribute_name) in _HEADLESS_SAFE_ACTIONS.items():
+        try:
+            _module = importlib.import_module(_module_name)
+            globals()[_target_name] = getattr(_module, _attribute_name)
+        except Exception:
+            pass
 
+# Force back to headless if we are in headless mode,
+# overriding any potential partial imports
 if not _GUI_IMPORTS_ALLOWED:
-    # Force back to headless if we are in headless mode,
-    # overriding any potential partial imports
     SystemMonitor = _HeadlessSystemMonitor
     ProactiveEngine = _HeadlessProactiveEngine
     PredictiveAutomationDaemon = _HeadlessPredictiveAutomationDaemon
     VisualMonitorRegistry = _HeadlessVisualMonitorRegistry
+    # Also reset tools that might have failed to import in the loop but are still not None
+    for _target_name in _HEADLESS_SAFE_ACTIONS.keys():
+        if _target_name not in ["SystemMonitor", "ProactiveEngine", "PredictiveAutomationDaemon", "VisualMonitorRegistry"]:
+             globals()[_target_name] = None
+
 
 if _GUI_IMPORTS_ALLOWED:
     from actions.open_app import open_app
