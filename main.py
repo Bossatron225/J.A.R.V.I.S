@@ -142,6 +142,16 @@ try:
 except Exception:
     file_processor = None
 
+# ... [KEEP EXISTING _HEADLESS_SAFE_ACTIONS LOOP HERE] ...
+
+if not _GUI_IMPORTS_ALLOWED:
+    # Force back to headless if we are in headless mode,
+    # overriding any potential partial imports
+    SystemMonitor = _HeadlessSystemMonitor
+    ProactiveEngine = _HeadlessProactiveEngine
+    PredictiveAutomationDaemon = _HeadlessPredictiveAutomationDaemon
+    VisualMonitorRegistry = _HeadlessVisualMonitorRegistry
+
 if _GUI_IMPORTS_ALLOWED:
     from actions.open_app import open_app
     from actions.weather_report import weather_action
