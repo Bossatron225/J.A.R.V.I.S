@@ -585,6 +585,7 @@ class ElevenLabsTTSEngine:
                 resp.raise_for_status()
                 self.voice_id = voice_id
                 if self.audio_sink is not None:
+                    print(f"[TTS] ElevenLabs audio generated, sending to sink (len={len(resp.content)})")
                     self.audio_sink(resp.content)
                 else:
                     _play_audio_bytes(resp.content, sample_rate=24000)
