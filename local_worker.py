@@ -14,6 +14,7 @@ LOCAL_ACTIONS = {
     'browser_control',
     'capture_screen',
     'capture_camera',
+    'capture_visual',
     'desktop_control',
     'system_status',
     'computer_control',
@@ -43,6 +44,7 @@ ACTION_HANDLERS = {
     'system_status': ('actions.system_monitor', 'get_system_status'),
     'youtube_video': ('actions.youtube_video', 'youtube_video'),
     'capture_camera': ('actions.screen_processor', 'capture_camera_b64'),
+    'capture_visual': ('actions.screen_processor', 'capture_targeted_visual_b64'),
 }
 
 

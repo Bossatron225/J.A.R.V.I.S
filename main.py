@@ -840,6 +840,7 @@ TOOL_DECLARATIONS = [
             "Captures a full screen, a specific window/app, a specific browser tab, or a webcam image and lets you analyze it. "
             "Use this when the user asks what is on screen, what you see, look at camera, inspect a browser tab, inspect a window, or analyze a specific app. "
             "In a remote VPS session, target_type=camera requests a frame from the currently logged-in webpage device camera; it does not require the Mac. "
+            "To explicitly target the Mac's camera instead of the remote device, use target_type=mac_camera. "
             "You have NO visual ability without this tool. "
             "When using camera: the live view stays open until user says close it or calls close_camera."
         ),
@@ -847,7 +848,7 @@ TOOL_DECLARATIONS = [
             "type": "OBJECT",
             "properties": {
                 "angle": {"type": "STRING", "description": "Backward-compatible alias for target_type. 'screen' or 'camera'."},
-                "target_type": {"type": "STRING", "description": "screen | camera | window | app | tab | browser_tab"},
+                "target_type": {"type": "STRING", "description": "screen | camera | mac_camera | window | app | tab | browser_tab"},
                 "browser": {"type": "STRING", "description": "Browser name for tab capture: chrome | edge | firefox | safari | brave | opera | vivaldi"},
                 "target": {"type": "STRING", "description": "Tab title/url fragment or general visual target label"},
                 "index": {"type": "INTEGER", "description": "1-based browser tab index for tab capture"},
@@ -2982,6 +2983,35 @@ class JarvisLive:
             callable(handler)
             for handler in (_capture_camera, _capture_screen, _capture_targeted_visual)
         ):
+            request_local_action = getattr(self._remote_bridge, "request_local_action", None)
+            if callable(request_local_action):
+                task_result = await asyncio.to_thread(request_local_action, "capture_visual", args, 20.0)
+                if task_result.get("status") == "completed" and "image_b64" in task_result.get("result", {}):
+                    import base64
+                    res_dict = task_result["result"]
+                    img_b = base64.b64decode(res_dict["image_b64"])
+                    mime_t = res_dict.get("mime_type", "image/jpeg")
+                    target_label = res_dict.get("label", "Mac Visual")
+                    user_text = args.get("text", "Analyze this image.")
+                    self._pending_vision = (img_b, mime_t, str(user_text), target_label)
+                    return types.FunctionResponse(
+                        id=fc.id,
+                        name=name,
+                        response={
+                            "result": (
+                                f"[VISION_ACTIVE] {target_label} captured via remote Mac worker. "
+                                f"Immediately say ONE short natural sentence in the user's own language, "
+                                f"telling them you are looking at their {target_label} right now. "
+                                f"Do NOT describe or guess content — the actual image arrives in the NEXT message."
+                            )
+                        },
+                    )
+                else:
+                    return types.FunctionResponse(
+                        id=fc.id,
+                        name=name,
+                        response={"result": f"Could not capture remote visual: {task_result.get('error') or task_result.get('message') or 'unknown error'}"},
+                    )
             result = "screen_process is unavailable on the headless VPS; wake the Mac local worker for visual capture."
             return types.FunctionResponse(
                 id=fc.id,
