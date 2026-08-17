@@ -3821,11 +3821,15 @@ class JarvisLive:
         print("[JARVIS] 🔊 Play started")
         reset_audio_output()
 
+        import sys
+        import numpy as np
+        play_channels = 2 if sys.platform == "darwin" else CHANNELS
+
         have_local_audio = True
         try:
             stream = sd.RawOutputStream(
                 samplerate=RECEIVE_SAMPLE_RATE,
-                channels=CHANNELS,
+                channels=play_channels,
                 dtype="int16",
                 blocksize=int(self._audio_cfg.get("speaker_chunk_size", 960)),
                 latency=self._audio_cfg.get("output_latency", "low"),
@@ -3883,8 +3887,13 @@ class JarvisLive:
                         break
 
                 try:
-                    await asyncio.to_thread(stream.write, bytes(batch))
-                    self._audio_diag_inc("speaker_played_bytes", len(batch))
+                    write_data = bytes(batch)
+                    if play_channels == 2 and write_data:
+                        # Convert mono 16-bit PCM to stereo
+                        arr = np.frombuffer(write_data, dtype=np.int16)
+                        write_data = np.repeat(arr, 2).tobytes()
+                    await asyncio.to_thread(stream.write, write_data)
+                    self._audio_diag_inc("speaker_played_bytes", len(write_data))
                 except (RuntimeError, asyncio.CancelledError):
                     break   # executor shutting down — exit cleanly
         except Exception as e:
