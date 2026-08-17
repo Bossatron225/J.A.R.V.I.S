@@ -575,6 +575,7 @@
     function _renderDiagnostics(p) {
       const sys = p.system || {};
       const audio = p.audio || {};
+      if (p.state === 'active' || p.state === 'sleeping') setStatus(p.state);
       const cpu = Number(sys.cpu_percent);
       const ram = Number(sys.ram_percent);
       const micQ = Number(audio.mic_queue || 0);
