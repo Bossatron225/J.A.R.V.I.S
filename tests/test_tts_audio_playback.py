@@ -158,7 +158,13 @@ def test_play_audio_bytes_handles_raw_pcm_bytes(monkeypatch):
     tts._play_audio_bytes(pcm_bytes, sample_rate=16000)
 
     assert captured["sample_rate"] == 16000
-    np.testing.assert_allclose(captured["data"], [0.0, 0.5, -0.5, 0.0], atol=1e-6)
+    data = np.asarray(captured["data"], dtype=np.float32)
+    if sys.platform == "darwin":
+        assert data.ndim == 2
+        np.testing.assert_allclose(data, [[0.0, 0.0], [0.5, 0.5], [-0.5, -0.5], [0.0, 0.0]], atol=1e-6)
+    else:
+        assert data.ndim == 1
+        np.testing.assert_allclose(data, [0.0, 0.5, -0.5, 0.0], atol=1e-6)
 
 
 def test_play_audio_bytes_ignores_sounddevice_errors(monkeypatch):
