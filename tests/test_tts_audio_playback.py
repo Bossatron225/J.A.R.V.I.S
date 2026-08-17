@@ -24,8 +24,12 @@ def test_play_np_mixes_stereo_to_mono(monkeypatch):
 
     assert captured["sample_rate"] == 22050
     data = np.asarray(captured["data"], dtype=np.float32)
-    assert data.ndim == 1
-    np.testing.assert_allclose(data, np.array([0.0, 0.0], dtype=np.float32))
+    if sys.platform == "darwin":
+        assert data.ndim == 2
+        np.testing.assert_allclose(data, np.array([[0.0, 0.0], [0.0, 0.0]], dtype=np.float32))
+    else:
+        assert data.ndim == 1
+        np.testing.assert_allclose(data, np.array([0.0, 0.0], dtype=np.float32))
 
 
 def test_play_audio_bytes_flattens_numpy_samples_before_sounddevice(monkeypatch):
@@ -38,7 +42,7 @@ def test_play_audio_bytes_flattens_numpy_samples_before_sounddevice(monkeypatch)
             FLOAT32 = "float32"
 
         def decode(self, audio_bytes, output_format, nchannels):
-            assert audio_bytes == b"abc"
+            assert audio_bytes == b"ID3abc"
             assert output_format == self.SampleFormat.FLOAT32
             assert nchannels == 1
             return FakeDecoded()
@@ -53,11 +57,17 @@ def test_play_audio_bytes_flattens_numpy_samples_before_sounddevice(monkeypatch)
     monkeypatch.setattr(tts.sd, "play", fake_play)
     monkeypatch.setattr(tts.sd, "wait", lambda: None)
 
-    tts._play_audio_bytes(b"abc")
+    tts._play_audio_bytes(b"ID3abc")
 
     assert captured["sample_rate"] == 22050
     assert isinstance(captured["data"], list)
-    np.testing.assert_allclose(captured["data"], [0.15, 0.35])
+    data = np.asarray(captured["data"], dtype=np.float32)
+    if sys.platform == "darwin":
+        assert data.ndim == 2
+        np.testing.assert_allclose(data, [[0.15, 0.15], [0.35, 0.35]])
+    else:
+        assert data.ndim == 1
+        np.testing.assert_allclose(data, [0.15, 0.35])
 
 
 def test_elevenlabs_falls_back_to_default_voice(monkeypatch):
