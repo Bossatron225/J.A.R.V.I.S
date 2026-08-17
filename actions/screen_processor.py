@@ -766,9 +766,12 @@ class _VisionSession:
             raise  
 
     async def _play_loop(self) -> None:
+        import sys
+        import numpy as np
+        play_channels = 2 if sys.platform == "darwin" else _CHANNELS
         stream = sd.RawOutputStream(
             samplerate=_RECEIVE_SAMPLE_RATE,
-            channels=_CHANNELS,
+            channels=play_channels,
             dtype="int16",
             blocksize=_CHUNK_SIZE,
         )
@@ -776,6 +779,10 @@ class _VisionSession:
         try:
             while True:
                 chunk = await self._audio_in.get()
+                if play_channels == 2 and chunk:
+                    # Convert mono 16-bit PCM to stereo
+                    arr = np.frombuffer(chunk, dtype=np.int16)
+                    chunk = np.repeat(arr, 2).tobytes()
                 await asyncio.to_thread(stream.write, chunk)
         except Exception as e:
             print(f"[Vision] ❌ Play error: {e}")
