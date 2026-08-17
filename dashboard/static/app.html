@@ -390,6 +390,7 @@
         <button id="cam-start" class="cam-btn pri" type="button" onclick="startPhoneCamera()">Start Feed</button>
         <button id="cam-stop" class="cam-btn warn" type="button" onclick="stopPhoneCamera()">Stop Feed</button>
         <button id="cam-analyze" class="cam-btn" type="button" onclick="analyzeCameraNow()">Analyze Now</button>
+        <button id="cam-mac" class="cam-btn" type="button" onclick="requestMacCamera()">Mac Camera</button>
       </div>
     </div>
   </section>
@@ -679,6 +680,14 @@
       feed.appendChild(d); feed.scrollTop = feed.scrollHeight;
     }
 
+    function appendImage(speaker, labelText, b64, mimeType) {
+      const d = document.createElement('div');
+      d.className = speaker === 'jarvis' ? 'msg msg-j' : 'msg msg-sys';
+      d.innerHTML = `<div class="lbl">${labelText}</div><img src="data:${mimeType};base64,${b64}" style="max-width: 100%; border-radius: 8px; margin-top: 8px; border: 1px solid var(--border);">`;
+      feed.appendChild(d);
+      feed.scrollTop = feed.scrollHeight;
+    }
+
     function esc(s) {
       return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
@@ -915,6 +924,21 @@
         camState.textContent = 'Camera analysis failed: ' + (error?.message || 'connection error');
       } finally {
         _cameraAnalysisInFlight = false;
+      }
+    }
+
+    async function requestMacCamera() {
+      camState.textContent = 'Requesting Mac camera feed...';
+      try {
+        const response = await _authFetch('/api/mac-camera-feed', { method: 'POST' });
+        const result = await response.json();
+        if (!response.ok || result.status !== 'completed' || !result.result || !result.result.image_b64) {
+          throw new Error(result.error || result.message || 'Failed to capture Mac camera');
+        }
+        camState.textContent = 'Mac camera feed received.';
+        appendImage('sys', 'Mac Camera', result.result.image_b64, result.result.mime_type || 'image/jpeg');
+      } catch (e) {
+        camState.textContent = 'Error: ' + (e?.message || 'unknown error');
       }
     }
 
