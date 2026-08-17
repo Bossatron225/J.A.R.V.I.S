@@ -42,6 +42,7 @@ ACTION_HANDLERS = {
     'send_message': ('actions.send_message', 'send_message'),
     'system_status': ('actions.system_monitor', 'get_system_status'),
     'youtube_video': ('actions.youtube_video', 'youtube_video'),
+    'capture_camera': ('actions.screen_processor', 'capture_camera_b64'),
 }
 
 

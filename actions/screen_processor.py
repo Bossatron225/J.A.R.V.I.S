@@ -538,6 +538,13 @@ def _get_camera_index() -> int:
     return _detect_camera_index()
 
 
+def capture_camera_b64(parameters=None, player=None) -> dict:
+    image_bytes, mime_type = _capture_camera()
+    return {
+        "image_b64": base64.b64encode(image_bytes).decode("ascii"),
+        "mime_type": mime_type
+    }
+
 def _capture_camera() -> tuple[bytes, str]:
     if not _CV2:
         raise RuntimeError("OpenCV (cv2) is not installed. Run: pip install opencv-python")
