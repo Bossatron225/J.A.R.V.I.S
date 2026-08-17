@@ -88,17 +88,19 @@ from memory.document_ingestion import (
 
 _HEADLESS_ENV = str(os.getenv("JARVIS_HEADLESS") or "").strip().lower() in {"1", "true", "yes", "on"}
 _NO_DESKTOP = _platform.system() == "Linux" and not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY")
+# --- Headless safe imports ---
 _GUI_IMPORTS_ALLOWED = not (_HEADLESS_ENV or _NO_DESKTOP)
+print(f"[DEBUG] _GUI_IMPORTS_ALLOWED: {_GUI_IMPORTS_ALLOWED}")
 
 try:
     from actions.file_processor import file_processor
-except Exception:  # pragma: no cover - headless / missing optional deps
+except Exception:
     file_processor = None
 
-try:
-    from actions.flight_finder import flight_finder
-except Exception:  # pragma: no cover - headless / missing optional deps
-    flight_finder = None
+SystemMonitor = _HeadlessSystemMonitor
+ProactiveEngine = _HeadlessProactiveEngine
+PredictiveAutomationDaemon = _HeadlessPredictiveAutomationDaemon
+VisualMonitorRegistry = _HeadlessVisualMonitorRegistry
 
 if _GUI_IMPORTS_ALLOWED:
     from actions.open_app import open_app
@@ -129,10 +131,16 @@ if _GUI_IMPORTS_ALLOWED:
     from actions.workspace_agent import workspace_agent
     from actions.computer_control import computer_control
     from actions.game_updater import game_updater
-    from actions.system_monitor import SystemMonitor, get_system_status
-    from actions.proactive import ProactiveEngine
-    from actions.predictive_automation import PredictiveAutomationDaemon
-    from actions.visual_monitor import VisualMonitorRegistry
+    from actions.system_monitor import SystemMonitor as RealSystemMonitor, get_system_status
+    from actions.proactive import ProactiveEngine as RealProactiveEngine
+    from actions.predictive_automation import PredictiveAutomationDaemon as RealPredictiveAutomationDaemon
+    from actions.visual_monitor import VisualMonitorRegistry as RealVisualMonitorRegistry
+    
+    SystemMonitor = RealSystemMonitor
+    ProactiveEngine = RealProactiveEngine
+    PredictiveAutomationDaemon = RealPredictiveAutomationDaemon
+    VisualMonitorRegistry = RealVisualMonitorRegistry
+
     from actions.background_monitor import (
         add_monitor, remove_monitor, list_monitors, check_all as monitor_check_all,
     )
@@ -178,11 +186,7 @@ else:
     workspace_agent = None
     computer_control = None
     game_updater = None
-    SystemMonitor = None
     get_system_status = None
-    ProactiveEngine = None
-    PredictiveAutomationDaemon = None
-    VisualMonitorRegistry = None
     add_monitor = None
     remove_monitor = None
     list_monitors = None
@@ -200,6 +204,7 @@ else:
     find_my = None
     alexa_routines = None
     ifttt_webhooks = None
+
 
     # Headless Linux still supports cloud/network and code capabilities. Import
     # these independently so one optional integration cannot disable all others.
