@@ -4514,11 +4514,18 @@ class JarvisLive:
 
     def _on_dashboard_wake(self) -> None:
         self._conn_backoff = 3
-        if hasattr(self, "_wake_event") and self._wake_event:
-            self._wake_event.set()
+        loop = getattr(self, "_loop", None)
+        if loop and loop.is_running():
+            try:
+                loop.call_soon_threadsafe(self._wake_event.set)
+            except Exception:
+                if hasattr(self, "_wake_event") and self._wake_event:
+                    self._wake_event.set()
+        else:
+            if hasattr(self, "_wake_event") and self._wake_event:
+                self._wake_event.set()
         if self._dashboard:
             try:
-                loop = getattr(self, "_loop", None)
                 if loop and loop.is_running():
                     asyncio.run_coroutine_threadsafe(
                         self._dashboard.broadcast({"type": "status", "state": "active"}),
