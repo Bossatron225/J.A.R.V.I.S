@@ -4705,10 +4705,16 @@ class JarvisLive:
                 self._use_external_tts = False
                 if self._external_tts_enabled(runtime_cfg):
                     try:
+                        def local_audio_sink(pcm_bytes):
+                            if self.audio_in_queue:
+                                self._loop.call_soon_threadsafe(
+                                    self.audio_in_queue.put_nowait, pcm_bytes
+                                )
+
                         audio_sink = (
                             self._remote_bridge.publish_audio
                             if self._remote_bridge is not None
-                            else None
+                            else local_audio_sink
                         )
                         self._tts_player = create_tts_player(
                             runtime_cfg,

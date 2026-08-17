@@ -658,7 +658,11 @@ def create_tts_player(
     if engine_name == "kokoro":
         voice  = config.get("tts_voice", "af_heart")
         speed  = float(config.get("tts_speed", 1.0))
-        engine = KokoroTTSEngine(voice=voice, speed=speed)
+        engine = KokoroTTSEngine(
+            voice=voice,
+            speed=speed,
+            audio_sink=audio_sink,
+        )
     elif engine_name == "elevenlabs":
         api_key  = config.get("elevenlabs_api_key", "")
         voice_id = config.get("tts_voice", "pNInz6obpgDQGcFmaJgB")
@@ -669,5 +673,8 @@ def create_tts_player(
         )
     else:   # edgetts (default)
         voice  = config.get("tts_voice", "en-US-GuyNeural")
-        engine = EdgeTTSEngine(voice=voice)
+        engine = EdgeTTSEngine(
+            voice=voice,
+            audio_sink=audio_sink,
+        )
     return TTSPlayer(engine)
