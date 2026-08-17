@@ -4689,6 +4689,7 @@ class JarvisLive:
                     try:
                         def local_audio_sink(pcm_bytes):
                             if self.audio_in_queue:
+                                print(f"[TTS] Received {len(pcm_bytes)} bytes of audio from ElevenLabs")
                                 # Slice into smaller chunks for responsiveness (interruptions)
                                 slice_size = int(self._audio_cfg.get("incoming_slice_bytes", 2400))
                                 for i in range(0, len(pcm_bytes), slice_size):
