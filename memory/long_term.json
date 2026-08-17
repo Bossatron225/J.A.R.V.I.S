@@ -68,17 +68,17 @@
   "sessions": [
     {
       "date": "2026-08-14",
-      "summary": "The user discussed turning on their legs to plug in their phone and engaged with JARVIS regarding news updates on the Iran conflict and a live camera feed.",
-      "language": "English"
-    },
-    {
-      "date": "2026-08-14",
       "summary": "The user greeted JARVIS and requested an additional action regarding the news updates after the assistant displayed the 2026 FIFA World Cup final match-up.",
       "language": "English"
     },
     {
       "date": "2026-08-17",
       "summary": "James Lumsden reviewed today's news headlines—noting that lowering oil prices is a top US priority over the Iran nuclear program—and discussed system diagnostics, active applications, and resource utilization for his connected remote server",
+      "language": "English"
+    },
+    {
+      "date": "2026-08-17",
+      "summary": "James Lumsden reviewed today's news headlines—noting a shift in U.S. regional priorities toward lowering oil prices—and discussed the configuration and function of the \"wake\" button for his remote server.",
       "language": "English"
     }
   ],
