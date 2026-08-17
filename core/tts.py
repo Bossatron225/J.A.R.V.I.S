@@ -102,6 +102,25 @@ def _run_sounddevice_call(func: Callable[..., object], *args, **kwargs) -> objec
         return None
 
 
+def _is_compressed_or_wav(audio_bytes: bytes) -> bool:
+    """Check if the bytes start with a header that miniaudio can decode."""
+    if len(audio_bytes) < 4:
+        return False
+    # WAV / RIFF
+    if audio_bytes.startswith(b"RIFF"):
+        return True
+    # MP3 (ID3v2 tag or frame sync bytes)
+    if audio_bytes.startswith(b"ID3") or audio_bytes[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+        return True
+    # FLAC
+    if audio_bytes.startswith(b"fLaC"):
+        return True
+    # Ogg Vorbis
+    if audio_bytes.startswith(b"OggS"):
+        return True
+    return False
+
+
 def _play_np(samples, sample_rate: int) -> None:
     """Play float32 mono (or stereo) audio via sounddevice.
     Accepts numpy arrays or PyTorch tensors.
@@ -117,7 +136,11 @@ def _play_np(samples, sample_rate: int) -> None:
         # sounddevice expects a 1-D float32 array for PCM playback. Converting to
         # a plain list avoids the NumPy 2.5 deprecation warning triggered by the
         # library's internal reshape path.
-        _run_sounddevice_call(sd.play, arr.astype(np.float32, copy=False).reshape(-1).tolist(), sample_rate)
+        if sys.platform == "darwin":
+            stereo_samples = np.column_stack((arr, arr))
+            _run_sounddevice_call(sd.play, stereo_samples.astype(np.float32, copy=False).tolist(), sample_rate)
+        else:
+            _run_sounddevice_call(sd.play, arr.astype(np.float32, copy=False).reshape(-1).tolist(), sample_rate)
         _run_sounddevice_call(sd.wait)
     except Exception as exc:
         print(f"[TTS] Audio playback failed: {exc}")
@@ -136,21 +159,26 @@ def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> Non
         reset_audio_output()
         import miniaudio
 
-        decoded = miniaudio.decode(
-            audio_bytes,
-            output_format=miniaudio.SampleFormat.FLOAT32,
-            nchannels=1,
-        )
-        samples = np.array(decoded.samples, dtype=np.float32)
-        if samples.ndim == 2 and samples.shape[1] == 2:
-            samples = samples.mean(axis=1)
-        elif samples.ndim > 1 and samples.shape[-1] == 2:
-            samples = samples.mean(axis=-1)
+        if _is_compressed_or_wav(audio_bytes):
+            decoded = miniaudio.decode(
+                audio_bytes,
+                output_format=miniaudio.SampleFormat.FLOAT32,
+                nchannels=1,
+            )
+            samples = np.array(decoded.samples, dtype=np.float32)
+            if samples.ndim == 2 and samples.shape[1] == 2:
+                samples = samples.mean(axis=1)
+            elif samples.ndim > 1 and samples.shape[-1] == 2:
+                samples = samples.mean(axis=-1)
 
-        flat_samples = samples.astype(np.float32, copy=False).reshape(-1)
-        _run_sounddevice_call(sd.play, flat_samples.tolist(), decoded.sample_rate)
-        _run_sounddevice_call(sd.wait)
-        return
+            flat_samples = samples.astype(np.float32, copy=False).reshape(-1)
+            if sys.platform == "darwin":
+                stereo_samples = np.column_stack((flat_samples, flat_samples))
+                _run_sounddevice_call(sd.play, stereo_samples.astype(np.float32, copy=False).tolist(), decoded.sample_rate)
+            else:
+                _run_sounddevice_call(sd.play, flat_samples.tolist(), decoded.sample_rate)
+            _run_sounddevice_call(sd.wait)
+            return
     except Exception as _e:
         print(f"[TTS] miniaudio decode/play failed: {_e}")
 
@@ -172,7 +200,11 @@ def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> Non
             arr = arr.reshape(-1, ch).mean(axis=1)
 
         arr = arr.astype(np.float32, copy=False).reshape(-1)
-        _run_sounddevice_call(sd.play, arr.tolist(), sr)
+        if sys.platform == "darwin":
+            stereo_samples = np.column_stack((arr, arr))
+            _run_sounddevice_call(sd.play, stereo_samples.astype(np.float32, copy=False).tolist(), sr)
+        else:
+            _run_sounddevice_call(sd.play, arr.tolist(), sr)
         _run_sounddevice_call(sd.wait)
         return
 
@@ -189,7 +221,11 @@ def _play_audio_bytes(audio_bytes: bytes, sample_rate: int | None = None) -> Non
 
     arr = arr.astype(np.float32, copy=False).reshape(-1)
     try:
-        _run_sounddevice_call(sd.play, arr.tolist(), sample_rate)
+        if sys.platform == "darwin":
+            stereo_samples = np.column_stack((arr, arr))
+            _run_sounddevice_call(sd.play, stereo_samples.astype(np.float32, copy=False).tolist(), sample_rate)
+        else:
+            _run_sounddevice_call(sd.play, arr.tolist(), sample_rate)
         _run_sounddevice_call(sd.wait)
     except Exception as exc:
         print(f"[TTS] Audio playback failed: {exc}")
