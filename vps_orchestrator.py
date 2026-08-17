@@ -1041,6 +1041,19 @@ def create_app() -> Flask:
 
         return jsonify({"ok": True, "accepted": True, "text": text})
 
+    @app.post("/api/mac-camera-feed")
+    def api_mac_camera_feed():
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None:
+            return jsonify({"error": "remote dashboard unavailable"}), 503
+
+        tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+        if not tok or not dashboard._is_token_valid(tok):
+            return jsonify({"error": "Unauthorized"}), 401
+
+        result = orchestrator.runtime_bridge.request_local_action("capture_camera", {}, timeout=20.0)
+        return jsonify(result)
+
     @app.post("/api/camera/analyze")
     def api_camera_analyze():
         dashboard = orchestrator.dashboard_server
