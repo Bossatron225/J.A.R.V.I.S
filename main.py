@@ -1588,9 +1588,12 @@ class JarvisLive:
             return
 
         def _play_raw_pcm16(data_chunks: list[bytes]) -> None:
+            import sys
+            import numpy as np
+            play_channels = 2 if sys.platform == "darwin" else CHANNELS
             stream = sd.RawOutputStream(
                 samplerate=RECEIVE_SAMPLE_RATE,
-                channels=CHANNELS,
+                channels=play_channels,
                 dtype="int16",
                 blocksize=int(self._audio_cfg.get("speaker_chunk_size", 960)),
                 latency=self._audio_cfg.get("output_latency", "low"),
@@ -1599,6 +1602,10 @@ class JarvisLive:
             try:
                 for chunk in data_chunks:
                     if chunk:
+                        if play_channels == 2:
+                            # Convert mono 16-bit PCM to stereo
+                            arr = np.frombuffer(chunk, dtype=np.int16)
+                            chunk = np.repeat(arr, 2).tobytes()
                         stream.write(chunk)
             finally:
                 stream.stop()
