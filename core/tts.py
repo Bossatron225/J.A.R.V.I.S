@@ -493,7 +493,7 @@ class ElevenLabsTTSEngine:
         for voice_id in self._voice_candidates():
             try:
                 resp = requests.post(
-                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=mp3_44100_128",
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=pcm_24000",
                     json=payload,
                     headers=headers,
                     timeout=60,
@@ -503,7 +503,7 @@ class ElevenLabsTTSEngine:
                 if self.audio_sink is not None:
                     self.audio_sink(resp.content)
                 else:
-                    _play_audio_bytes(resp.content, sample_rate=44100)
+                    _play_audio_bytes(resp.content, sample_rate=24000)
                 return
             except Exception as exc:
                 last_error = exc
