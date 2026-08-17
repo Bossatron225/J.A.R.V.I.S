@@ -404,6 +404,7 @@ class VPSOrchestrator:
             from main import JarvisLive, _HeadlessUI
 
             ui = _HeadlessUI()
+            ui.dashboard = self.dashboard_server
             jarvis = JarvisLive(
                 ui,
                 dashboard=self.dashboard_server,

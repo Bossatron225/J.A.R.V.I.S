@@ -4899,6 +4899,7 @@ class _HeadlessUI:
     def __init__(self):
         self.root = self._Root()
         self._muted = False
+        self.dashboard = None
 
     def __getattr__(self, name):
         def _noop(*_args, **_kwargs):
@@ -4919,8 +4920,22 @@ class _HeadlessUI:
     def set_state(self, *_args, **_kwargs):
         return None
 
-    def write_log(self, *_args, **_kwargs):
-        return None
+    def write_log(self, *args, **_kwargs):
+        # Headless VPS deployments have no window to show logs in, but the
+        # reconnect loop's error text (why the live session keeps failing)
+        # still needs to land somewhere — journalctl and the dashboard feed.
+        text = " ".join(str(a) for a in args if a is not None).strip()
+        if not text:
+            return
+        print(f"[JARVIS] {text}", flush=True)
+        dashboard = getattr(self, "dashboard", None)
+        if dashboard is not None:
+            try:
+                asyncio.get_running_loop().create_task(
+                    dashboard.broadcast({"type": "sys", "text": text})
+                )
+            except RuntimeError:
+                pass
 
     def notify_phone_connected(self):
         return None
