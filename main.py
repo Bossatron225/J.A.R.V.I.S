@@ -86,6 +86,51 @@ from memory.document_ingestion import (
     search_document_index,
 )
 
+# ── Headless Fallbacks ────────────────────────────────────────────────────────
+class _HeadlessSystemMonitor:
+    def __init__(self, *args, **kwargs):
+        self.last = None
+    def check(self, *args, **kwargs):
+        return {"ok": True, "status": "headless"}
+
+class _HeadlessProactiveEngine:
+    def should_trigger(self, *args, **kwargs):
+        return False
+    def mark_triggered(self, *args, **kwargs):
+        return None
+    def build_prompt(self, *args, **kwargs):
+        return ""
+
+class _HeadlessPredictiveAutomationDaemon:
+    def __init__(self, *args, **kwargs):
+        self._empty = []
+    def record_text_command(self, *args, **kwargs):
+        return None
+    def record_tool_call(self, *args, **kwargs):
+        return None
+    def generate_suggestions(self, *args, **kwargs):
+        return []
+
+class _HeadlessVisualMonitorRegistry:
+    def __init__(self, *args, **kwargs):
+        self._targets = []
+    def add_target(self, *args, **kwargs):
+        return None
+    def list_targets(self, *args, **kwargs):
+        return []
+    def remove_target(self, *args, **kwargs):
+        return False
+    def clear(self, *args, **kwargs):
+        return None
+    def poll_once(self, *args, **kwargs):
+        return []
+
+# Initialize with headless versions
+SystemMonitor = _HeadlessSystemMonitor
+ProactiveEngine = _HeadlessProactiveEngine
+PredictiveAutomationDaemon = _HeadlessPredictiveAutomationDaemon
+VisualMonitorRegistry = _HeadlessVisualMonitorRegistry
+
 _HEADLESS_ENV = str(os.getenv("JARVIS_HEADLESS") or "").strip().lower() in {"1", "true", "yes", "on"}
 _NO_DESKTOP = _platform.system() == "Linux" and not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY")
 # --- Headless safe imports ---
@@ -96,11 +141,6 @@ try:
     from actions.file_processor import file_processor
 except Exception:
     file_processor = None
-
-SystemMonitor = _HeadlessSystemMonitor
-ProactiveEngine = _HeadlessProactiveEngine
-PredictiveAutomationDaemon = _HeadlessPredictiveAutomationDaemon
-VisualMonitorRegistry = _HeadlessVisualMonitorRegistry
 
 if _GUI_IMPORTS_ALLOWED:
     from actions.open_app import open_app
