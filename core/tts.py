@@ -546,8 +546,10 @@ class ElevenLabsTTSEngine:
         last_error: Exception | None = None
         for voice_id in self._voice_candidates():
             try:
+                fmt = "pcm_44100" if sys.platform == "darwin" else "pcm_24000"
+                sr  = 44100 if sys.platform == "darwin" else 24000
                 resp = requests.post(
-                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=pcm_24000",
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format={fmt}",
                     json=payload,
                     headers=headers,
                     timeout=60,
@@ -557,7 +559,7 @@ class ElevenLabsTTSEngine:
                 if self.audio_sink is not None:
                     self.audio_sink(resp.content)
                 else:
-                    _play_audio_bytes(resp.content, sample_rate=24000)
+                    _play_audio_bytes(resp.content, sample_rate=sr)
                 return
             except Exception as exc:
                 last_error = exc
