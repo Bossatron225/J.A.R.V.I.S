@@ -545,6 +545,25 @@ def capture_camera_b64(parameters=None, player=None) -> dict:
         "mime_type": mime_type
     }
 
+def capture_targeted_visual_b64(parameters=None, player=None) -> dict:
+    params = parameters or {}
+    target_type = params.get("target_type") or params.get("angle") or "screen"
+    if target_type in {"mac_camera", "mac_webcam"}:
+        target_type = "camera"
+    data, mime, label = _capture_targeted_visual(
+        target_type=target_type,
+        browser=params.get("browser", ""),
+        target=params.get("target", ""),
+        index=params.get("index"),
+        window_title=params.get("window_title", ""),
+        app_name=params.get("app_name", ""),
+    )
+    return {
+        "image_b64": base64.b64encode(data).decode("ascii"),
+        "mime_type": mime,
+        "label": label,
+    }
+
 def _capture_camera() -> tuple[bytes, str]:
     if not _CV2:
         raise RuntimeError("OpenCV (cv2) is not installed. Run: pip install opencv-python")
