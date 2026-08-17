@@ -51,6 +51,13 @@ def main():
                     else:
                         print(commit_result.stderr.strip() or commit_result.stdout.strip())
                     
+                    # Pull before pushing to avoid conflicts
+                    pull_origin = run(["git", "pull", "--rebase", "origin", "HEAD"], cwd=REPO_ROOT, check=False)
+                    if pull_origin.returncode != 0:
+                        print(f"Origin pull failed: {pull_origin.stderr.strip()}")
+                        # Abort rebase if it failed
+                        run(["git", "rebase", "--abort"], cwd=REPO_ROOT, check=False)
+
                     # Push to origin (GitHub)
                     push_origin = run(["git", "push", "origin", "HEAD"], cwd=REPO_ROOT, check=False)
                     if push_origin.returncode == 0:
