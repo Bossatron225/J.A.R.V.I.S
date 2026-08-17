@@ -517,7 +517,12 @@ class KokoroTTSEngine:
             arr = audio_q.get()
             if arr is None:
                 break
-            _play_np(arr, 24000)
+            if self.audio_sink is not None:
+                # Kokoro emits float32; convert to 16-bit PCM for the sink
+                pcm_bytes = (arr * 32767).astype(np.int16).tobytes()
+                self.audio_sink(pcm_bytes)
+            else:
+                _play_np(arr, 24000)
 
         synth_thread.join()
 
@@ -570,10 +575,9 @@ class ElevenLabsTTSEngine:
         last_error: Exception | None = None
         for voice_id in self._voice_candidates():
             try:
-                fmt = "pcm_44100" if sys.platform == "darwin" else "pcm_24000"
-                sr  = 44100 if sys.platform == "darwin" else 24000
+                # We use 24kHz PCM for consistency with the rest of MARK XL's audio loop.
                 resp = requests.post(
-                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format={fmt}",
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=pcm_24000",
                     json=payload,
                     headers=headers,
                     timeout=60,
@@ -583,7 +587,7 @@ class ElevenLabsTTSEngine:
                 if self.audio_sink is not None:
                     self.audio_sink(resp.content)
                 else:
-                    _play_audio_bytes(resp.content, sample_rate=sr)
+                    _play_audio_bytes(resp.content, sample_rate=24000)
                 return
             except Exception as exc:
                 last_error = exc
