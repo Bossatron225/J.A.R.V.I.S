@@ -3796,8 +3796,10 @@ class JarvisLive:
             raise
 
     async def _play_audio(self):
-        print("[JARVIS] 🔊 Play started")
-        reset_audio_output()
+        print("[JARVIS] 🔊 Play task started")
+        # Do NOT call reset_audio_output() here anymore; it calls sd.stop() which
+        # can kill other active streams and cause AUHAL issues on macOS.
+        # reset_audio_output()
 
         import sys
         import numpy as np
@@ -3810,10 +3812,12 @@ class JarvisLive:
                 channels=play_channels,
                 dtype="int16",
                 blocksize=int(self._audio_cfg.get("speaker_chunk_size", 960)),
-                latency=self._audio_cfg.get("output_latency", "low"),
+                latency=self._audio_cfg.get("output_latency", "high"), # Use 'high' for better compatibility on macOS
             )
             stream.start()
-        except Exception:
+            print(f"[JARVIS] 🔊 Audio stream started (channels={play_channels}, rate={RECEIVE_SAMPLE_RATE})")
+        except Exception as e:
+            print(f"[JARVIS] ❌ Audio stream failed to start: {e}")
             have_local_audio = False
             stream = None
 
