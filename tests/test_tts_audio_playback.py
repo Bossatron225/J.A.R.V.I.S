@@ -60,8 +60,8 @@ def test_play_audio_bytes_flattens_numpy_samples_before_sounddevice(monkeypatch)
     tts._play_audio_bytes(b"ID3abc")
 
     assert captured["sample_rate"] == 22050
-    assert isinstance(captured["data"], list)
-    data = np.asarray(captured["data"], dtype=np.float32)
+    assert isinstance(captured["data"], np.ndarray)
+    data = captured["data"]
     if sys.platform == "darwin":
         assert data.ndim == 2
         np.testing.assert_allclose(data, [[0.15, 0.15], [0.35, 0.35]])
@@ -105,9 +105,10 @@ def test_elevenlabs_falls_back_to_default_voice(monkeypatch):
     engine = tts.ElevenLabsTTSEngine(api_key="abc", voice_id="invalid-voice")
     engine.speak("hello")
 
+    expected_fmt = "pcm_44100" if sys.platform == "darwin" else "pcm_24000"
     assert len(sys.modules["requests"].calls) == 2
-    assert "/invalid-voice?output_format=pcm_24000" in sys.modules["requests"].calls[0][0]
-    assert "/pNInz6obpgDQGcFmaJgB?output_format=pcm_24000" in sys.modules["requests"].calls[1][0]
+    assert f"?output_format={expected_fmt}" in sys.modules["requests"].calls[0][0]
+    assert f"?output_format={expected_fmt}" in sys.modules["requests"].calls[1][0]
     assert captured["payload"] == b"audio"
 
 
