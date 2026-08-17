@@ -414,6 +414,7 @@ class DashboardServer:
         self._clients: set[WebSocket]     = set()
         self._audio_clients: set[WebSocket] = set()
         self._history: list[dict]         = []
+        self._current_state: str          = "sleeping"
         self._command_queue               = asyncio.Queue()
         self._wake_callback               = None
         self._connect_callback            = None
@@ -745,6 +746,8 @@ class DashboardServer:
     # ── broadcast ────────────────────────────────────────────────────────
 
     async def broadcast(self, msg: dict) -> None:
+        if isinstance(msg, dict) and msg.get("type") == "status":
+            self._current_state = str(msg.get("state") or "sleeping")
         self._history.append(msg)
         if len(self._history) > 300:
             self._history = self._history[-300:]

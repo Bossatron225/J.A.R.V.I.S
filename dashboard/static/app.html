@@ -549,7 +549,7 @@
         if (m.type === 'pong') return;
         if (m.type === 'log')           append(m.speaker, m.text);
         if (m.type === 'status')        setStatus(m.state);
-        if (m.type === 'wake')          sys('Wake word detected — connecting…');
+        if (m.type === 'wake')          { sys('Wake signal received.'); setStatus('active'); }
         if (m.type === 'sys')           sys(m.text);
         if (m.type === 'file_received') _onFileReceived(m);
         if (m.type === 'diagnostics')   _renderDiagnostics(m.payload || {});
@@ -823,7 +823,9 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
-      });
+      }).then(r => r.json()).then(data => {
+        if (data && data.ok) setStatus('active');
+      }).catch(() => {});
     }
 
     function doSend() {
@@ -846,7 +848,18 @@
 
     function doWake() {
       sys('Sending wake signal…');
-      _authFetch('/api/wake', { method: 'POST' });
+      setStatus('active');
+      _authFetch('/api/wake', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.ok) {
+            toast('Wake signal sent');
+            setStatus('active');
+          }
+        })
+        .catch(err => {
+          sys('Wake error: ' + (err.message || 'connection error'));
+        });
     }
 
     document.getElementById('inp').addEventListener('keydown', e => {
