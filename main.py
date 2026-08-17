@@ -4685,9 +4685,13 @@ class JarvisLive:
                     try:
                         def local_audio_sink(pcm_bytes):
                             if self.audio_in_queue:
-                                self._loop.call_soon_threadsafe(
-                                    self.audio_in_queue.put_nowait, pcm_bytes
-                                )
+                                # Slice into smaller chunks for responsiveness (interruptions)
+                                slice_size = int(self._audio_cfg.get("incoming_slice_bytes", 2400))
+                                for i in range(0, len(pcm_bytes), slice_size):
+                                    chunk = pcm_bytes[i : i + slice_size]
+                                    self._loop.call_soon_threadsafe(
+                                        self.audio_in_queue.put_nowait, chunk
+                                    )
 
                         audio_sink = (
                             self._remote_bridge.publish_audio
