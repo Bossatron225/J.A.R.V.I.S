@@ -1518,6 +1518,8 @@ class JarvisLive:
         self.ui.on_interrupt      = self.interrupt
         self.ui.on_biometric_failure = self._handle_biometric_failure
         self._turn_done_event: asyncio.Event | None = None
+        self._wake_event = asyncio.Event()
+        self._pending_commands = asyncio.Queue()
         self._dashboard     = dashboard
         self._remote_bridge = remote_bridge
         self._briefing_sent    = False          # morning briefing fires once per process
