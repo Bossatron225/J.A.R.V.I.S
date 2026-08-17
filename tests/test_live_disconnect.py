@@ -446,3 +446,23 @@ def test_vps_headless_mode_blocks_shutdown(monkeypatch) -> None:
 
     assert result is False
     assert seen == []
+
+
+def test_on_dashboard_wake_thread_safe_scheduling(monkeypatch) -> None:
+    jarvis = JarvisLive(DummyUI())
+    
+    # Mock loop and check if call_soon_threadsafe is called
+    calls = []
+    class FakeLoop:
+        def is_running(self):
+            return True
+        def call_soon_threadsafe(self, fn, *args):
+            calls.append((fn, args))
+            
+    jarvis._loop = FakeLoop()
+    jarvis._on_dashboard_wake()
+    
+    # Assert that call_soon_threadsafe was called with self._wake_event.set
+    assert len(calls) == 1
+    assert calls[0][0] == jarvis._wake_event.set
+
