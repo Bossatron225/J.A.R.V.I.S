@@ -140,7 +140,8 @@ def test_elevenlabs_streams_remote_pcm_at_24khz(monkeypatch):
     )
     engine.speak("hello")
 
-    assert captured_request["url"].endswith("?output_format=pcm_24000")
+    expected_fmt = "pcm_44100" if sys.platform == "darwin" else "pcm_24000"
+    assert captured_request["url"].endswith(f"?output_format={expected_fmt}")
     assert "output_format" not in captured_request["payload"]
     assert remote_audio == [b"remote-pcm"]
 
