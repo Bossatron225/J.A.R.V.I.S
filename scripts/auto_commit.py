@@ -50,6 +50,23 @@ def main():
                         print(f"Committed changes: {message}")
                     else:
                         print(commit_result.stderr.strip() or commit_result.stdout.strip())
+                    
+                    # Push to origin (GitHub)
+                    push_origin = run(["git", "push", "origin", "HEAD"], cwd=REPO_ROOT, check=False)
+                    if push_origin.returncode == 0:
+                        print("Pushed to origin (GitHub)")
+                    else:
+                        print(f"Origin push failed: {push_origin.stderr.strip()}")
+                        
+                    # Push to vps if remote exists
+                    remotes = run(["git", "remote"], cwd=REPO_ROOT, check=False).stdout.split()
+                    if "vps" in remotes:
+                        push_vps = run(["git", "push", "vps", "HEAD"], cwd=REPO_ROOT, check=False)
+                        if push_vps.returncode == 0:
+                            print("Pushed to vps (VPS server)")
+                        else:
+                            print(f"VPS push failed: {push_vps.stderr.strip()}")
+
                     last_status = status
                 else:
                     time.sleep(POLL_SECONDS)
