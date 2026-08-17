@@ -146,6 +146,11 @@ try:
 except Exception:
     file_processor = None
 
+try:
+    from actions.flight_finder import flight_finder
+except Exception:
+    flight_finder = None
+
     # ... (imports) ...
     for _target_name, (_module_name, _attribute_name) in _HEADLESS_SAFE_ACTIONS.items():
         try:
