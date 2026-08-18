@@ -4668,6 +4668,11 @@ class JarvisLive:
             try:
                 text = await self._pending_commands.get()
                 if getattr(self.ui, "is_biometric_lock_active", lambda: False)():
+                    override_code = self._extract_override_code(text)
+                    if override_code is not None:
+                        success, message = self.ui.unlock_via_override(override_code)
+                        self.ui.write_log(f"SYS: {message}")
+                        continue
                     self.ui.write_log(f"SYS: Biometric lock active — dashboard command dropped: {text}")
                     continue
                 for _ in range(300):
