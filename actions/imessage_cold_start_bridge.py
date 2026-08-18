@@ -491,6 +491,7 @@ def _launch_jarvis(python_exec: str, target_script: Path, extra_env: dict | None
                         cwd=str(BASE_DIR),
                         stdout=launch_log,
                         stderr=launch_log,
+                        env=launch_env,
                     )
                     time.sleep(4)
                     if _is_jarvis_running(target_script):
