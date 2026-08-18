@@ -512,3 +512,68 @@ def test_enroll_biometric_profile_trains_model_from_visual_samples(monkeypatch) 
     assert "model trained: 3 sample(s)" in result
     primary = file_controller_module._AUTHORIZED_PROFILES["primary"]
     assert len(primary["visual_samples"]) == 3
+
+
+def test_local_speech_gate_active_when_desktop_locked() -> None:
+    class DummyDesktopUI:
+        def is_biometric_lock_active(self) -> bool:
+            return True
+
+    live = main_module.JarvisLive(DummyDesktopUI())
+
+    assert live._local_speech_gate_active() is True
+
+
+def test_local_speech_gate_inactive_when_desktop_unlocked() -> None:
+    class DummyDesktopUI:
+        def is_biometric_lock_active(self) -> bool:
+            return False
+
+    live = main_module.JarvisLive(DummyDesktopUI())
+
+    assert live._local_speech_gate_active() is False
+
+
+def test_local_speech_gate_never_active_on_headless_vps(monkeypatch) -> None:
+    headless = main_module._HeadlessUI.__new__(main_module._HeadlessUI)
+    headless._biometric_locked = True
+    live = main_module.JarvisLive(headless)
+
+    # Even though the VPS/headless instance itself is locked, the local-only speech
+    # gate must not apply to it — it has no mic/speaker in the room to clash with,
+    # and (unlike the desktop) starts locked with no automatic unlock path.
+    assert live._local_speech_gate_active() is False
+
+
+def test_enqueue_tts_sentence_drops_while_locally_locked() -> None:
+    class DummyDesktopUI:
+        def is_biometric_lock_active(self) -> bool:
+            return True
+
+    live = main_module.JarvisLive(DummyDesktopUI())
+    live._tts_sentence_queue = asyncio.Queue()
+
+    live._enqueue_tts_sentence("hello there")
+
+    assert live._tts_sentence_queue.empty()
+
+
+def test_speak_external_tts_drops_while_locally_locked() -> None:
+    class DummyDesktopUI:
+        def is_biometric_lock_active(self) -> bool:
+            return True
+
+    class DummyTTSPlayer:
+        def __init__(self) -> None:
+            self.spoken: list[str] = []
+
+        def speak(self, text: str) -> None:
+            self.spoken.append(text)
+
+    live = main_module.JarvisLive(DummyDesktopUI())
+    player = DummyTTSPlayer()
+    live._tts_player = player
+
+    asyncio.run(live._speak_external_tts("hello there"))
+
+    assert player.spoken == []
