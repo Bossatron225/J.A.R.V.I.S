@@ -4854,7 +4854,7 @@ class JarvisLive:
                 if self._external_tts_enabled(runtime_cfg):
                     try:
                         def local_audio_sink(pcm_bytes):
-                            if self.audio_in_queue:
+                            if self.audio_in_queue and not self._local_speech_gate_active():
                                 print(f"[TTS] Received {len(pcm_bytes)} bytes of audio from ElevenLabs")
                                 # Slice into smaller chunks for responsiveness (interruptions)
                                 slice_size = int(self._audio_cfg.get("incoming_slice_bytes", 2400))
