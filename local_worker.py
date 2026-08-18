@@ -29,6 +29,16 @@ LOCAL_ACTIONS = {
     'youtube_video',
 }
 
+# Actions that just fetch data or a frame — never worth a visible "wake" on the Mac.
+QUIET_ACTIONS = {
+    'status',
+    'capture_camera',
+    'capture_visual',
+    'capture_screen',
+    'system_status',
+    'find_my',
+}
+
 ACTION_HANDLERS = {
     'open_app': ('actions.open_app', 'open_app'),
     'browser_control': ('actions.browser_control', 'browser_control'),
