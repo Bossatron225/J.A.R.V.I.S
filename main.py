@@ -65,6 +65,12 @@ import speech_recognition as sr
 from google import genai
 from google.genai import types
 from ui import JarvisUI
+from actions.file_controller import (
+    check_override_rate_limit,
+    record_override_attempt,
+    verify_override_code,
+    _append_override_audit_log,
+)
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
     save_session_summary, get_recent_sessions,
