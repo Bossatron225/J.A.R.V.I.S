@@ -790,6 +790,9 @@ def _resolve_path(raw: str) -> Path:
         "videos":    _get_videos(),
         "home":      Path.home(),
     }
+    if _OS == "Darwin":
+        shortcuts["volumes"] = Path("/Volumes")
+        shortcuts["usb"] = Path("/Volumes")
     lower = raw.strip().lower()
     if lower in shortcuts:
         return shortcuts[lower]
