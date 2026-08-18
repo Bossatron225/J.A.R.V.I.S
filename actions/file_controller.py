@@ -572,10 +572,6 @@ _OVERRIDE_COOLDOWN_SECONDS = 60.0
 _override_attempts = {"count": 0, "locked_until": 0.0}
 
 
-def _config_dir() -> Path:
-    return Path(__file__).resolve().parent.parent / "config"
-
-
 def _override_secret_path() -> Path:
     return _config_dir() / "override_secret.json"
 
