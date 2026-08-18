@@ -1317,6 +1317,69 @@ def has_active_browser_session(browser: str | None = None) -> bool:
     return _registry.has(browser)
 
 
+def needs_cdp_relaunch(browser_name: str) -> bool:
+    """
+    True when this browser is already running natively but without the
+    remote-debugging port JARVIS needs to see its tabs in the background —
+    it needs a one-time restart (with the user's consent) to enable that.
+    """
+    if _OS != "Darwin" or not browser_name:
+        return False
+    name = _ALIASES.get(browser_name.lower().strip(), browser_name.lower().strip())
+    port = _CDP_PORTS.get(name)
+    if port is None or _cdp_endpoint_reachable(port):
+        return False
+    app = _MAC_APP_NAMES.get(name)
+    return bool(app) and _is_mac_app_running(app)
+
+
+def relaunch_with_debugging(browser_name: str) -> str:
+    """
+    Quits and reopens a browser with CDP debugging enabled so JARVIS can see
+    every tab in the background. Only call this after the user has agreed —
+    it closes and reopens the app (tabs restore automatically via the
+    browser's own session-restore).
+    """
+    if _OS != "Darwin":
+        return "Background tab sight for an already-running browser is currently supported on macOS only."
+    name = _ALIASES.get((browser_name or "").lower().strip(), (browser_name or "").lower().strip())
+    port = _CDP_PORTS.get(name)
+    app  = _MAC_APP_NAMES.get(name)
+    if port is None or not app:
+        return f"'{browser_name}' is not supported for background tab sight."
+    if name == "safari":
+        return "Safari already supports per-tab background sight without a restart."
+
+    quit_result = _close_native_browser_all_tabs(name)
+    print(f"[Browser] Quit for CDP relaunch: {quit_result}")
+    time.sleep(1.0)
+    try:
+        subprocess.run(
+            ["open", "-a", app, "--args", f"--remote-debugging-port={port}"],
+            check=True, timeout=10,
+        )
+    except Exception as e:
+        return f"Could not relaunch {app}: {e}"
+
+    for _ in range(20):
+        if _cdp_endpoint_reachable(port):
+            break
+        time.sleep(0.5)
+
+    return f"{app} restarted with background tab sight enabled — your tabs should restore automatically."
+
+
+def list_all_open_tabs() -> list[dict]:
+    """Structured inventory of every tab across every currently active browser session."""
+    tabs: list[dict] = []
+    for sess in _registry.active_sessions():
+        try:
+            tabs.extend(sess.run(sess.list_tabs_struct()))
+        except Exception as e:
+            print(f"[Browser] list_all_open_tabs: {sess.browser_name} failed: {e}")
+    return tabs
+
+
 def capture_browser_tab(parameters: dict | None = None) -> tuple[bytes, str, str]:
     """Capture a focused browser tab screenshot as image bytes for vision analysis."""
     params = parameters or {}
