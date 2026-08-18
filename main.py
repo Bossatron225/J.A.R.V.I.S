@@ -1517,6 +1517,8 @@ class JarvisLive:
         self._session_log: list[str] = []          # conversation turns for end-of-session summary
         self._tts_player = None
         self._use_external_tts = False
+        self._vertex_project = ""
+        self._vertex_location = "us-central1"
         self._tts_sentence_queue: asyncio.Queue[str | None] | None = None
         self._tts_pending_sentence = ""  # partial sentence awaiting next chunk
         # Per-session tool result cache (avoids redundant API calls for same args)
