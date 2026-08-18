@@ -442,16 +442,25 @@ def _capture_targeted_visual(target_type: str = "screen", *, browser: str = "", 
         data, mime = _capture_camera()
         return data, mime, "camera"
     if source in {"tab", "browser", "browser_tab", "browser-tab"}:
-        if _get_os() == "mac":
-            b = (browser or "").strip().lower()
-            if not b:
-                b = _detect_frontmost_macos_browser()
-            if b in _MAC_BROWSER_APP_NAMES:
-                return _capture_macos_browser_tab(browser=b, target=target, index=index)
+        b = (browser or "").strip().lower()
+        if not b and _get_os() == "mac":
+            b = _detect_frontmost_macos_browser()
+
+        # An automation session (Playwright, via browser_control) can screenshot
+        # any tab by index/title through CDP without switching to it first — true
+        # background capture. OS-level window capture, by contrast, only ever
+        # sees whichever tab is currently active on screen in that window. Prefer
+        # the automation session whenever JARVIS already has one driving this
+        # browser, and only fall back to window capture (frontmost tab only) when
+        # it doesn't — e.g. a browser window the user opened themselves.
+        has_session = bool(_has_active_browser_session and _has_active_browser_session(b))
+
+        if not has_session and _get_os() == "mac" and b in _MAC_BROWSER_APP_NAMES:
+            return _capture_macos_browser_tab(browser=b, target=target, index=index)
         if not _capture_browser_tab:
             raise RuntimeError("Browser tab capture is unavailable in this build.")
         data, mime, label = _capture_browser_tab({
-            "browser": browser,
+            "browser": b or browser,
             "target": target,
             "index": index,
         })
