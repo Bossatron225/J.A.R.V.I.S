@@ -122,6 +122,7 @@ def add_authorized_profile(profile_id: str, name: str, voice_print: str, visual_
         _AUTHORIZED_PERSONNEL.add(normalized_visual)
 
     verify_biometric_security.cache_clear()
+    _save_profiles_to_disk()
     return f"BiometricLock_Protocol: Successfully added authorized profile for '{name}' with ID '{profile_id}'."
 
 
