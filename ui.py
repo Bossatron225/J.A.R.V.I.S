@@ -53,6 +53,7 @@ from actions.file_controller import (
     get_authorized_profiles,
     has_override_code_configured,
     record_override_attempt,
+    set_override_code,
     verify_biometric_security,
     verify_override_code,
     _append_override_audit_log,
