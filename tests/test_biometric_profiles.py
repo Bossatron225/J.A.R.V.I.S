@@ -17,6 +17,15 @@ requires_face_module = pytest.mark.skipif(
 )
 
 
+def _make_synthetic_face(freq_x: float = 1.0, freq_y: float = 1.0, phase: float = 0.0):
+    """LBPH compares *texture*, so a flat/random image has no structure for it to key
+    off of — use a smooth 2D sinusoid instead, which behaves like real face texture
+    for testing purposes (distinct identities => distinct frequencies/phase)."""
+    xx, yy = np.meshgrid(np.linspace(0, 4 * np.pi, 200), np.linspace(0, 4 * np.pi, 200))
+    pattern = 128 + 100 * np.sin(xx * freq_x + phase) * np.cos(yy * freq_y)
+    return np.clip(pattern, 0, 255).astype(np.uint8)
+
+
 def _fake_extract_for_training(base_face):
     """Return a monkeypatch target standing in for auth._extract_face_for_training:
     each "sample" is the same underlying face with a small deterministic amount of
