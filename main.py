@@ -326,6 +326,14 @@ LIVE_MODELS = (
     "models/gemini-2.5-flash-native-audio-preview-09-2025",
     "models/gemini-3.1-flash-live-preview",
 )
+# Used instead of LIVE_MODELS when config/api_keys.json sets "vertex_project".
+# Google's consumer Generative Language API (the plain gemini_api_key path
+# above) blocks the Live/audio websocket from datacenter IPs with a "User
+# location is not supported" error — this doesn't affect Vertex AI, which
+# authenticates via a GCP service account/OAuth instead of a bare API key.
+VERTEX_LIVE_MODELS = (
+    "gemini-live-2.5-flash-native-audio",
+)
 SESSION_SUMMARY_MODELS = (
     "models/gemini-flash-lite-latest",
     "models/gemini-flash-latest",
