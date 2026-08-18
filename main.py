@@ -4744,10 +4744,17 @@ class JarvisLive:
                 config = self._build_config()
 
                 # Fresh client on every reconnect — avoids stale HTTP session state
-                client = genai.Client(
-                    api_key=_get_api_key(),
-                    http_options={"api_version": "v1beta"}
-                )
+                if self._vertex_project:
+                    client = genai.Client(
+                        vertexai=True,
+                        project=self._vertex_project,
+                        location=self._vertex_location,
+                    )
+                else:
+                    client = genai.Client(
+                        api_key=_get_api_key(),
+                        http_options={"api_version": "v1beta"}
+                    )
 
                 connected = False
                 connect_error = None
