@@ -344,3 +344,164 @@ def test_audio_callbacks_are_blocked_during_biometric_lock() -> None:
 
     assert live.out_queue.empty()
     assert live.audio_in_queue.empty()
+
+
+@requires_face_module
+def test_train_face_model_learns_from_multiple_angle_samples(monkeypatch, tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    base_face = rng.integers(0, 256, size=(200, 200), dtype=np.uint8)
+    monkeypatch.setattr(auth_module, "_extract_face_for_training", _fake_extract_for_training(base_face))
+
+    samples = [bytes([i]) for i in range(6)]
+    ok, model_bytes, message = auth_module.train_face_model(samples)
+
+    assert ok is True
+    assert model_bytes
+    assert "6 face sample" in message
+
+    saved_path = auth_module.save_face_model("test_profile", model_bytes)
+    try:
+        assert saved_path.exists()
+        loaded = auth_module.load_face_model("test_profile")
+        assert loaded is not None
+
+        matching_gray = np.clip(
+            base_face.astype(int) + np.random.default_rng(99).integers(-8, 8, size=base_face.shape), 0, 255
+        ).astype(np.uint8)
+        _, matching_confidence = loaded.predict(matching_gray)
+
+        different_gray = rng.integers(0, 256, size=(200, 200), dtype=np.uint8)
+        _, different_confidence = loaded.predict(different_gray)
+
+        assert matching_confidence <= auth_module._LBPH_DEFAULT_THRESHOLD
+        assert different_confidence > matching_confidence
+    finally:
+        saved_path.unlink(missing_ok=True)
+
+
+def test_train_face_model_rejects_too_few_samples(monkeypatch) -> None:
+    monkeypatch.setattr(auth_module, "_extract_face_for_training", lambda image_bytes: np.zeros((200, 200), dtype=np.uint8))
+
+    ok, model_bytes, message = auth_module.train_face_model([b"only-one"])
+
+    assert ok is False
+    assert model_bytes is None
+    assert "need at least" in message
+
+
+@requires_face_module
+def test_verify_face_against_model_matches_and_rejects(monkeypatch) -> None:
+    rng = np.random.default_rng(7)
+    base_face = rng.integers(0, 256, size=(200, 200), dtype=np.uint8)
+    monkeypatch.setattr(auth_module, "_extract_face_for_training", _fake_extract_for_training(base_face))
+
+    samples = [bytes([i]) for i in range(5)]
+    ok, model_bytes, _ = auth_module.train_face_model(samples)
+    assert ok is True
+
+    recognizer = auth_module.cv2.face.LBPHFaceRecognizer_create()
+    with tempfile.NamedTemporaryFile(suffix=".yml") as tmp:
+        Path(tmp.name).write_bytes(model_bytes)
+        recognizer.read(tmp.name)
+
+    monkeypatch.setattr(auth_module, "_extract_primary_face", lambda gray, detector: gray)
+
+    class FakeCapture:
+        def __init__(self, frame):
+            self._frame = frame
+            self._served = False
+
+        def isOpened(self):
+            return True
+
+        def read(self):
+            if self._served:
+                return False, None
+            self._served = True
+            return True, self._frame
+
+        def release(self):
+            pass
+
+    matching_gray = np.clip(
+        base_face.astype(int) + np.random.default_rng(3).integers(-8, 8, size=base_face.shape), 0, 255
+    ).astype(np.uint8)
+    matching_frame = np.stack([matching_gray] * 3, axis=-1).astype(np.uint8)
+    monkeypatch.setattr(auth_module.cv2, "VideoCapture", lambda idx: FakeCapture(matching_frame))
+    matched, reason = auth_module.verify_face_against_model(recognizer, num_frames=1)
+    assert matched is True, reason
+
+    different_gray = rng.integers(0, 256, size=(200, 200), dtype=np.uint8)
+    different_frame = np.stack([different_gray] * 3, axis=-1).astype(np.uint8)
+    monkeypatch.setattr(auth_module.cv2, "VideoCapture", lambda idx: FakeCapture(different_frame))
+    rejected, reason2 = auth_module.verify_face_against_model(recognizer, num_frames=1)
+    assert rejected is False, reason2
+
+
+def _setup_lbph_evaluation(monkeypatch, model_match: bool, model_reason: str) -> None:
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PROFILES", {
+        "primary": {
+            "name": "James Lumsden",
+            "voice_prints": ["james lumsden"],
+            "visual_signatures": ["james lumsden"],
+            "clearance_level": "omega",
+        },
+        "authorized": {},
+    })
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", {"james", "james lumsden"})
+    monkeypatch.setattr(file_controller_module, "_record_voice_sample", lambda *args, **kwargs: (b"audio-sample", 0.05))
+    monkeypatch.setattr(file_controller_module, "_capture_live_visual_frame", lambda *args, **kwargs: (b"frame", True))
+    monkeypatch.setattr(file_controller_module, "_verify_live_voice_with_gemini", lambda *args, **kwargs: True)
+    # Legacy/network signals all say "yes" — the trained model must be authoritative regardless.
+    monkeypatch.setattr(file_controller_module, "_verify_reference_face_match", lambda: (True, "ok"))
+    monkeypatch.setattr(file_controller_module, "_verify_live_face_with_gemini", lambda *args, **kwargs: True)
+    monkeypatch.setattr(file_controller_module, "_load_primary_face_model", lambda: object())
+    monkeypatch.setattr(file_controller_module, "_verify_live_face_with_trained_model", lambda model: (model_match, model_reason))
+
+
+def test_evaluate_live_biometric_security_lbph_rejects_despite_legacy_yes(monkeypatch) -> None:
+    _setup_lbph_evaluation(monkeypatch, model_match=False, model_reason="Face did not match trained model (confidence=120.0, threshold=75.0)")
+
+    granted, details = file_controller_module.evaluate_live_biometric_security("James Lumsden")
+
+    assert granted is False
+    assert details["visual_detected"] is False
+    assert details["visual_engine"] == "lbph"
+
+
+def test_evaluate_live_biometric_security_lbph_accepts_trained_match(monkeypatch) -> None:
+    _setup_lbph_evaluation(monkeypatch, model_match=True, model_reason="Face matched trained model (confidence=30.0, threshold=75.0)")
+
+    granted, details = file_controller_module.evaluate_live_biometric_security("James Lumsden")
+
+    assert granted is True
+    assert details["visual_detected"] is True
+    assert details["visual_engine"] == "lbph"
+
+
+def test_enroll_biometric_profile_trains_model_from_visual_samples(monkeypatch) -> None:
+    monkeypatch.setattr(
+        file_controller_module,
+        "_AUTHORIZED_PROFILES",
+        {"primary": {"name": "James Lumsden", "voice_prints": [], "visual_signatures": [], "clearance_level": "omega"}, "authorized": {}},
+    )
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", set())
+    monkeypatch.setattr(
+        file_controller_module,
+        "_train_and_save_face_model",
+        lambda profile_key, visual_samples: f"model trained: {len(visual_samples)} sample(s)",
+    )
+
+    result = file_controller_module.enroll_biometric_profile(
+        profile_id="james",
+        name="James Lumsden",
+        voice_print="James Lumsden",
+        visual_signature="James Lumsden",
+        clearance_level="omega",
+        make_primary=True,
+        visual_samples=[b"sample-1", b"sample-2", b"sample-3"],
+    )
+
+    assert "model trained: 3 sample(s)" in result
+    primary = file_controller_module._AUTHORIZED_PROFILES["primary"]
+    assert len(primary["visual_samples"]) == 3
