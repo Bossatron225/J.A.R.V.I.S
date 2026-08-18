@@ -630,6 +630,9 @@ def _capture_camera() -> tuple[bytes, str]:
         except ValueError:
             continue
 
+    if proc.stderr.strip():
+        print(f"[Camera] subprocess stderr: {proc.stderr.strip()[-800:]}")
+
     if payload is None:
         detail = proc.stderr.strip()[-400:] or "no output"
         raise RuntimeError(f"Camera capture failed: {detail}")
