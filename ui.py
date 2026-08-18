@@ -1769,7 +1769,7 @@ class BiometricLockOverlay(QWidget):
         btn_row.addWidget(manage_btn)
         lay.addLayout(btn_row)
 
-        override_btn = QPushButton("OVERRIDE")
+        override_btn = QPushButton("OVERRIDE CODE")
         override_btn.setFixedHeight(30)
         override_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         override_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1780,8 +1780,51 @@ class BiometricLockOverlay(QWidget):
             }}
             QPushButton:hover {{ background: #200010; }}
         """)
-        override_btn.clicked.connect(self.verified.emit)
+        override_btn.clicked.connect(self._prompt_override_code)
         lay.addWidget(override_btn)
+
+    def _prompt_override_code(self):
+        if not has_override_code_configured():
+            self._status_lbl.setText("STATUS: NO OVERRIDE CODE CONFIGURED")
+            self._status_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
+            return
+
+        allowed, message = check_override_rate_limit()
+        if not allowed:
+            self._status_lbl.setText(f"STATUS: {message}")
+            self._status_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
+            return
+
+        code, ok = QInputDialog.getText(
+            self,
+            "Manual Override",
+            "Enter manual override code:",
+            QLineEdit.EchoMode.Password,
+            "",
+        )
+        if not ok or not code:
+            return
+
+        success = verify_override_code(code)
+        record_override_attempt(success)
+        _append_override_audit_log(success, "manual_override")
+
+        if success:
+            self._status_lbl.setText("STATUS: OVERRIDE CODE ACCEPTED")
+            self._status_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+            host = self.window()
+            if host is not None and hasattr(host, "_log"):
+                host._log.append_log("SYS: BiometricLock_Protocol cleared via manual override code.")
+            self.verified.emit()
+        else:
+            allowed, message = check_override_rate_limit()
+            self._status_lbl.setText(
+                f"STATUS: {message}" if not allowed else "STATUS: OVERRIDE CODE REJECTED"
+            )
+            self._status_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
+            host = self.window()
+            if host is not None and hasattr(host, "_log"):
+                host._log.append_log("SYS: Manual override attempt rejected.")
 
     def _refresh_profile_label(self):
         primary = get_authorized_profiles().get("primary") or {}
