@@ -1707,20 +1707,122 @@ class ManageProfilesOverlay(QWidget):
     def _countdown_baseline_step(self):
         if getattr(self, "_setup_timer", 0) <= 1:
             self._set_capture_state("recording")
-            self._setup_countdown_label.setText("Capturing baseline...")
-            self._setup_status.setText("Capturing your live voice and face baseline now.")
-            ok, message = establish_biometric_baseline(name=self._setup_name)
-            if ok:
-                self._show_capture_confirmation(message)
-            else:
-                self._setup_status.setText(message)
-                self._setup_status.setStyleSheet(f"color: {C.RED}; background: transparent;")
-                self._setup_countdown_label.setText("Capture failed")
-                self._set_capture_state("idle")
+            self._start_guided_visual_capture()
             return
         self._setup_timer -= 1
         self._setup_countdown_label.setText(f"{self._setup_timer}...")
         QTimer.singleShot(1000, self._countdown_baseline_step)
+
+    def _start_guided_visual_capture(self) -> None:
+        """Drive a short guided sequence of prompts (angle + distance changes) while
+        collecting one face sample per prompt, so the trained model isn't built from a
+        single pose/distance. Reuses the already-open preview camera/timer."""
+        self._captured_visual_samples = []
+        self._visual_capture_prompt_index = 0
+        self._visual_capture_retries_this_prompt = 0
+        self._setup_countdown_label.setText("Capturing multi-angle face baseline...")
+        self._show_visual_capture_prompt()
+        try:
+            if self._visual_capture_timer is None:
+                self._visual_capture_timer = QTimer()
+                self._visual_capture_timer.timeout.connect(self._visual_capture_tick)
+            self._visual_capture_timer.setInterval(self._VISUAL_CAPTURE_TICK_MS)
+            self._visual_capture_timer.start()
+        except RuntimeError:
+            self._finish_guided_visual_capture()
+
+    def _show_visual_capture_prompt(self) -> None:
+        prompt = self._VISUAL_CAPTURE_PROMPTS[self._visual_capture_prompt_index]
+        captured = len(self._captured_visual_samples)
+        total = len(self._VISUAL_CAPTURE_PROMPTS)
+        self._safe_set_widget_text(
+            self._preview_placeholder,
+            f"[{captured}/{total}] {prompt}...",
+        )
+        self._safe_set_widget_stylesheet(self._preview_placeholder, f"color: {C.TEXT}; background: transparent;")
+
+    def _visual_capture_tick(self) -> None:
+        if self._camera_cap is None:
+            self._finish_guided_visual_capture()
+            return
+        try:
+            import cv2
+        except ImportError:
+            self._finish_guided_visual_capture()
+            return
+        try:
+            ok, frame = self._camera_cap.read()
+        except Exception:
+            ok, frame = False, None
+
+        face_detected = False
+        sample_bytes = None
+        if ok and frame is not None:
+            try:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                face_cascade_ctor = getattr(cv2, "CascadeClassifier", None)
+                if face_cascade_ctor is not None:
+                    face_cascade = face_cascade_ctor(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+                    if not getattr(face_cascade, "empty", lambda: True)():
+                        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+                        face_detected = bool(len(faces) > 0)
+                if face_detected:
+                    _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+                    sample_bytes = buf.tobytes() if buf is not None else None
+            except Exception:
+                face_detected = False
+
+        if face_detected and sample_bytes:
+            self._captured_visual_samples.append(sample_bytes)
+            self._visual_capture_prompt_index += 1
+            self._visual_capture_retries_this_prompt = 0
+            if self._visual_capture_prompt_index >= len(self._VISUAL_CAPTURE_PROMPTS):
+                self._finish_guided_visual_capture()
+                return
+            self._show_visual_capture_prompt()
+            return
+
+        self._visual_capture_retries_this_prompt += 1
+        if self._visual_capture_retries_this_prompt >= self._VISUAL_CAPTURE_MAX_RETRIES_PER_PROMPT:
+            # Couldn't get a clean face read for this pose in time — move on rather
+            # than hang indefinitely; we still need _VISUAL_CAPTURE_MIN_SAMPLES total.
+            self._visual_capture_prompt_index += 1
+            self._visual_capture_retries_this_prompt = 0
+            if self._visual_capture_prompt_index >= len(self._VISUAL_CAPTURE_PROMPTS):
+                self._finish_guided_visual_capture()
+                return
+            self._show_visual_capture_prompt()
+
+    def _finish_guided_visual_capture(self) -> None:
+        try:
+            if self._visual_capture_timer is not None:
+                self._visual_capture_timer.stop()
+        except Exception:
+            pass
+
+        if len(self._captured_visual_samples) < self._VISUAL_CAPTURE_MIN_SAMPLES:
+            self._setup_status.setText(
+                f"Only captured {len(self._captured_visual_samples)} usable face sample(s) "
+                f"(need at least {self._VISUAL_CAPTURE_MIN_SAMPLES}). Move into better light and try again."
+            )
+            self._setup_status.setStyleSheet(f"color: {C.RED}; background: transparent;")
+            self._setup_countdown_label.setText("Capture failed")
+            self._set_capture_state("idle")
+            return
+
+        self._setup_countdown_label.setText("Capturing voice sample...")
+        self._setup_status.setText("Face samples captured. Capturing your live voice baseline now.")
+        ok, message = establish_biometric_baseline(
+            name=self._setup_name,
+            visual_samples=self._captured_visual_samples,
+        )
+        if ok:
+            self._show_capture_confirmation(message)
+        else:
+            self._setup_status.setText(message)
+            self._setup_status.setStyleSheet(f"color: {C.RED}; background: transparent;")
+            self._setup_countdown_label.setText("Capture failed")
+            self._set_capture_state("idle")
 
 
 class BiometricLockOverlay(QWidget):
