@@ -211,6 +211,7 @@ return outputLines as text
             removed = self._targets.pop(target_id, None) is not None
             self._last_hash.pop(target_id, None)
             self._last_seen.pop(target_id, None)
+            self._auto_group.discard(target_id)
         return removed
 
     def list_targets(self) -> list[dict]:
@@ -222,6 +223,82 @@ return outputLines as text
             self._targets.clear()
             self._last_hash.clear()
             self._last_seen.clear()
+            self._auto_group.clear()
+
+    def has_auto_group(self) -> bool:
+        with self._lock:
+            return bool(self._auto_group)
+
+    def add_all(self, params: dict | None = None) -> dict:
+        """
+        Registers a passive watch target for every currently open browser tab
+        and every other app's window, so JARVIS can be asked about any of
+        them later ("what's on tab 3", "screenshot my Gmail tab") without the
+        user having to add each one individually. These targets are passive/
+        on-demand, not proactive — see poll_once/_run_visual_monitor, which
+        only speaks up for individually opted-in targets. Otherwise JARVIS
+        would comment on every DOM twitch across dozens of tabs.
+        """
+        params = params or {}
+        interval = max(1.0, min(float(params.get("interval_seconds", 5.0) or 5.0), 60.0))
+        current_ids: set[str] = set()
+
+        try:
+            from actions.browser_control import list_all_open_tabs
+            for tab in list_all_open_tabs():
+                identity = str(tab.get("url") or tab.get("title") or "").strip()
+                if not identity:
+                    continue
+                t = self.add_target({
+                    "target_type": "tab",
+                    "browser": tab.get("browser", ""),
+                    "target": identity,
+                    "label": f"tab:{tab.get('browser')}: {tab.get('title', '')}"[:80],
+                    "interval_seconds": interval,
+                    "enabled": True,
+                })
+                current_ids.add(t.target_id)
+        except Exception as e:
+            print(f"[VisualMonitor] add_all tab scan failed: {e}")
+
+        for app in self._macos_app_inventory():
+            app_name = str(app.get("app_name", "") or "").strip()
+            if not app_name:
+                continue
+            for win in app.get("windows", []):
+                t = self.add_target({
+                    "target_type": "window",
+                    "app_name": app_name,
+                    "window_title": win.get("title", ""),
+                    "window_id": win.get("window_id"),
+                    "label": f"{app_name}: {win.get('title', '')}"[:80],
+                    "interval_seconds": interval,
+                    "enabled": True,
+                })
+                current_ids.add(t.target_id)
+
+        with self._lock:
+            self._auto_group |= current_ids
+
+        return {"added": len(current_ids), "target_ids": sorted(current_ids)}
+
+    def resync_all(self) -> dict:
+        """
+        Re-scans tabs/windows for the add_all group: registers anything newly
+        opened, drops anything closed. Only touches targets add_all created —
+        individually added watches are never removed by this.
+        """
+        with self._lock:
+            prior = set(self._auto_group)
+        if not prior:
+            return {"added": 0, "removed": 0}
+
+        result = self.add_all()
+        current = set(result["target_ids"])
+        stale = prior - current
+        for target_id in stale:
+            self.remove_target(target_id)
+        return {"added": len(current - prior), "removed": len(stale)}
 
     def _capture(self, target: VisualTarget) -> tuple[bytes, str, str]:
         return _capture_targeted_visual(
