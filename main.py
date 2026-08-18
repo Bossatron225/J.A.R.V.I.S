@@ -4650,6 +4650,9 @@ class JarvisLive:
         while True:
             try:
                 text = await self._pending_commands.get()
+                if getattr(self.ui, "is_biometric_lock_active", lambda: False)():
+                    self.ui.write_log(f"SYS: Biometric lock active — dashboard command dropped: {text}")
+                    continue
                 for _ in range(300):
                     if self.session:
                         break
