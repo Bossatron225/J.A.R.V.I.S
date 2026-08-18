@@ -4560,7 +4560,6 @@ class MainWindow(QMainWindow):
         )
         ov.verified.connect(lambda: self._on_biometric_done(ov))
         ov.failed.connect(self._handle_biometric_failure)
-        ov.manage_requested.connect(self._open_manage_profiles)
         ov.show()
         self._biometric_overlay = ov
         self._biometric_locked = True
