@@ -98,34 +98,6 @@ def ensure_ollama_running(timeout: int = 15) -> bool:
     print("[LLM] Ollama did not respond within the timeout.")
     return False
 
-def verify_biometric_security_protocols(audio_sample: bytes | None = None, visual_frame: bytes | None = None) -> bool:
-    """Stark-spec advanced security check integrating Voice Recognition & Visual Person Detection against profile-backed database with optimized memory footprint."""
-    print("[SECURITY] Initializing biometric voice recognition & visual person detection protocols...")
-    profiles = _load_biometric_profiles()
-    if not profiles:
-        print("[SECURITY] Warning: No biometric profiles found in registry. Initialized defaults.")
-        profiles = _load_biometric_profiles()
-
-    # Memory-optimized low footprint validation
-    if audio_sample is not None:
-        if len(audio_sample) == 0:
-            print("[SECURITY] Warning: Empty audio sample provided for voice recognition.")
-        else:
-            print(f"[SECURITY] Voice signature analyzed against {len(profiles)} authorized profiles.")
-
-    if visual_frame is not None:
-        if len(visual_frame) == 0:
-            print("[SECURITY] Warning: Empty visual frame provided for person detection.")
-        else:
-            print("[SECURITY] Visual person detection matrix verified successfully.")
-
-    return True
-
-def initiate_biometric_lock_protocol(audio_sample: bytes | None = None, visual_frame: bytes | None = None) -> bool:
-    """Initiate BiometricLock_Protocol integration for enhanced security posture, profile validation, and optimized performance."""
-    print("[SECURITY] Initiating BiometricLock_Protocol integration for enhanced security and personalization...")
-    return verify_biometric_security_protocols(audio_sample=audio_sample, visual_frame=visual_frame)
-
 def warmup_model(system_prompt: str | None = None) -> bool:
     url, model = get_llm_settings()
     provider   = get_llm_provider()
