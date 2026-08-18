@@ -4523,6 +4523,10 @@ class JarvisUI:
             self._win = None
             return
         self._app.setStyle("Fusion")
+        # This process is a background VPS worker as much as it is a visible
+        # HUD — closing the window (or the window dying for any other reason)
+        # must not take down the asyncio loop / local-worker polling with it.
+        self._app.setQuitOnLastWindowClosed(False)
         self._win = MainWindow(face_path)
         self._window_alive = True
         self._win.destroyed.connect(self._on_window_destroyed)
