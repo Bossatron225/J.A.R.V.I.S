@@ -17,5 +17,6 @@ config/api_keys.json
 config/authorized_profiles.json
 config/override_secret.json
 config/override_audit.log
+config/biometric_models/
 bin/jarvis_python
 bin/python_app_backup/
