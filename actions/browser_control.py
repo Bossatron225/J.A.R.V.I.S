@@ -453,10 +453,20 @@ def _open_native(url: str, browser_name: Optional[str]) -> str:
 
     # Specific browser → launch its own executable, exactly like the user would.
     if name:
+        cdp_port = _CDP_PORTS.get(name) if _cdp_attach_enabled() else None
+
         if _OS == "Darwin":
             app = _MAC_APP_NAMES.get(name)
             if app:
-                cmd = ["open", "-a", app] + ([url] if url else [])
+                cmd = ["open", "-a", app]
+                if cdp_port:
+                    # Leaves a CDP debugger port open — no visible effect on
+                    # launch (no banner, no UI change) — so a later automation
+                    # session can attach and see every tab in the background,
+                    # including ones the user opens by hand.
+                    cmd += ["--args", f"--remote-debugging-port={cdp_port}"] + ([url] if url else [])
+                elif url:
+                    cmd += [url]
                 try:
                     subprocess.run(cmd, check=True, timeout=10)
                     return f"Opened in {name}: {url}" if url else f"Opened {name}."
@@ -472,10 +482,12 @@ def _open_native(url: str, browser_name: Optional[str]) -> str:
                 exe = _find_exe_windows(_WIN_EXE_HINTS.get(name, name))
         if exe:
             try:
-                subprocess.Popen(
-                    [exe, url] if url else [exe],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                )
+                argv = [exe]
+                if cdp_port:
+                    argv.append(f"--remote-debugging-port={cdp_port}")
+                if url:
+                    argv.append(url)
+                subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return f"Opened in {name}: {url}" if url else f"Opened {name}."
             except Exception as e:
                 print(f"[Browser] Native launch failed for {name}: {e}")
