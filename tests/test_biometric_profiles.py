@@ -438,7 +438,7 @@ def test_verify_face_against_model_matches_and_rejects(monkeypatch) -> None:
     matched, reason = auth_module.verify_face_against_model(recognizer, num_frames=1)
     assert matched is True, reason
 
-    different_gray = rng.integers(0, 256, size=(200, 200), dtype=np.uint8)
+    different_gray = _make_synthetic_face(freq_x=0.7, freq_y=2.1, phase=1.3)
     different_frame = np.stack([different_gray] * 3, axis=-1).astype(np.uint8)
     monkeypatch.setattr(auth_module.cv2, "VideoCapture", lambda idx: FakeCapture(different_frame))
     rejected, reason2 = auth_module.verify_face_against_model(recognizer, num_frames=1)
