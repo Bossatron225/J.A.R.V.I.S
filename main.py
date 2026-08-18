@@ -2836,6 +2836,18 @@ class JarvisLive:
         self.ui.write_log(f"ERR: {tool_name} — {short}")
         self.speak(f"Sir, {tool_name} encountered an error. {short}")
 
+    def _local_speech_gate_active(self) -> bool:
+        """True only on the local desktop Mac app while BiometricLock_Protocol hasn't
+        cleared — used to hold Jarvis's own speech/messages/proactive routines silent
+        so its speaker output can't bleed into the live mic capture used for voice
+        verification. Deliberately excludes the VPS/headless instance (`_HeadlessUI`):
+        it has no physical mic/speaker in the room to clash with, and it starts locked
+        with no automatic unlock path, so gating it here would silence it indefinitely.
+        """
+        if isinstance(self.ui, _HeadlessUI):
+            return False
+        return bool(getattr(self.ui, "is_biometric_lock_active", lambda: False)())
+
     def _handle_biometric_failure(self) -> None:
         self.ui.write_log("SYS: Biometric verification failed — initiating fail-closed shutdown.")
         self._schedule_shutdown("biometric verification failed")
