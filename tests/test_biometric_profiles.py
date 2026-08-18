@@ -514,6 +514,24 @@ def test_enroll_biometric_profile_trains_model_from_visual_samples(monkeypatch) 
     assert len(primary["visual_samples"]) == 3
 
 
+def test_is_worker_mode_requires_explicit_worker_env(monkeypatch) -> None:
+    """Regression: MainWindow.__init__ used to gate the face/voice scan UI on whether
+    JARVIS_VPS_URL was set, not on actual worker mode. run_local.sh (interactive,
+    attended) sets JARVIS_VPS_URL too, so the scan UI never showed on the desktop
+    app — it just sat locked with no way to clear it short of the override code."""
+    monkeypatch.delenv("JARVIS_MODE", raising=False)
+    assert ui_module._is_worker_mode() is False
+
+    monkeypatch.setenv("JARVIS_VPS_URL", "http://vps.example.com")
+    assert ui_module._is_worker_mode() is False  # VPS URL alone must not imply worker mode
+
+    monkeypatch.setenv("JARVIS_MODE", "interactive")
+    assert ui_module._is_worker_mode() is False
+
+    monkeypatch.setenv("JARVIS_MODE", "worker")
+    assert ui_module._is_worker_mode() is True
+
+
 def test_jarvis_ui_forwards_biometric_lock_state() -> None:
     """Regression: JarvisUI is a hand-written forwarding wrapper around MainWindow
     with no __getattr__ fallback. is_biometric_lock_active/unlock_via_override were
