@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Tuple
 
@@ -13,6 +14,11 @@ try:
     import numpy as np
 except Exception:  # pragma: no cover - optional dependency
     np = None
+
+_HAS_FACE_MODULE = bool(cv2 is not None and hasattr(cv2, "face"))
+_LBPH_FACE_SIZE = (200, 200)
+_LBPH_LABEL = 1
+_LBPH_DEFAULT_THRESHOLD = 75.0
 
 
 def _load_detector():
