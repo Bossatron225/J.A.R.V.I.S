@@ -1212,6 +1212,19 @@ class ManageProfilesOverlay(QWidget):
     Profile management overlay for BiometricLock_Protocol.
     Allows viewing, adding, and removing authorized profiles (voice & visual signatures).
     """
+
+    _VISUAL_CAPTURE_PROMPTS = [
+        "Look straight at the camera",
+        "Turn your head slightly left",
+        "Turn your head slightly right",
+        "Tilt your chin down slightly",
+        "Move a little closer to the camera",
+        "Step back a little from the camera",
+    ]
+    _VISUAL_CAPTURE_MAX_RETRIES_PER_PROMPT = 6
+    _VISUAL_CAPTURE_TICK_MS = 900
+    _VISUAL_CAPTURE_MIN_SAMPLES = 3
+
     def __init__(self, parent=None):
         self._qt_ready = False
         app = _ensure_qapplication()
