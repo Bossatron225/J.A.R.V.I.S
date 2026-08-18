@@ -574,7 +574,18 @@ class _BrowserSession:
             asyncio.run_coroutine_threadsafe(self._async_close(), self._loop).result(10)
 
     async def _async_close(self):
-        if self._context:
+        if self._cdp_attached:
+            # This Browser came from connect_over_cdp — .close() here only
+            # drops JARVIS's automation connection, it does not quit the
+            # user's real browser or any of its tabs.
+            if self._cdp_browser:
+                try:
+                    await self._cdp_browser.close()
+                except Exception:
+                    pass
+            self._cdp_browser = None
+            self._cdp_attached = False
+        elif self._context:
             try:
                 await self._context.close()
             except Exception:
