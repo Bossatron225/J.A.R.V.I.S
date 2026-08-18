@@ -399,8 +399,7 @@ def test_train_face_model_rejects_too_few_samples(monkeypatch) -> None:
 
 @requires_face_module
 def test_verify_face_against_model_matches_and_rejects(monkeypatch) -> None:
-    rng = np.random.default_rng(7)
-    base_face = rng.integers(0, 256, size=(200, 200), dtype=np.uint8)
+    base_face = _make_synthetic_face()
     monkeypatch.setattr(auth_module, "_extract_face_for_training", _fake_extract_for_training(base_face))
 
     samples = [bytes([i]) for i in range(5)]
