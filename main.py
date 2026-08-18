@@ -4293,6 +4293,9 @@ class JarvisLive:
             return
         await asyncio.sleep(8)
         while True:
+            if self._local_speech_gate_active():
+                await asyncio.sleep(8)
+                continue
             try:
                 alerts = await asyncio.to_thread(poll_mail_alerts)
                 if alerts:
