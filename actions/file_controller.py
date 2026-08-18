@@ -531,16 +531,19 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
 
     visual_confidence = None
     visual_engine = "legacy"
-    trained_model = _load_primary_face_model() if voice_detected and face_detected else None
+    trained_model = _load_primary_face_model() if voice_detected else None
 
     if trained_model is not None:
         # A trained multi-angle/distance model exists for the primary profile: this is
         # now the authoritative local check and it is NOT overridable by a Gemini "yes"
         # or the old single-baseline comparisons — those are weaker, network-dependent
         # or single-pose signals and must not be able to pass someone the model rejects.
+        # It runs its own multi-frame capture/detection burst rather than relying on the
+        # single quick frame above, since that single frame is exactly what pose/distance
+        # variation makes unreliable.
         visual_engine = "lbph"
         model_match, model_reason = _verify_live_face_with_trained_model(trained_model)
-        visual_detected = bool(face_detected and model_match)
+        visual_detected = bool(model_match)
         reference_face_reason = model_reason
         try:
             visual_confidence = float(model_reason.split("confidence=")[1].split(",")[0].split(")")[0])
