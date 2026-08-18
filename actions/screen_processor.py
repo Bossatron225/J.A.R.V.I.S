@@ -570,9 +570,22 @@ def _capture_camera() -> tuple[bytes, str]:
 
     index   = _get_camera_index()
     backend = _cv2_backend()
-    cap     = cv2.VideoCapture(index, backend)
 
-    if not cap.isOpened():
+    # AVFoundation can transiently refuse to open the device (e.g. right after
+    # another process/session released it) even though it's genuinely free a
+    # moment later — a couple of short retries clears this without masking a
+    # real "no camera" failure.
+    cap = None
+    for attempt in range(3):
+        cap = cv2.VideoCapture(index, backend)
+        if cap.isOpened():
+            break
+        cap.release()
+        cap = None
+        if attempt < 2:
+            time.sleep(0.5)
+
+    if cap is None:
         raise RuntimeError(f"Camera index {index} could not be opened.")
 
     for _ in range(10):
