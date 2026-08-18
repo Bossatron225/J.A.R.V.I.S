@@ -43,6 +43,11 @@ _BIOMETRIC_DEBUG = os.environ.get("JARVIS_BIOMETRIC_DEBUG", "0") == "1"
 
 _SAFE_ROOTS: tuple[Path, ...] = (
     Path.home(),
+    # External/USB volumes — macOS mounts them under /Volumes. Reachable only once
+    # BiometricLock_Protocol is actually cleared, same as every other tool call
+    # (see JarvisLive._execute_tool), which is the "upon biometric verification"
+    # gate this was widened for.
+    *([Path("/Volumes")] if _OS == "Darwin" else []),
 )
 
 
