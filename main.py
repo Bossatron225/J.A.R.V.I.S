@@ -5058,23 +5058,66 @@ class _HeadlessUI:
         return None
 
 
-def _acquire_single_instance(lock_path: str | None = None):
+def _acquire_single_instance(lock_path: str | None = None, mode: str = "interactive"):
     if fcntl is None:
         return object()
 
     lock_file = Path(lock_path or (Path(__file__).resolve().parent / ".jarvis.lock"))
     try:
-        handle = open(lock_file, "w", encoding="utf-8")
+        # "a+" so opening never truncates a lock we don't yet hold — the prior
+        # holder's pid/mode has to survive long enough for us to read it below.
+        handle = open(lock_file, "a+", encoding="utf-8")
     except Exception as exc:  # pragma: no cover - defensive
         print(f"[JARVIS] Could not create lock file: {exc}")
         return None
 
-    try:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        handle.close()
-        print("[JARVIS] Another JARVIS instance is already running. Exiting.")
-        return None
+    def _try_lock() -> bool:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except OSError:
+            return False
+
+    if not _try_lock():
+        handle.seek(0)
+        try:
+            owner = json.loads(handle.read() or "{}")
+        except Exception:
+            owner = {}
+        owner_pid = int(owner.get("pid") or 0)
+        owner_mode = str(owner.get("mode") or "")
+
+        # An interactive session at the keyboard takes priority over the
+        # headless VPS worker: signal it to step aside instead of just
+        # failing, since launchd (KeepAlive) will bring it back on its own
+        # once this session releases the lock.
+        if mode == "interactive" and owner_mode == "worker" and owner_pid:
+            print(f"[JARVIS] Stepping down background worker (pid {owner_pid}) for this session.")
+            try:
+                os.kill(owner_pid, _signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            except Exception as exc:
+                print(f"[JARVIS] Could not signal background worker: {exc}")
+            acquired = False
+            for _ in range(50):  # up to ~5s
+                time.sleep(0.1)
+                if _try_lock():
+                    acquired = True
+                    break
+            if not acquired:
+                handle.close()
+                print("[JARVIS] Another JARVIS instance is already running. Exiting.")
+                return None
+        else:
+            handle.close()
+            print("[JARVIS] Another JARVIS instance is already running. Exiting.")
+            return None
+
+    handle.seek(0)
+    handle.truncate()
+    handle.write(json.dumps({"pid": os.getpid(), "mode": mode}))
+    handle.flush()
     return handle
 
 
