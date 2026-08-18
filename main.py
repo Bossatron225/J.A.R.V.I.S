@@ -877,12 +877,17 @@ TOOL_DECLARATIONS = [
         "name": "visual_watch",
         "description": (
             "Registers, lists, removes, or clears live visual targets so Jarvis can keep watching specific browser tabs, apps, or windows over time. "
-            "Use this when the user wants a persistent monitor instead of a one-off screenshot."
+            "Use this when the user wants a persistent monitor instead of a one-off screenshot. "
+            "Use action=add_all when the user wants EVERY open tab and EVERY app window watched at once "
+            "('watch everything', 'keep an eye on all my tabs') instead of adding them one by one — this "
+            "also keeps auto-tracking new tabs/windows as they open and drops ones that close. These bulk "
+            "targets are passive/on-demand (ask 'what's on tab 3' anytime) and do not trigger spoken "
+            "alerts on every change the way an individually added target does."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action": {"type": "STRING", "description": "add | list | remove | clear | status"},
+                "action": {"type": "STRING", "description": "add | add_all | list | remove | clear | status"},
                 "target_type": {"type": "STRING", "description": "tab | browser_tab | window | app | screen"},
                 "browser": {"type": "STRING", "description": "Browser name for tab watching"},
                 "target": {"type": "STRING", "description": "Tab title/url fragment or generic target label"},
