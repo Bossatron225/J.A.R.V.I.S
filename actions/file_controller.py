@@ -180,6 +180,7 @@ def remove_authorized_profile(profile_id: str) -> str:
     if profile_key in _AUTHORIZED_PROFILES["authorized"]:
         removed = _AUTHORIZED_PROFILES["authorized"].pop(profile_key)
         verify_biometric_security.cache_clear()
+        _save_profiles_to_disk()
         return f"BiometricLock_Protocol: Successfully removed profile for '{removed.get('name', profile_id)}'."
     
     return f"Profile registry error: Profile '{profile_id}' not found."
