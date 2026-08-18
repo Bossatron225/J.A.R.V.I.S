@@ -1422,6 +1422,32 @@ def browser_control(
         _log(player, result)
         return result
 
+    if action == "enable_background_sight":
+        target = browser or params.get("target", "").lower().strip()
+        name = _ALIASES.get(target, target) if target else ""
+        if not name:
+            result = "Please specify a browser."
+        elif _registry.has(name):
+            result = f"Already watching every tab in {name} in the background."
+        elif needs_cdp_relaunch(name) and not bool(params.get("confirm")):
+            app_label = _MAC_APP_NAMES.get(name, name)
+            result = (
+                f"{app_label} is already open without background tab access. "
+                "I can restart it with that enabled — open tabs restore automatically. "
+                "Say confirm and I'll do it."
+            )
+        else:
+            if needs_cdp_relaunch(name):
+                print(f"[Browser] {relaunch_with_debugging(name)}")
+            try:
+                sess = _registry.get(name)
+                tabs = sess.run(sess.list_tabs())
+                result = f"Now watching every tab in {name} in the background.\n{tabs}"
+            except Exception as e:
+                result = f"Could not enable background tab sight for {name}: {e}"
+        _log(player, result)
+        return result
+
     if action == "list_tabs":
         target_browser = browser
         if _registry.has(target_browser):
