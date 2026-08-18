@@ -192,12 +192,20 @@ def _capture_screen() -> tuple[bytes, str]:
     return _compress(png, "PNG")
 
 
-def _capture_macos_window(window_title: str = "", app_name: str = "") -> tuple[bytes, str]:
+def _capture_macos_window(window_title: str = "", app_name: str = "", window_id: int | None = None) -> tuple[bytes, str]:
     if _get_os() != "mac":
         raise RuntimeError("Targeted application/window capture is currently supported on macOS only.")
 
     title_l = (window_title or "").lower().strip()
     app_l = (app_name or "").lower().strip()
+
+    # A known CGWindowID (from the app/window inventory) skips the fragile
+    # title-search entirely — the only reliable way to hit one specific
+    # window when several share a title (two Terminal tabs both "bash", etc.)
+    # and it works whether or not the window is currently frontmost/occluded.
+    if window_id:
+        return _screencapture_window(str(int(window_id)), app_name or window_title or "window")
+
     if app_l:
         script = f'''
         set targetApp to "{app_name.replace('"', '\\"')}"
