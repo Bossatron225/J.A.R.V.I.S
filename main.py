@@ -5076,11 +5076,33 @@ class _HeadlessUI:
         self.root = self._Root()
         self._muted = False
         self.dashboard = None
+        # Fail closed: a headless/VPS-brain deployment has no camera/mic scan UI to
+        # clear this from, so it starts locked and can only be cleared via the manual
+        # override code (see unlock_via_override / the "unlock <code>" command).
+        self._biometric_locked = True
 
     def __getattr__(self, name):
         def _noop(*_args, **_kwargs):
             return None
         return _noop
+
+    def is_biometric_lock_active(self) -> bool:
+        return self._biometric_locked
+
+    def unlock_via_override(self, code: str) -> tuple[bool, str]:
+        allowed, message = check_override_rate_limit()
+        if not allowed:
+            return False, message
+
+        success = verify_override_code(code)
+        record_override_attempt(success)
+        _append_override_audit_log(success, "remote_unlock")
+
+        if not success:
+            return False, "Override code rejected."
+
+        self._biometric_locked = False
+        return True, "Override accepted. BiometricLock_Protocol cleared."
 
     @property
     def muted(self):
