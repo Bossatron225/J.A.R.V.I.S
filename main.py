@@ -4343,7 +4343,7 @@ class JarvisLive:
         while True:
             await asyncio.sleep(60)   # evaluate once per minute
 
-            if not self.session:
+            if not self.session or self._local_speech_gate_active():
                 continue
 
             with self._speaking_lock:
