@@ -558,10 +558,25 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
     }
 
 
-def establish_biometric_baseline(name: str = "James Lumsden") -> tuple[bool, str]:
-    """Capture a live voice sample and face frame to establish the official biometric baseline."""
+def establish_biometric_baseline(
+    name: str = "James Lumsden",
+    visual_samples: list[bytes] | None = None,
+) -> tuple[bool, str]:
+    """Capture a live voice sample and face frame(s) to establish the official biometric baseline.
+
+    `visual_samples`, when supplied by a guided multi-angle/distance capture (see
+    ui.py's ManageProfilesOverlay), is used instead of a single webcam frame so the
+    trained face model spans more than one pose/distance. Falls back to the legacy
+    single-frame capture when the caller doesn't provide samples.
+    """
     audio_bytes, voice_energy = _record_voice_sample(duration_seconds=1.6)
-    image_bytes, face_detected = _capture_live_visual_frame()
+
+    if visual_samples:
+        image_bytes = visual_samples[0]
+        face_detected = True
+    else:
+        image_bytes, face_detected = _capture_live_visual_frame()
+        visual_samples = [image_bytes] if image_bytes else []
 
     profile_name = (name or "James Lumsden").strip() or "James Lumsden"
     voice_text = profile_name
@@ -592,10 +607,12 @@ def establish_biometric_baseline(name: str = "James Lumsden") -> tuple[bool, str
         make_primary=True,
         voice_sample=audio_bytes if audio_bytes else None,
         visual_sample=image_bytes if image_bytes else None,
+        visual_samples=visual_samples if len(visual_samples) > 1 else None,
     )
     return True, (
         f"Baseline established for {profile_name}. "
-        f"Voice sample captured={'yes' if audio_bytes else 'no'}; face sample captured={'yes' if image_bytes else 'no'}."
+        f"Voice sample captured={'yes' if audio_bytes else 'no'}; "
+        f"face sample(s) captured={len(visual_samples)}."
     )
 
 
