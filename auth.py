@@ -62,6 +62,164 @@ def _extract_primary_face(gray_frame, detector):
     return gray_frame[y : y + h, x : x + w]
 
 
+def _biometric_models_dir() -> Path:
+    path = Path(__file__).resolve().parent / "config" / "biometric_models"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _model_path(profile_key: str) -> Path:
+    safe_key = "".join(ch for ch in profile_key.strip().lower() if ch.isalnum() or ch in ("-", "_")) or "primary"
+    return _biometric_models_dir() / f"{safe_key}.yml"
+
+
+def _normalize_face_crop(gray_face):
+    resized = cv2.resize(gray_face, _LBPH_FACE_SIZE)
+    return cv2.equalizeHist(resized)
+
+
+def _extract_face_for_training(image_bytes: bytes):
+    """Decode an enrollment sample and return a normalized face crop, or None if unusable."""
+    if cv2 is None or np is None or not image_bytes:
+        return None
+    try:
+        arr = np.frombuffer(image_bytes, dtype=np.uint8)
+        frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            return None
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        detector = _load_detector()
+        face = _extract_primary_face(gray, detector)
+        if face is None:
+            return None
+        return _normalize_face_crop(face)
+    except Exception:
+        return None
+
+
+def train_face_model(sample_images: list, min_samples: int = 3) -> Tuple[bool, "bytes | None", str]:
+    """Train an LBPH recognizer from several enrollment samples (ideally spanning
+    different angles/distances) and return the serialized model bytes."""
+    if not _HAS_FACE_MODULE:
+        return False, None, "cv2.face is unavailable (install opencv-contrib-python)"
+
+    faces = []
+    for image_bytes in sample_images or []:
+        face = _extract_face_for_training(image_bytes)
+        if face is not None:
+            faces.append(face)
+
+    if len(faces) < min_samples:
+        return False, None, f"Only {len(faces)} usable face sample(s) captured; need at least {min_samples}"
+
+    try:
+        recognizer = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=8, grid_x=8, grid_y=8)
+        labels = np.array([_LBPH_LABEL] * len(faces))
+        recognizer.train(faces, labels)
+        with tempfile.NamedTemporaryFile(suffix=".yml", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            recognizer.write(tmp_path)
+            model_bytes = Path(tmp_path).read_bytes()
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+        return True, model_bytes, f"Trained on {len(faces)} face sample(s)"
+    except Exception as exc:
+        return False, None, f"Training failed: {exc}"
+
+
+def save_face_model(profile_key: str, model_bytes: bytes) -> Path:
+    path = _model_path(profile_key)
+    path.write_bytes(model_bytes)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return path
+
+
+def load_face_model(profile_key: str):
+    """Load a previously trained LBPH model for a profile, or None if none exists."""
+    if not _HAS_FACE_MODULE:
+        return None
+    path = _model_path(profile_key)
+    if not path.exists():
+        return None
+    try:
+        recognizer = cv2.face.LBPHFaceRecognizer_create()
+        recognizer.read(str(path))
+        return recognizer
+    except Exception:
+        return None
+
+
+def _lbph_threshold() -> float:
+    try:
+        return float(os.environ.get("JARVIS_LBPH_THRESHOLD", _LBPH_DEFAULT_THRESHOLD))
+    except (TypeError, ValueError):
+        return _LBPH_DEFAULT_THRESHOLD
+
+
+def verify_face_against_model(
+    recognizer,
+    camera_index: int = 0,
+    num_frames: int = 14,
+    threshold: float | None = None,
+) -> Tuple[bool, str]:
+    """Capture a short burst of live frames and match the best face crop against a
+    trained per-profile LBPH model. Robust to head angle/distance because the model
+    was trained on samples spanning those variations, and matching is done against
+    the single best (lowest-distance) frame in the burst rather than one snapshot."""
+    if recognizer is None:
+        return False, "no-model"
+    if cv2 is None or np is None:
+        return False, "opencv-unavailable"
+
+    gate = _lbph_threshold() if threshold is None else threshold
+
+    try:
+        capture = cv2.VideoCapture(camera_index)
+        if not capture.isOpened():
+            capture.release()
+            return False, "no-webcam"
+
+        detector = _load_detector()
+        best_confidence = None
+        face_seen = False
+        for _ in range(num_frames):
+            ok, frame = capture.read()
+            if not ok or frame is None:
+                continue
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            face = _extract_primary_face(gray, detector)
+            if face is None:
+                continue
+            face_seen = True
+            normalized = _normalize_face_crop(face)
+            try:
+                _, confidence = recognizer.predict(normalized)
+            except Exception:
+                continue
+            if best_confidence is None or confidence < best_confidence:
+                best_confidence = confidence
+            if best_confidence is not None and best_confidence <= gate:
+                break
+        capture.release()
+
+        if not face_seen:
+            return False, "no-face-detected"
+        if best_confidence is None:
+            return False, "predict-failed"
+        if best_confidence <= gate:
+            return True, f"Face matched trained model (confidence={best_confidence:.1f}, threshold={gate:.1f})"
+        return False, f"Face did not match trained model (confidence={best_confidence:.1f}, threshold={gate:.1f})"
+    except Exception as exc:
+        return False, f"Face verification failed: {exc}"
+
+
 def _similarity_metrics(reference_face, live_face):
     ref_norm = cv2.equalizeHist(cv2.resize(reference_face, (160, 160)))
     live_norm = cv2.equalizeHist(cv2.resize(live_face, (160, 160)))
