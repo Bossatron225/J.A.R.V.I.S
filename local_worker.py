@@ -126,7 +126,7 @@ class LocalWorker:
         except Exception as exc:
             return {'status': 'error', 'machine': 'mac', 'action': action, 'error': str(exc)}
 
-    def poll_for_tasks(self, poll_interval: float = 5.0, limit: int = 10) -> list[dict]:
+    def poll_for_tasks(self, poll_interval: float = 5.0, limit: int = 10, on_task=None) -> list[dict]:
         token = self._worker_token()
         if not token:
             return []
