@@ -977,6 +977,18 @@ class _BrowserSession:
             lines.append(f"{idx}. {title} — {url}{marker}")
         return "\n".join(lines)
 
+    async def list_tabs_struct(self) -> list[dict]:
+        """Structured tab inventory (browser/index/title/url) for bulk watch registration."""
+        await self._launch()
+        if not self._context:
+            return []
+        pages = [page for page in self._context.pages if not page.is_closed()]
+        out = []
+        for idx, page in enumerate(pages, 1):
+            title, url = await self._page_info(page)
+            out.append({"browser": self.browser_name, "index": idx, "title": title, "url": url})
+        return out
+
     async def _find_tab(self, index: int | None = None, target: str = "") -> tuple[Page | None, int | None]:
         if not self._context:
             return None, None
