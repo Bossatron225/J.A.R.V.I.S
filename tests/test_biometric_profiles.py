@@ -357,8 +357,7 @@ def test_audio_callbacks_are_blocked_during_biometric_lock() -> None:
 
 @requires_face_module
 def test_train_face_model_learns_from_multiple_angle_samples(monkeypatch, tmp_path) -> None:
-    rng = np.random.default_rng(42)
-    base_face = rng.integers(0, 256, size=(200, 200), dtype=np.uint8)
+    base_face = _make_synthetic_face()
     monkeypatch.setattr(auth_module, "_extract_face_for_training", _fake_extract_for_training(base_face))
 
     samples = [bytes([i]) for i in range(6)]
@@ -379,7 +378,7 @@ def test_train_face_model_learns_from_multiple_angle_samples(monkeypatch, tmp_pa
         ).astype(np.uint8)
         _, matching_confidence = loaded.predict(matching_gray)
 
-        different_gray = rng.integers(0, 256, size=(200, 200), dtype=np.uint8)
+        different_gray = _make_synthetic_face(freq_x=0.7, freq_y=2.1, phase=1.3)
         _, different_confidence = loaded.predict(different_gray)
 
         assert matching_confidence <= auth_module._LBPH_DEFAULT_THRESHOLD
