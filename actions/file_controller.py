@@ -529,9 +529,26 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
     if voice_detected:
         reference_face_match, reference_face_reason = _verify_reference_face_match()
 
-    # Prefer live face detector when available; allow strong reference-photo match fallback for OpenCV builds
-    # that do not expose reliable cascade detection on this platform.
-    if image_bytes:
+    visual_confidence = None
+    visual_engine = "legacy"
+    trained_model = _load_primary_face_model() if voice_detected and face_detected else None
+
+    if trained_model is not None:
+        # A trained multi-angle/distance model exists for the primary profile: this is
+        # now the authoritative local check and it is NOT overridable by a Gemini "yes"
+        # or the old single-baseline comparisons — those are weaker, network-dependent
+        # or single-pose signals and must not be able to pass someone the model rejects.
+        visual_engine = "lbph"
+        model_match, model_reason = _verify_live_face_with_trained_model(trained_model)
+        visual_detected = bool(face_detected and model_match)
+        reference_face_reason = model_reason
+        try:
+            visual_confidence = float(model_reason.split("confidence=")[1].split(",")[0].split(")")[0])
+        except Exception:
+            visual_confidence = None
+    elif image_bytes:
+        # No trained model yet (profile hasn't been re-enrolled with the guided
+        # multi-angle capture) — fall back to the legacy signals unchanged.
         if face_detected and (_verify_live_face_with_gemini(image_bytes, identity_name) or reference_face_match):
             visual_detected = True
         elif reference_face_match:
@@ -553,6 +570,8 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
         "identity_match": identity_match,
         "voice_energy": voice_energy,
         "face_detected": face_detected,
+        "visual_engine": visual_engine,
+        "visual_confidence": visual_confidence,
         "profile_name": primary.get("name") or identity_name,
         "biometric_debug": _BIOMETRIC_DEBUG,
     }
