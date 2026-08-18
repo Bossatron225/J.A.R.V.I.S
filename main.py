@@ -2467,11 +2467,29 @@ class JarvisLive:
             if self.session is None:
                 local_started = self._launch_local_jarvis_if_needed()
             status = "online" if self.session or local_started else "remote only"
+            if self.session is not None and not _HEADLESS_ENV:
+                # This process was already alive when the wake text arrived — the ack
+                # below correctly reports it as online, but nothing brings its window
+                # forward, so a wake against an already-running-but-backgrounded session
+                # looks like nothing happened. Surface it the same way a cold start does.
+                self._bring_window_to_front()
             ack = self._build_wake_remote_access_message()
             ack = ack + f"\nLocal status: {status}."
             result = await asyncio.to_thread(send_imessage, ack_target, ack)
             self.ui.write_log(f"SYS: iMessage wake acknowledgement: {result}")
         return True
+
+    def _bring_window_to_front(self) -> None:
+        try:
+            _subprocess.run(
+                [
+                    "osascript", "-e",
+                    f'tell application "System Events" to set frontmost of first process whose unix id is {os.getpid()} to true',
+                ],
+                capture_output=True, text=True, timeout=5,
+            )
+        except Exception as e:
+            self.ui.write_log(f"SYS: Window activation failed: {e}")
 
     async def _maybe_handle_imessage_shutdown_protocol(self, alert: dict) -> bool:
         if not self._shutdown_protocol_cfg.get("enabled", True):
