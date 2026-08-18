@@ -18,7 +18,6 @@ def get_base_dir() -> Path:
 
 BASE_DIR    = get_base_dir()
 CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
-BIOMETRIC_PROFILE_PATH = BASE_DIR / "config" / "biometric_profiles.json"
 
 _DEFAULTS = {
     "llm_url":      "http://localhost:11434",
