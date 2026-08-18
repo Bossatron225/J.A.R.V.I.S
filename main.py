@@ -2861,6 +2861,7 @@ class JarvisLive:
         self._live_model_backoff_until[model] = time.monotonic() + max(30, int(seconds))
 
     def _available_live_models(self) -> list[str]:
+        pool = VERTEX_LIVE_MODELS if self._vertex_project else LIVE_MODELS
         now = time.monotonic()
         blocked = {
             model
@@ -2874,13 +2875,13 @@ class JarvisLive:
             if until > now
         }
 
-        models = [m for m in LIVE_MODELS if m not in blocked]
+        models = [m for m in pool if m not in blocked]
         if models:
             return models
 
         # Safety valve: if everything is blocked, reset and try all again.
         self._live_model_backoff_until.clear()
-        return list(LIVE_MODELS)
+        return list(pool)
 
     async def _execute_tool(self, fc) -> types.FunctionResponse:
         name = fc.name
