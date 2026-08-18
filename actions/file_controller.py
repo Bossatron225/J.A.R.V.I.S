@@ -86,6 +86,10 @@ def _load_profiles_from_disk() -> dict:
 
 
 def _save_profiles_to_disk() -> None:
+    # Never let a test run overwrite the real, on-disk profile registry — tests
+    # monkeypatch _AUTHORIZED_PROFILES in-memory only and don't expect disk writes.
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return
     path = _profiles_path()
     try:
         os.makedirs(path.parent, exist_ok=True)
