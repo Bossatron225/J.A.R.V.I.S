@@ -143,7 +143,13 @@ class LocalWorker:
         for task in tasks[:limit]:
             action = str(task.get('action') or '').strip().lower()
             payload = task.get('payload') or {}
-            result = self.execute_local_action(action, payload)
+            if on_task:
+                on_task(action, 'start')
+            try:
+                result = self.execute_local_action(action, payload)
+            finally:
+                if on_task:
+                    on_task(action, 'done')
             result_url = f'{self.base_url.rstrip("/")}/api/local-worker/results/{task.get("id")}'
             body = json.dumps(result).encode('utf-8')
             try:
