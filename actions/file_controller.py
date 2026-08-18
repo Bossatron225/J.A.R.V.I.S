@@ -544,9 +544,6 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
 
     reference_face_match = False
     reference_face_reason = "voice-not-detected"
-    if voice_detected:
-        reference_face_match, reference_face_reason = _verify_reference_face_match()
-
     visual_engine = "legacy"
     trained_model = _load_primary_face_model() if voice_detected else None
 
@@ -557,19 +554,21 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
         # or single-pose signals and must not be able to pass someone the model rejects.
         # It runs its own multi-frame capture/detection burst rather than relying on the
         # single quick frame above, since that single frame is exactly what pose/distance
-        # variation makes unreliable.
+        # variation makes unreliable. (The legacy reference-photo check is skipped
+        # entirely here — it would just be a redundant camera burst once a model exists.)
         visual_engine = "lbph"
         model_match, model_reason = _verify_live_face_with_trained_model(trained_model)
         visual_detected = bool(model_match)
         reference_face_reason = model_reason
-    elif image_bytes:
+    elif voice_detected:
         # No trained model yet (profile hasn't been re-enrolled with the guided
         # multi-angle capture) — fall back to the legacy signals unchanged.
-        if face_detected and (_verify_live_face_with_gemini(image_bytes, identity_name) or reference_face_match):
+        reference_face_match, reference_face_reason = _verify_reference_face_match()
+        if image_bytes and face_detected and (_verify_live_face_with_gemini(image_bytes, identity_name) or reference_face_match):
             visual_detected = True
         elif reference_face_match:
             visual_detected = True
-        elif face_detected and stored_visual_sample:
+        elif image_bytes and face_detected and stored_visual_sample:
             try:
                 baseline_image = base64.b64decode(str(stored_visual_sample))
             except Exception:
