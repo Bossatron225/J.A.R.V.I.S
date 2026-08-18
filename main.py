@@ -4619,6 +4619,18 @@ class JarvisLive:
                 print(f"[Dashboard] Flush command error: {e}")
                 await asyncio.sleep(0.5)
 
+    _WORKER_IDLE_STATE = "STANDBY"
+
+    def _on_local_task_state(self, action: str, phase: str) -> None:
+        """Give the HUD a brief, honest indicator for remote-triggered work — no full 'wake'."""
+        if phase == "start":
+            if action in _LOCAL_WORKER_QUIET_ACTIONS:
+                self.ui.set_state(f"REMOTE ACCESS · {action}")
+            else:
+                self.ui.set_state(f"WORKING · {action}")
+        else:
+            self.ui.set_state(self._WORKER_IDLE_STATE)
+
     async def _run_vps_local_worker(self) -> None:
         """Poll the VPS queue and run only the local actions that belong on this Mac."""
         while True:
@@ -4630,7 +4642,9 @@ class JarvisLive:
             try:
                 worker = self._local_worker or LocalWorker(vps_url)
                 self._local_worker = worker
-                completed = await asyncio.to_thread(worker.poll_for_tasks, 5.0, 5)
+                completed = await asyncio.to_thread(
+                    worker.poll_for_tasks, 5.0, 5, self._on_local_task_state
+                )
                 if not self._vps_link_established_said:
                     self._vps_link_established_said = True
                     self.ui.write_log("SYS: VPS local worker link established.")
