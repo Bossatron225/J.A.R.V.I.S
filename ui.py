@@ -1361,6 +1361,10 @@ class ManageProfilesOverlay(QWidget):
         self._preview_timer = None
         self._capture_state_text = "WAITING"
         self._setup_name = ""
+        self._visual_capture_timer = None
+        self._captured_visual_samples: list[bytes] = []
+        self._visual_capture_prompt_index = 0
+        self._visual_capture_retries_this_prompt = 0
 
         self._speak_indicator = QLabel("● WAITING")
         self._speak_indicator.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
