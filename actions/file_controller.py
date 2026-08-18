@@ -431,7 +431,10 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
     visual_detected = False
 
     if audio_bytes:
-        if voice_energy > 0.0 or _verify_live_voice_with_gemini(audio_bytes, identity_name):
+        # voice_energy only confirms *sound was captured*, not identity — it must never
+        # be a pass condition on its own. Use it only to skip a wasted Gemini call on
+        # silence; the actual identity check below is what has to return True.
+        if voice_energy > 0.01 and _verify_live_voice_with_gemini(audio_bytes, identity_name):
             voice_detected = True
         elif stored_voice_sample:
             try:
