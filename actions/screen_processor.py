@@ -446,7 +446,7 @@ def _capture_macos_browser_tab(browser: str, target: str = "", index: int | None
             pass
 
 
-def _capture_targeted_visual(target_type: str = "screen", *, browser: str = "", target: str = "", index: int | None = None, window_title: str = "", app_name: str = "") -> tuple[bytes, str, str]:
+def _capture_targeted_visual(target_type: str = "screen", *, browser: str = "", target: str = "", index: int | None = None, window_title: str = "", app_name: str = "", window_id: int | None = None) -> tuple[bytes, str, str]:
     source = (target_type or "screen").strip().lower()
     if source in {"screen", "display", "full"}:
         data, mime = _capture_screen()
