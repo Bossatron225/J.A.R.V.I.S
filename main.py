@@ -5058,6 +5058,19 @@ class _HeadlessUI:
         return None
 
 
+def _resolve_jarvis_mode() -> str:
+    """"worker" = headless, VPS-task-only, no mic/voice. "interactive" = full local
+    voice session — optionally still linked to the VPS (memory sync, remote task
+    servicing) if JARVIS_VPS_URL is set. JARVIS_MODE lets a caller (e.g. the iMessage
+    wake bridge) request interactive mode without giving up the VPS link; absent that,
+    presence of JARVIS_VPS_URL alone still implies worker mode for backward compatibility
+    with the existing background-worker launch (JarvisWorker.app)."""
+    explicit = str(os.getenv("JARVIS_MODE") or "").strip().lower()
+    if explicit in {"interactive", "worker"}:
+        return explicit
+    return "worker" if (os.getenv("JARVIS_VPS_URL") or "").strip() else "interactive"
+
+
 def _acquire_single_instance(lock_path: str | None = None, mode: str = "interactive"):
     if fcntl is None:
         return object()
