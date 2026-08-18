@@ -2001,6 +2001,58 @@
           "content": "not a real pptx file"
         }
       ]
+    },
+    {
+      "status": "indexed",
+      "path": "/private/var/folders/zf/0rxnqzk13cl5yjryllz4g4_40000gn/T/pytest-of-jameslumsden/pytest-50/test_ingest_markdown_and_recal0/project_note.md",
+      "source_name": "project-note",
+      "kind": ".md",
+      "added_at": "2026-08-18T15:23:12Z",
+      "chunks": [
+        {
+          "id": "project_note.md:1",
+          "content": "# Project goals Jarvis should launch on startup and remember the user's favorite coffee."
+        }
+      ]
+    },
+    {
+      "status": "indexed",
+      "path": "/private/var/folders/zf/0rxnqzk13cl5yjryllz4g4_40000gn/T/pytest-of-jameslumsden/pytest-50/test_index_codebase_recovers_r0/sample_repo/README.md",
+      "source_name": "README",
+      "kind": ".md",
+      "added_at": "2026-08-18T15:23:12Z",
+      "chunks": [
+        {
+          "id": "README.md:1",
+          "content": "# Sample repo This app tracks user hours and launch events."
+        }
+      ]
+    },
+    {
+      "status": "indexed",
+      "path": "/private/var/folders/zf/0rxnqzk13cl5yjryllz4g4_40000gn/T/pytest-of-jameslumsden/pytest-50/test_index_codebase_recovers_r0/sample_repo/app.py",
+      "source_name": "app",
+      "kind": ".py",
+      "added_at": "2026-08-18T15:23:12Z",
+      "chunks": [
+        {
+          "id": "app.py:1",
+          "content": "def launch_on_startup(): return 'ready' def track_hours(): print('hours recorded')"
+        }
+      ]
+    },
+    {
+      "status": "indexed",
+      "path": "/private/var/folders/zf/0rxnqzk13cl5yjryllz4g4_40000gn/T/pytest-of-jameslumsden/pytest-50/test_index_pptx_file0/deck.pptx",
+      "source_name": "deck",
+      "kind": ".pptx",
+      "added_at": "2026-08-18T15:23:12Z",
+      "chunks": [
+        {
+          "id": "deck.pptx:1",
+          "content": "not a real pptx file"
+        }
+      ]
     }
   ]
 }
