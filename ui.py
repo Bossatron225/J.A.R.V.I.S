@@ -4568,6 +4568,27 @@ class MainWindow(QMainWindow):
     def is_biometric_lock_active(self) -> bool:
         return self._biometric_locked
 
+    def unlock_via_override(self, code: str) -> tuple[bool, str]:
+        """Clears BiometricLock_Protocol via the manual override code, independent of whether
+        the visual lock overlay exists (e.g. VPS/headless mode has no scan UI to unlock from)."""
+        allowed, message = check_override_rate_limit()
+        if not allowed:
+            return False, message
+
+        success = verify_override_code(code)
+        record_override_attempt(success)
+        _append_override_audit_log(success, "remote_unlock")
+
+        if not success:
+            return False, "Override code rejected."
+
+        if self._biometric_overlay is not None:
+            self._biometric_overlay.hide()
+            self._biometric_overlay = None
+        self._biometric_locked = False
+        self._apply_state("LISTENING")
+        return True, "Override accepted. BiometricLock_Protocol cleared."
+
     def _handle_biometric_failure(self):
         self._log.append_log("SYS: BiometricLock_Protocol failed. Security shutdown initiated.")
         self._biometric_locked = True
