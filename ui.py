@@ -1424,6 +1424,35 @@ class ManageProfilesOverlay(QWidget):
 
         self._load_profiles()
 
+    def _set_override_code(self) -> None:
+        code, ok = QInputDialog.getText(
+            self,
+            "Manual Override Code",
+            "Enter a new manual override code (min. 8 characters):",
+            QLineEdit.EchoMode.Password,
+            "",
+        )
+        if not ok or not code:
+            return
+
+        confirm, ok = QInputDialog.getText(
+            self,
+            "Manual Override Code",
+            "Re-enter the override code to confirm:",
+            QLineEdit.EchoMode.Password,
+            "",
+        )
+        if not ok:
+            return
+        if confirm != code:
+            self._setup_status.setText("Override code entries did not match. Not saved.")
+            return
+
+        success, message = set_override_code(code)
+        self._setup_status.setText(message)
+        if success:
+            self._override_btn.setText("CHANGE OVERRIDE CODE")
+
     def _safe_set_widget_text(self, widget: QLabel | None, text: str) -> None:
         if widget is None:
             return
