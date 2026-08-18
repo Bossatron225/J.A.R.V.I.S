@@ -1171,6 +1171,16 @@ def _close_all_native_browsers_macos() -> str:
     return " | ".join(messages)
 
 
+def has_active_browser_session(browser: str | None = None) -> bool:
+    """
+    True when JARVIS already has a Playwright automation session driving this
+    browser. That session can screenshot any tab by index/title via CDP
+    without bringing it to the front — unlike OS-level window capture, which
+    only ever sees whatever tab is currently active on screen.
+    """
+    return _registry.has(browser)
+
+
 def capture_browser_tab(parameters: dict | None = None) -> tuple[bytes, str, str]:
     """Capture a focused browser tab screenshot as image bytes for vision analysis."""
     params = parameters or {}
