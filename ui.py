@@ -1391,6 +1391,23 @@ class ManageProfilesOverlay(QWidget):
         setup_btn.clicked.connect(self._establish_baseline)
         lay.addWidget(setup_btn)
 
+        override_btn = QPushButton(
+            "CHANGE OVERRIDE CODE" if has_override_code_configured() else "SET OVERRIDE CODE"
+        )
+        override_btn.setFixedHeight(34)
+        override_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        override_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        override_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.PANEL2}; color: {C.RED};
+                border: 1px solid {C.RED}; border-radius: 4px;
+            }}
+            QPushButton:hover {{ background: #200010; }}
+        """)
+        self._override_btn = override_btn
+        override_btn.clicked.connect(self._set_override_code)
+        lay.addWidget(override_btn)
+
         close_btn = QPushButton("CLOSE")
         close_btn.setFixedHeight(34)
         close_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
