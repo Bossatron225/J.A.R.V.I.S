@@ -54,8 +54,7 @@ def _config_dir() -> Path:
 _SECURITY_ENABLED = True
 _AUTHORIZED_PERSONNEL = {"james", "james lumsden", "jarvis"}
 
-# Profile-backed biometric security registry for managing primary and authorized personnel profiles
-_AUTHORIZED_PROFILES = {
+_DEFAULT_AUTHORIZED_PROFILES = {
     "primary": {
         "name": "James Lumsden",
         "voice_prints": ["james lumsden", "james", "james l"],
@@ -64,6 +63,40 @@ _AUTHORIZED_PROFILES = {
     },
     "authorized": {},
 }
+
+
+def _profiles_path() -> Path:
+    return _config_dir() / "authorized_profiles.json"
+
+
+def _load_profiles_from_disk() -> dict:
+    """Loads the persisted profile registry, falling back to the default on a missing
+    or incompatible file (e.g. the legacy list-shaped authorized_profiles.json)."""
+    path = _profiles_path()
+    if not path.exists():
+        return {"primary": dict(_DEFAULT_AUTHORIZED_PROFILES["primary"]), "authorized": {}}
+    try:
+        data = json.loads(path.read_text())
+        if not isinstance(data, dict) or "primary" not in data:
+            return {"primary": dict(_DEFAULT_AUTHORIZED_PROFILES["primary"]), "authorized": {}}
+        data.setdefault("authorized", {})
+        return data
+    except Exception:
+        return {"primary": dict(_DEFAULT_AUTHORIZED_PROFILES["primary"]), "authorized": {}}
+
+
+def _save_profiles_to_disk() -> None:
+    path = _profiles_path()
+    try:
+        os.makedirs(path.parent, exist_ok=True)
+        path.write_text(json.dumps(_AUTHORIZED_PROFILES, indent=2))
+        os.chmod(path, 0o600)
+    except Exception:
+        pass
+
+
+# Profile-backed biometric security registry for managing primary and authorized personnel profiles
+_AUTHORIZED_PROFILES = _load_profiles_from_disk()
 
 def add_authorized_profile(profile_id: str, name: str, voice_print: str, visual_signature: str, clearance_level: str = "beta") -> str:
     """Adds a new authorized profile to the BiometricLock_Protocol registry."""
