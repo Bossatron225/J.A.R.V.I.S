@@ -1938,7 +1938,8 @@ class BiometricLockOverlay(QWidget):
                 f"face_detected={details.get('face_detected')} "
                 f"voice_energy={float(details.get('voice_energy') or 0.0):.4f} "
                 f"ref_match={details.get('reference_face_match')} "
-                f"ref_reason={details.get('reference_face_reason', 'n/a')}"
+                f"ref_reason={details.get('reference_face_reason', 'n/a')} "
+                f"visual_engine={details.get('visual_engine', 'legacy')}"
             )
             try:
                 host = self.window()
