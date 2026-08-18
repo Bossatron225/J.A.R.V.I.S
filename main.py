@@ -124,6 +124,12 @@ class _HeadlessVisualMonitorRegistry:
         return None
     def poll_once(self, *args, **kwargs):
         return []
+    def add_all(self, *args, **kwargs):
+        return {"added": 0, "target_ids": []}
+    def resync_all(self, *args, **kwargs):
+        return {"added": 0, "removed": 0}
+    def has_auto_group(self, *args, **kwargs):
+        return False
 
 def get_system_status_headless():
     return {"status": "headless"}
