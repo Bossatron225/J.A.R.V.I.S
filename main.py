@@ -4308,6 +4308,22 @@ class JarvisLive:
         while True:
             try:
                 await asyncio.sleep(interval)
+
+                # "watch everything" groups (visual_watch add_all) drift out of
+                # date as tabs/windows open and close — resync periodically so
+                # new ones get picked up and closed ones stop being polled.
+                now_mono = time.monotonic()
+                if (now_mono - self._visual_resync_last) >= 20.0 and self._visual_monitor.has_auto_group():
+                    self._visual_resync_last = now_mono
+                    try:
+                        resync = await asyncio.to_thread(self._visual_monitor.resync_all)
+                        if resync.get("added") or resync.get("removed"):
+                            self.ui.write_log(
+                                f"VISUAL: resync +{resync.get('added', 0)} -{resync.get('removed', 0)}"
+                            )
+                    except Exception as e:
+                        print(f"[VisualMonitor] resync failed: {e}")
+
                 total_targets = len(self._visual_monitor.list_targets())
                 if total_targets == 0:
                     self.ui.set_visual_watch_status("Visual watch: idle (no targets)", "neutral")
