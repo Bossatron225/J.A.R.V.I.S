@@ -587,7 +587,6 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
         "voice_energy": voice_energy,
         "face_detected": face_detected,
         "visual_engine": visual_engine,
-        "visual_confidence": visual_confidence,
         "profile_name": primary.get("name") or identity_name,
         "biometric_debug": _BIOMETRIC_DEBUG,
     }
