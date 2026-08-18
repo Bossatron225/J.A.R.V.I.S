@@ -2841,19 +2841,9 @@ class MainWindow(QMainWindow):
 
         self._overlay: SetupOverlay | None = None
         self._ready = self._check_config()
-        # NOTE: this must mirror main.py's _resolve_jarvis_mode() — only an explicit
-        # JARVIS_MODE=worker (JarvisWorker.app's launchd wrapper) means unattended,
-        # no-one-at-the-Mac operation. JARVIS_VPS_URL alone does NOT mean that: both
-        # run_local.sh (interactive) and JarvisWorker.app (worker) set it, since the
-        # local Mac stays linked to the VPS for memory sync either way. Checking
-        # JARVIS_VPS_URL here instead of JARVIS_MODE meant the interactive desktop
-        # app — which only ever runs this constructor when there IS a real GUI with
-        # someone in front of it — silently skipped showing the face/voice scan UI
-        # and just sat locked, with no way to clear it short of the override code.
-        is_worker_mode = str(os.getenv("JARVIS_MODE") or "").strip().lower() == "worker"
         if not self._ready:
             self._show_setup()
-        elif is_worker_mode:
+        elif _is_worker_mode():
             # Pure VPS-worker mode runs unattended — there's no one at the Mac
             # to clear a face/voice scan, and the scan's own camera use would
             # fight remote camera-capture requests for the same device. The
