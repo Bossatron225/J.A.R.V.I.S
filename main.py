@@ -4797,6 +4797,9 @@ class JarvisLive:
                         break
                     except Exception as e:
                         connect_error = e
+                        if _is_live_location_blocked_error(e):
+                            # Not model-specific — every model will fail the same way.
+                            raise
                         if _is_live_model_unavailable_error(e):
                             self._block_live_model(live_model, seconds=900)
                             print(f"[JARVIS] Live model unavailable: {live_model} — trying fallback")
