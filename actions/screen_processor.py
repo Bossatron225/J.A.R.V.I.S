@@ -564,6 +564,43 @@ def capture_targeted_visual_b64(parameters=None, player=None) -> dict:
         "label": label,
     }
 
+_CAMERA_SUBPROCESS_SRC = r"""
+import sys, json, base64, io
+import cv2
+try:
+    import PIL.Image as PILImage
+except Exception:
+    PILImage = None
+
+index, backend, max_w, max_h, quality = (int(a) for a in sys.argv[1:6])
+
+cap = cv2.VideoCapture(index, backend)
+if not cap.isOpened():
+    print(json.dumps({"error": f"Camera index {index} could not be opened."}))
+    sys.exit(0)
+for _ in range(10):
+    cap.read()
+ret, frame = cap.read()
+cap.release()
+if not ret or frame is None:
+    print(json.dumps({"error": "Camera returned no frame."}))
+    sys.exit(0)
+
+if PILImage is not None:
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    img = PILImage.fromarray(rgb)
+    img.thumbnail((max_w, max_h), PILImage.BILINEAR)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=quality)
+    data = buf.getvalue()
+else:
+    _, jbuf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    data = jbuf.tobytes()
+
+print(json.dumps({"image_b64": base64.b64encode(data).decode("ascii")}))
+"""
+
+
 def _capture_camera() -> tuple[bytes, str]:
     if not _CV2:
         raise RuntimeError("OpenCV (cv2) is not installed. Run: pip install opencv-python")
@@ -571,42 +608,35 @@ def _capture_camera() -> tuple[bytes, str]:
     index   = _get_camera_index()
     backend = _cv2_backend()
 
-    # AVFoundation can transiently refuse to open the device (e.g. right after
-    # another process/session released it) even though it's genuinely free a
-    # moment later — a couple of short retries clears this without masking a
-    # real "no camera" failure.
-    cap = None
-    for attempt in range(3):
-        cap = cv2.VideoCapture(index, backend)
-        if cap.isOpened():
+    # macOS only completes the AVFoundation camera-permission handshake when
+    # it owns a plain process main thread. Inside this app (Qt event loop +
+    # asyncio worker threads), that handshake fails silently no matter how
+    # it's retried. A short-lived, single-threaded subprocess sidesteps that
+    # entirely — it's the same shape of process that reliably works standalone.
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", _CAMERA_SUBPROCESS_SRC,
+             str(index), str(backend), str(_IMG_MAX_W), str(_IMG_MAX_H), str(_JPEG_Q)],
+            capture_output=True, text=True, timeout=15,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Camera capture timed out.")
+
+    payload = None
+    for line in reversed(proc.stdout.strip().splitlines()):
+        try:
+            payload = json.loads(line)
             break
-        cap.release()
-        cap = None
-        if attempt < 2:
-            time.sleep(0.5)
+        except ValueError:
+            continue
 
-    if cap is None:
-        raise RuntimeError(f"Camera index {index} could not be opened.")
+    if payload is None:
+        detail = proc.stderr.strip()[-400:] or "no output"
+        raise RuntimeError(f"Camera capture failed: {detail}")
+    if "error" in payload:
+        raise RuntimeError(payload["error"])
 
-    for _ in range(10):
-        cap.read()
-
-    ret, frame = cap.read()
-    cap.release()
-
-    if not ret or frame is None:
-        raise RuntimeError("Camera returned no frame.")
-
-    if _PIL:
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = PIL.Image.fromarray(rgb)
-        img.thumbnail((_IMG_MAX_W, _IMG_MAX_H), PIL.Image.BILINEAR)
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=_JPEG_Q)
-        return buf.getvalue(), "image/jpeg"
-
-    _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, _JPEG_Q])
-    return buf.tobytes(), "image/jpeg"
+    return base64.b64decode(payload["image_b64"]), "image/jpeg"
 
 class _VisionSession:
     def __init__(self):
