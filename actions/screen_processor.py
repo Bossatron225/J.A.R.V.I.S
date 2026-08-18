@@ -288,6 +288,11 @@ def _capture_macos_window(window_title: str = "", app_name: str = "", known_wind
             raise RuntimeError(f"Could not find a visible window matching '{window_title}'.")
         raise RuntimeError("Could not find the frontmost window.")
 
+    return _screencapture_window_id(window_id)
+
+
+def _screencapture_window_id(window_id: str) -> tuple[bytes, str]:
+    """Captures one specific window by CGWindowID — works even when occluded/not frontmost."""
     fd, temp_path = tempfile.mkstemp(suffix=".png", prefix="jarvis_window_")
     os.close(fd)
     try:
