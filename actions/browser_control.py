@@ -535,6 +535,13 @@ class _BrowserSession:
         self._context: BrowserContext | None = None
         self._page:    Page           | None = None
 
+        # Set when self._context comes from connect_over_cdp against the
+        # user's real, already-running browser rather than a fresh
+        # automation-only window. Closing must then only disconnect — never
+        # quit the user's actual browser.
+        self._cdp_attached: bool             = False
+        self._cdp_browser:  Browser | None   = None
+
     def start(self):
         if self._thread and self._thread.is_alive():
             return
