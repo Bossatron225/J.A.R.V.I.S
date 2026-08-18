@@ -1225,6 +1225,10 @@ class _SessionRegistry:
                 lines.append(f"  • {name}{marker}")
             return "Open browsers:\n" + "\n".join(lines)
 
+    def active_sessions(self) -> list["_BrowserSession"]:
+        with self._lock:
+            return list(self._sessions.values())
+
 
 _registry = _SessionRegistry()
 
