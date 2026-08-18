@@ -35,6 +35,9 @@ class VisualMonitorRegistry:
         self._last_hash: dict[str, str] = {}
         self._last_seen: dict[str, float] = {}
         self._lock = threading.Lock()
+        # target_ids created by add_all() — the only ones resync_all() touches,
+        # so it never adds/drops targets the user registered individually.
+        self._auto_group: set[str] = set()
 
     @staticmethod
     def _normalize_label(value: str) -> str:
