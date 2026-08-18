@@ -31,8 +31,6 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     cv2 = None
 
-import auth as _auth
-
 try:
     import send2trash
     _SEND2TRASH = True
