@@ -167,6 +167,7 @@ def enroll_biometric_profile(
         _AUTHORIZED_PERSONNEL.add(normalized_visual)
 
     verify_biometric_security.cache_clear()
+    _save_profiles_to_disk()
     return f"Enrolled biometric profile for {normalized_name} with voice and visual signatures."
 
 def remove_authorized_profile(profile_id: str) -> str:
