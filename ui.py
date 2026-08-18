@@ -2624,6 +2624,11 @@ class MainWindow(QMainWindow):
         self._ready = self._check_config()
         if not self._ready:
             self._show_setup()
+        elif os.getenv("JARVIS_VPS_URL", "").strip():
+            # Pure VPS-worker mode runs unattended — there's no one at the Mac
+            # to clear a face/voice scan, and the scan's own camera use would
+            # fight remote camera-capture requests for the same device.
+            self._log.append_log("SYS: VPS worker mode — biometric lock skipped.")
         else:
             QTimer.singleShot(400, self._show_biometric_lock)
         QTimer.singleShot(500, self._start_vps_status_polling)
