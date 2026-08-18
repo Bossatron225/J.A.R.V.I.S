@@ -4833,6 +4833,28 @@ class JarvisLive:
                         f"NET: Model audio unsupported ({self._current_live_model}) — switching model."
                     )
 
+                if _is_live_location_blocked_error(e):
+                    # Google is rejecting the Live API for this server's network/IP —
+                    # not a model, account, or TTS config problem. Retrying fast just
+                    # hammers the API, so back off hard and escalate.
+                    prev = getattr(self, "_conn_backoff", 3)
+                    _conn_backoff = min(prev * 2, 1800) if prev >= 300 else 300
+                    self._conn_backoff = _conn_backoff
+                    self.ui.write_log(
+                        "ERR: Google rejected the Live API connection from this server's "
+                        f"network location — not a model/account issue. Retrying in {_conn_backoff}s."
+                    )
+                    self.ui.set_state("SLEEPING")
+                    if self._dashboard:
+                        await self._dashboard.broadcast({"type": "status", "state": "sleeping"})
+                    delay = _conn_backoff
+                    try:
+                        await asyncio.wait_for(self._wake_event.wait(), timeout=delay)
+                        self._wake_event.clear()
+                    except asyncio.TimeoutError:
+                        pass
+                    continue
+
                 # Invalid API key — stop hammering the API, prompt re-configuration
                 if "api key not valid" in err_str:
                     self.ui.write_log("ERR: API key invalid — please re-enter your key.")
