@@ -1055,7 +1055,7 @@ TOOL_DECLARATIONS = [
             "type": "OBJECT",
             "properties": {
                 "action":      {"type": "STRING", "description": "list | create_file | create_folder | delete | move | copy | rename | read | write | find | largest | disk_usage | organize_desktop | info"},
-                "path":        {"type": "STRING", "description": "File/folder path or shortcut: desktop, downloads, documents, home"},
+                "path":        {"type": "STRING", "description": "File/folder path or shortcut: desktop, downloads, documents, home, volumes (external/USB drives — use 'list' with path=volumes to see mounted drives, or path=/Volumes/<drive name> for a specific one; 'find' only matches files, never a drive/volume name itself, so use 'list' to locate a drive by name)"},
                 "destination": {"type": "STRING", "description": "Destination path for move/copy"},
                 "new_name":    {"type": "STRING", "description": "New name for rename"},
                 "content":     {"type": "STRING", "description": "Content for create_file/write"},
