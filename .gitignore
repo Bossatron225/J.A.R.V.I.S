@@ -14,5 +14,8 @@ __pycache__/
 scripts/__pycache__/
 
 config/api_keys.json
+config/authorized_profiles.json
+config/override_secret.json
+config/override_audit.log
 bin/jarvis_python
 bin/python_app_backup/
