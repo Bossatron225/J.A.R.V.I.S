@@ -4523,6 +4523,33 @@ class JarvisUI:
         self._win.destroyed.connect(self._on_window_destroyed)
         self._win.show()
         self.root = _RootShim(self._app)
+        if platform.system() == "Darwin":
+            QTimer.singleShot(1500, self._prime_camera_permission)
+
+    @staticmethod
+    def _prime_camera_permission() -> None:
+        """One-time camera open on the process's real main thread.
+
+        Everything else in this app (the asyncio loop, the VPS local-worker
+        polling, capture_camera_b64) runs off background threads, and macOS
+        AVFoundation can only complete a first-time camera authorization
+        request from the main thread that's pumping the run loop — Qt's main
+        loop is the only place that's true here. Priming it once at startup
+        lets the OS permission dialog actually appear; once granted, later
+        background-thread captures work without re-requesting anything.
+        """
+        try:
+            import cv2
+            try:
+                backend = cv2.CAP_AVFOUNDATION
+            except AttributeError:
+                backend = cv2.CAP_ANY
+            cap = cv2.VideoCapture(0, backend)
+            if cap.isOpened():
+                cap.read()
+            cap.release()
+        except Exception as e:
+            print(f"[Camera] Permission priming failed: {e}")
 
     def _on_window_destroyed(self, *_):
         self._window_alive = False
