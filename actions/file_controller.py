@@ -547,7 +547,6 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
     if voice_detected:
         reference_face_match, reference_face_reason = _verify_reference_face_match()
 
-    visual_confidence = None
     visual_engine = "legacy"
     trained_model = _load_primary_face_model() if voice_detected else None
 
@@ -563,10 +562,6 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
         model_match, model_reason = _verify_live_face_with_trained_model(trained_model)
         visual_detected = bool(model_match)
         reference_face_reason = model_reason
-        try:
-            visual_confidence = float(model_reason.split("confidence=")[1].split(",")[0].split(")")[0])
-        except Exception:
-            visual_confidence = None
     elif image_bytes:
         # No trained model yet (profile hasn't been re-enrolled with the guided
         # multi-angle capture) — fall back to the legacy signals unchanged.
