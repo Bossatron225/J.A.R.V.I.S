@@ -796,32 +796,23 @@ def main() -> int:
                     _send_imessage(target, _build_remote_wake_notice(public_url, key, auto))
                     continue
 
-                if _is_jarvis_running(target_script):
-                    _log("wake command received but jarvis already running")
+                if _local_jarvis_mode() == "interactive":
+                    _log("wake command received but an interactive session is already running")
                     # Avoid chat spam while already running; cooldown above already records this wake.
                     continue
 
+                # "jarvis wake" always brings up the full local interactive JARVIS on this
+                # Mac (mic, wake word, GUI) — it preempts the always-on headless worker via
+                # main.py's own lock instead of being skipped in favor of it. It stays linked
+                # to the VPS (memory sync, remote task servicing) via JARVIS_VPS_URL below; the
+                # worker resumes on its own once this session ends. Use the "remote uplink"
+                # phrase instead to just fetch the web link without touching the local Mac.
                 vps_url = _resolve_vps_url()
+                extra_env = {"JARVIS_MODE": "interactive"}
                 if vps_url:
-                    try:
-                        health_url = f"{vps_url.rstrip('/')}/api/health"
-                        req = urllib.request.Request(health_url, headers={"User-Agent": "JARVIS-wake-bridge/1.0"})
-                        with urllib.request.urlopen(req, timeout=4) as resp:
-                            payload = resp.read(2048)
-                        data = json.loads(payload.decode("utf-8", errors="replace")) if payload else {}
-                        if isinstance(data, dict) and data.get("ok") is not False:
-                            _log(f"VPS active at {vps_url}; skipping local launch to keep wake remote-first")
-                            target = msg.get("sender") or msg.get("chat_name") or sender_allowed
-                            public_url, key, auto = _fetch_vps_remote_access_snapshot(vps_url)
-                            if not public_url:
-                                public_url, key, auto = _refresh_remote_access_snapshot()
-                            notice = _build_remote_wake_notice(public_url, key, auto)
-                            _send_imessage(target, notice)
-                            continue
-                    except Exception:
-                        pass
+                    extra_env["JARVIS_VPS_URL"] = vps_url
 
-                launched = _launch_jarvis(python_exec, target_script)
+                launched = _launch_jarvis(python_exec, target_script, extra_env=extra_env)
                 target = msg.get("sender") or msg.get("chat_name") or sender_allowed
                 if launched:
                     if not target:
