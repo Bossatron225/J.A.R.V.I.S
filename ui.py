@@ -1714,7 +1714,6 @@ class BiometricLockOverlay(QWidget):
     """
     verified = pyqtSignal()
     failed = pyqtSignal()
-    manage_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         self._qt_ready = False
