@@ -446,7 +446,8 @@ def _python_app_bundle_from_exec(python_exec: str) -> str | None:
     return None
 
 
-def _launch_jarvis(python_exec: str, target_script: Path) -> bool:
+def _launch_jarvis(python_exec: str, target_script: Path, extra_env: dict | None = None) -> bool:
+    launch_env = {**os.environ, **(extra_env or {})}
     for attempt in range(1, 4):
         try:
             STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -464,6 +465,7 @@ def _launch_jarvis(python_exec: str, target_script: Path) -> bool:
                     stderr=launch_log,
                     start_new_session=True,
                     close_fds=True,
+                    env=launch_env,
                 )
 
                 _log(f"launch requested (attempt={attempt}, pid={proc.pid}, python_exec={python_exec})")
