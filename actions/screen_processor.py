@@ -40,9 +40,13 @@ from google import genai
 from google.genai import types as gtypes
 
 try:
-    from actions.browser_control import capture_browser_tab as _capture_browser_tab
+    from actions.browser_control import (
+        capture_browser_tab as _capture_browser_tab,
+        has_active_browser_session as _has_active_browser_session,
+    )
 except Exception:
     _capture_browser_tab = None
+    _has_active_browser_session = None
 
 _MAC_BROWSER_APP_NAMES = {
      "safari": "Safari",
