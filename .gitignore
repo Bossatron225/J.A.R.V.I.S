@@ -8,6 +8,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .coverage
+*.log
 
 # Auto-commit helper
 scripts/__pycache__/
