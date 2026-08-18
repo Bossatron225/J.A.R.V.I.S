@@ -1526,6 +1526,7 @@ class JarvisLive:
         self._visual_watch_cfg = self._load_visual_watch_config()
         self._visual_monitor = VisualMonitorRegistry(API_CONFIG_PATH)
         self._visual_error_seen: dict[str, tuple[str, float]] = {}
+        self._visual_resync_last: float = 0.0
         self._started_ts = time.time()
         self._current_live_model: str | None = None
         self._live_model_backoff_until: dict[str, float] = {}
