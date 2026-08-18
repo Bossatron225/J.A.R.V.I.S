@@ -456,8 +456,20 @@ def _is_live_audio_unsupported_error(err: Exception | BaseException) -> bool:
         "content_type_audio",
         "audio content type",
         "not supported for this model configuration",
-        "received 1007",
     ))
+
+
+def _is_live_location_blocked_error(err: Exception | BaseException) -> bool:
+    """Google rejecting the Live API for this network's location/IP.
+
+    Not model- or account-specific — retrying other models, or retrying
+    quickly, will not help. Previously this was misclassified by
+    `_is_live_audio_unsupported_error` (both surface as WS close code 1007),
+    which caused every model in LIVE_MODELS to be tried and blocked every
+    reconnect cycle on a flat ~3s backoff — hammering the API for hours.
+    """
+    msg = _error_text(err)
+    return "user location is not supported" in msg
 
 
 def _is_billing_error(err: Exception | BaseException) -> bool:
