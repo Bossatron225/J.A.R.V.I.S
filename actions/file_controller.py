@@ -352,7 +352,7 @@ def _voice_matches_baseline(live_audio_bytes: bytes, baseline_audio_bytes: bytes
     corr = float(np.corrcoef(live_slice, baseline_slice)[0, 1]) if live_slice.size == baseline_slice.size else 0.0
     if np.isnan(corr):
         corr = 0.0
-    return corr > 0.12 and ratio < 4.0
+    return corr > 0.35 and ratio < 4.0
 
 
 def _visual_matches_baseline(live_image_bytes: bytes, baseline_image_bytes: bytes) -> bool:
