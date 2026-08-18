@@ -4707,6 +4707,8 @@ class JarvisLive:
                 print("[JARVIS] Connecting...")
                 self.ui.set_state("THINKING")
                 runtime_cfg = self._load_runtime_config()
+                self._vertex_project = str(runtime_cfg.get("vertex_project") or "").strip()
+                self._vertex_location = str(runtime_cfg.get("vertex_location") or "us-central1").strip()
                 self._tts_player = None
                 self._use_external_tts = False
                 if self._external_tts_enabled(runtime_cfg):
