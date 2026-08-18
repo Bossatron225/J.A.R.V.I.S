@@ -3,23 +3,75 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import http.client
+import json
 import os
 import platform
 import shutil
 import subprocess
 import threading
+import time
 import webbrowser
 from pathlib import Path
 from typing import Optional
 
 from playwright.async_api import (
     async_playwright,
+    Browser,
     BrowserContext,
     Page,
     Playwright,
     TimeoutError as PlaywrightTimeout,
 )
+
+from config import get_config
+
 _OS = platform.system()   # "Windows" | "Darwin" | "Linux"
+
+# Fixed remote-debugging port per browser. JARVIS launches browsers with this
+# port open (see _open_native) so it can later attach via Chrome DevTools
+# Protocol and see every tab across every window of the user's REAL browser
+# session — not just tabs opened through automation. Safari has no CDP
+# support and isn't listed here; it keeps its AppleScript-based capture path.
+_CDP_PORTS: dict[str, int] = {
+    "chrome":   9222,
+    "edge":     9223,
+    "brave":    9224,
+    "vivaldi":  9225,
+    "opera":    9226,
+    "operagx":  9226,
+    "firefox":  9227,
+}
+
+
+def _cdp_attach_enabled() -> bool:
+    return bool(get_config().get("browser_cdp_attach_enabled", True))
+
+
+def _cdp_endpoint_reachable(port: int) -> bool:
+    """True if a real CDP debugger is listening on this port (not just any process)."""
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=0.35)
+        conn.request("GET", "/json/version")
+        resp = conn.getresponse()
+        data = resp.read()
+        conn.close()
+        if resp.status != 200:
+            return False
+        return "webSocketDebuggerUrl" in json.loads(data)
+    except Exception:
+        return False
+
+
+def _is_mac_app_running(app_name: str) -> bool:
+    if _OS != "Darwin":
+        return False
+    try:
+        script = f'tell application "System Events" to (name of processes) contains "{app_name}"'
+        proc = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=5)
+        return (proc.stdout or "").strip().lower() == "true"
+    except Exception:
+        return False
 
 def _normalize_url(url: str) -> str:
     """
