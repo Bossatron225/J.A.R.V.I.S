@@ -421,6 +421,21 @@ def _is_jarvis_running(target_script: Path) -> bool:
         return False
 
 
+def _local_jarvis_mode() -> str | None:
+    """Read main.py's own singleton lock to see whether the running instance (if
+    any) is the always-on headless worker or an already-active interactive session.
+    A bare pgrep can't tell these apart, and the background worker is expected to be
+    running almost all the time — so "wake" needs this to know it should preempt the
+    worker rather than treat it as "already running"."""
+    lock_path = BASE_DIR / ".jarvis.lock"
+    try:
+        data = json.loads(lock_path.read_text(encoding="utf-8") or "{}")
+        mode = str(data.get("mode") or "").strip().lower()
+        return mode if mode in {"interactive", "worker"} else None
+    except Exception:
+        return None
+
+
 def _python_app_bundle_from_exec(python_exec: str) -> str | None:
     p = Path(python_exec)
     s = str(p)
