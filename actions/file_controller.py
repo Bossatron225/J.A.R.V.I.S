@@ -549,6 +549,127 @@ def verify_biometric_security(voice_print: str = "", visual_signature: str = "")
 
     return False
 
+
+# --- BiometricLock_Protocol manual override code ------------------------
+# A hashed+salted fallback credential the owner sets themselves, for when
+# live voice/visual verification isn't available (headless/VPS mode, a
+# damaged mic/camera, etc). Never stored or logged in plaintext.
+
+_OVERRIDE_MIN_LENGTH = 8
+_OVERRIDE_MAX_ATTEMPTS = 5
+_OVERRIDE_COOLDOWN_SECONDS = 60.0
+# In-memory only — resets on process restart. Acceptable for a single-owner
+# local machine (restart access implies the machine is already compromised);
+# would need persistent storage for a shared/exposed deployment.
+_override_attempts = {"count": 0, "locked_until": 0.0}
+
+
+def _config_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "config"
+
+
+def _override_secret_path() -> Path:
+    return _config_dir() / "override_secret.json"
+
+
+def _override_audit_log_path() -> Path:
+    return _config_dir() / "override_audit.log"
+
+
+def set_override_code(code: str) -> tuple[bool, str]:
+    """Sets (or replaces) the manual override code. Stored as a salted PBKDF2 hash only."""
+    clean = (code or "").strip()
+    if len(clean) < _OVERRIDE_MIN_LENGTH:
+        return False, f"Override code must be at least {_OVERRIDE_MIN_LENGTH} characters."
+
+    salt = os.urandom(16)
+    iterations = 200_000
+    derived = hashlib.pbkdf2_hmac("sha256", clean.encode("utf-8"), salt, iterations)
+
+    payload = {
+        "salt": salt.hex(),
+        "hash": derived.hex(),
+        "iterations": iterations,
+        "algo": "pbkdf2_sha256",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    path = _override_secret_path()
+    os.makedirs(path.parent, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2))
+    try:
+        os.chmod(path, 0o600)
+    except Exception:
+        pass
+
+    _override_attempts["count"] = 0
+    _override_attempts["locked_until"] = 0.0
+    return True, "Manual override code set."
+
+
+def has_override_code_configured() -> bool:
+    return _override_secret_path().exists()
+
+
+def verify_override_code(code: str) -> bool:
+    """Verifies a candidate code against the stored salted hash. Fails closed on any error."""
+    path = _override_secret_path()
+    if not path.exists():
+        return False
+    try:
+        payload = json.loads(path.read_text())
+        salt = bytes.fromhex(str(payload["salt"]))
+        stored_hash = bytes.fromhex(str(payload["hash"]))
+        iterations = int(payload.get("iterations", 200_000))
+    except Exception:
+        return False
+
+    clean = (code or "").strip()
+    if not clean:
+        return False
+
+    derived = hashlib.pbkdf2_hmac("sha256", clean.encode("utf-8"), salt, iterations)
+    return hmac.compare_digest(derived, stored_hash)
+
+
+def check_override_rate_limit() -> tuple[bool, str]:
+    """Returns (allowed, message). Blocks further attempts during an active cooldown."""
+    now = time.monotonic()
+    locked_until = _override_attempts.get("locked_until", 0.0)
+    if locked_until and now < locked_until:
+        remaining = int(locked_until - now) + 1
+        return False, f"Too many failed override attempts. Try again in {remaining}s."
+    return True, ""
+
+
+def record_override_attempt(success: bool) -> None:
+    """Updates the in-memory rate-limit counters after an override attempt."""
+    if success:
+        _override_attempts["count"] = 0
+        _override_attempts["locked_until"] = 0.0
+        return
+
+    _override_attempts["count"] = _override_attempts.get("count", 0) + 1
+    if _override_attempts["count"] >= _OVERRIDE_MAX_ATTEMPTS:
+        _override_attempts["locked_until"] = time.monotonic() + _OVERRIDE_COOLDOWN_SECONDS
+        _override_attempts["count"] = 0
+
+
+def _append_override_audit_log(success: bool, reason: str) -> None:
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "success": bool(success),
+        "reason": reason,
+    }
+    path = _override_audit_log_path()
+    try:
+        os.makedirs(path.parent, exist_ok=True)
+        with open(path, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
+
+
 @lru_cache(maxsize=32)
 def _is_safe_path(target: Path) -> bool:
     """Verilen path _SAFE_ROOTS içinde mi? Değilse işlemi reddet."""
