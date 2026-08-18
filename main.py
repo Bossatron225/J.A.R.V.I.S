@@ -4010,6 +4010,11 @@ class JarvisLive:
                     shown on the UI content panel. Waits for turn_complete event
                     instead of a fixed sleep so there is no unnecessary gap.
         """
+        if self._local_speech_gate_active():
+            # Skip the greeting entirely rather than queue it — BiometricLock_Protocol
+            # hasn't cleared, and this briefing's own audio would otherwise bleed into
+            # the mic capture used for voice verification.
+            return
         memory   = load_memory()
         identity = memory.get("identity", {})
 
