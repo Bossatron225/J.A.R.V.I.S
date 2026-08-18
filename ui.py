@@ -1800,20 +1800,6 @@ class BiometricLockOverlay(QWidget):
         """)
         self._scan_btn.clicked.connect(self._run_scan)
         btn_row.addWidget(self._scan_btn)
-
-        manage_btn = QPushButton("PROFILES")
-        manage_btn.setFixedHeight(36)
-        manage_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
-        manage_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        manage_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: {C.PANEL2}; color: {C.ACC2};
-                border: 1px solid {C.ACC2}; border-radius: 4px;
-            }}
-            QPushButton:hover {{ background: #241900; }}
-        """)
-        manage_btn.clicked.connect(self.manage_requested.emit)
-        btn_row.addWidget(manage_btn)
         lay.addLayout(btn_row)
 
         override_btn = QPushButton("OVERRIDE CODE")
