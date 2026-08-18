@@ -13,7 +13,6 @@ def get_base_dir() -> Path:
 
 BASE_DIR = get_base_dir()
 API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
-SECURITY_CONFIG_PATH = BASE_DIR / "config" / "security_profiles.json"
 DESKTOP = Path.home() / "Desktop"
 MAX_BUILD_ATTEMPTS = 3
 GEMINI_MODEL = "models/gemini-flash-lite-latest"
