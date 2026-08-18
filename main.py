@@ -1,7 +1,8 @@
 import platform as _platform
+import signal as _signal
 import subprocess as _subprocess
 import sys
-import warnings 
+import warnings
 
 try:
     import fcntl
