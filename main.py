@@ -5135,8 +5135,7 @@ def _acquire_single_instance(lock_path: str | None = None, mode: str = "interact
 
 
 def main():
-    vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
-    lock_handle = _acquire_single_instance(mode="worker" if vps_url else "interactive")
+    lock_handle = _acquire_single_instance(mode=_resolve_jarvis_mode())
     if lock_handle is None:
         raise SystemExit(1)
 
