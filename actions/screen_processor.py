@@ -490,7 +490,7 @@ def _capture_targeted_visual(target_type: str = "screen", *, browser: str = "", 
 
         title = (window_title or target).strip()
         resolved_app = _resolve_app_name((app_name or "").strip())
-        data, mime = _capture_macos_window(window_title=title, app_name=resolved_app)
+        data, mime = _capture_macos_window(window_title=title, app_name=resolved_app, known_window_id=window_id)
         return data, mime, f"window:{title or resolved_app or 'frontmost'}"
     raise RuntimeError(f"Unknown visual target type: {target_type}")
 
