@@ -593,14 +593,6 @@ def code_helper(
     code = p.get("code", "").strip()
     args = p.get("args", [])
     timeout = int(p.get("timeout", 30))
-    voice_sample = p.get("voice_sample", "").strip()
-    
-    profile_action = p.get("profile_action", "").strip()
-    profile_id = p.get("profile_id", "").strip()
-    profile_name = p.get("profile_name", "").strip()
-    profile_clearance = p.get("profile_clearance", "").strip()
-    profile_descriptors = p.get("profile_descriptors", "").strip()
-    profile_voice_notes = p.get("profile_voice_notes", "").strip()
 
     if action == "auto":
         action = _detect_intent(description, file_path, code)
