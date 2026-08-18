@@ -1000,12 +1000,16 @@ TOOL_DECLARATIONS = [
             "and logged-in accounts); interactive actions (click, type, fill_form...) attach an "
             "automation browser. "
             "Always pass the 'browser' parameter when the user specifies a browser (e.g. 'open in Edge', "
-            "'use Firefox', 'open Chrome'). Multiple browsers can run simultaneously."
+            "'use Firefox', 'open Chrome'). Multiple browsers can run simultaneously. "
+            "Use action=enable_background_sight to see EVERY tab of a browser in the background — even "
+            "ones the user opened by hand, not just tabs JARVIS launched — for screenshots/text later "
+            "without switching to them. If the browser is already running without that access it asks "
+            "before restarting it (tabs restore automatically); confirm by calling again with confirm=true."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":      {"type": "STRING", "description": "go_to | search | click | type | scroll | fill_form | smart_click | smart_type | get_text | get_url | press | new_tab | list_tabs | switch_tab | close_tab | screenshot | back | forward | reload | switch | list_browsers | close | close_all | close_safari_all | close_browser_all_tabs"},
+                "action":      {"type": "STRING", "description": "go_to | search | click | type | scroll | fill_form | smart_click | smart_type | get_text | get_url | press | new_tab | list_tabs | switch_tab | close_tab | screenshot | back | forward | reload | switch | list_browsers | close | close_all | close_safari_all | close_browser_all_tabs | enable_background_sight"},
                 "browser":     {"type": "STRING", "description": "Target browser: chrome | edge | firefox | opera | operagx | brave | vivaldi | safari. Omit to use the currently active browser."},
                 "url":         {"type": "STRING", "description": "URL for go_to / new_tab action"},
                 "query":       {"type": "STRING", "description": "Search query for search action"},
@@ -1021,6 +1025,7 @@ TOOL_DECLARATIONS = [
                 "path":        {"type": "STRING", "description": "Save path for screenshot"},
                 "incognito":   {"type": "BOOLEAN", "description": "Open in private/incognito mode"},
                 "clear_first": {"type": "BOOLEAN", "description": "Clear field before typing (default: true)"},
+                "confirm":     {"type": "BOOLEAN", "description": "Confirms restarting an already-open browser for enable_background_sight, after the user agrees"},
             },
             "required": ["action"]
         }
