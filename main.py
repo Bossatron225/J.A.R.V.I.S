@@ -2923,6 +2923,13 @@ class JarvisLive:
 
     async def _execute_tool(self, fc) -> types.FunctionResponse:
         name = fc.name
+        if getattr(self.ui, "is_biometric_lock_active", lambda: False)():
+            self.ui.write_log(f"SYS: Biometric lock active — tool call '{name}' blocked.")
+            return types.FunctionResponse(
+                id=fc.id,
+                name=name,
+                response={"result": "Access Denied: BiometricLock_Protocol active. Verification required before tool execution."},
+            )
         args = dict(fc.args or {})
         self._predictive_daemon.record_tool_call(name, args)
 
