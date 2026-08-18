@@ -575,7 +575,7 @@ def code_helper(
     Called from main.py.
 
     parameters:
-        action      : write | edit | explain | run | build | screen_debug | optimize | test | security_check | security_profile | auto
+        action      : write | edit | explain | run | build | screen_debug | optimize | test | auto
         description : What the code should do / what change to make / what problem to analyze
         language    : Programming language (default: python)
         output_path : Where to save — user specifies full path or filename
