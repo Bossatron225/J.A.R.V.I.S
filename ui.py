@@ -4874,6 +4874,20 @@ class JarvisUI:
             return
         self._win.on_biometric_failure = cb
 
+    def is_biometric_lock_active(self) -> bool:
+        # Fail closed (locked) if the window is gone, same as the `muted` property
+        # above — JarvisLive reads this via getattr(self.ui, ..., lambda: False),
+        # so without this forwarding method every lock check in main.py silently
+        # evaluated to "unlocked" on the real desktop app.
+        if not self._window_alive or self._win is None:
+            return True
+        return self._win.is_biometric_lock_active()
+
+    def unlock_via_override(self, code: str) -> tuple[bool, str]:
+        if not self._window_alive or self._win is None:
+            return False, "Window unavailable."
+        return self._win.unlock_via_override(code)
+
     def notify_phone_connected(self) -> None:
         self._safe_window_call("notify_phone_connected")
 
