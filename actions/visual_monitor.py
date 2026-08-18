@@ -41,8 +41,50 @@ class VisualMonitorRegistry:
 
     @staticmethod
     def _macos_app_inventory() -> list[dict]:
+        """
+        Every visible window of every app, front-to-back, each window carrying
+        a stable CGWindowID — not just window titles, which collide whenever
+        an app has multiple similarly-named windows (e.g. two Terminal tabs
+        both called "bash"). The window ID is what lets individual windows be
+        targeted and captured reliably, even when occluded by other windows.
+        """
         if platform.system() != "Darwin":
             return []
+        try:
+            import Quartz
+            wlist = Quartz.CGWindowListCopyWindowInfo(
+                Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
+                Quartz.kCGNullWindowID,
+            ) or []
+        except Exception:
+            return VisualMonitorRegistry._macos_app_inventory_applescript()
+
+        items: list[dict] = []
+        by_name: dict[str, dict] = {}
+        for w in wlist:
+            try:
+                if int(w.get("kCGWindowLayer", 0) or 0) != 0:
+                    continue  # skip menu bar / dock / overlay layers, keep normal app windows
+                owner = str(w.get("kCGWindowOwnerName") or "").strip()
+                wid = w.get("kCGWindowNumber")
+                if not owner or not wid:
+                    continue
+                wname = str(w.get("kCGWindowName") or "").strip() or "(untitled)"
+                obj = by_name.get(owner)
+                if not obj:
+                    # CGWindowListCopyWindowInfo returns windows front-to-back,
+                    # so the first window we see overall is the frontmost app.
+                    obj = {"app_name": owner, "frontmost": not items, "windows": []}
+                    by_name[owner] = obj
+                    items.append(obj)
+                obj["windows"].append({"title": wname, "window_id": int(wid)})
+            except Exception:
+                continue
+        return items
+
+    @staticmethod
+    def _macos_app_inventory_applescript() -> list[dict]:
+        """Fallback when Quartz/PyObjC is unavailable — no window IDs, titles only."""
         script = r'''
 set outputLines to {}
 tell application "System Events"
@@ -103,8 +145,8 @@ return outputLines as text
                     by_name[name] = obj
                     items.append(obj)
                 wname = parts[2].strip()
-                if wname and wname not in obj["windows"]:
-                    obj["windows"].append(wname)
+                if wname and wname not in [w.get("title") for w in obj["windows"]]:
+                    obj["windows"].append({"title": wname, "window_id": None})
         return items
 
     def add_target(self, params: dict) -> VisualTarget:
