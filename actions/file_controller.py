@@ -378,7 +378,7 @@ def _visual_matches_baseline(live_image_bytes: bytes, baseline_image_bytes: byte
         cv2.normalize(hist_live, hist_live)
         cv2.normalize(hist_base, hist_base)
         similarity = cv2.compareHist(hist_live, hist_base, cv2.HISTCMP_CORREL)
-        return float(similarity) > 0.2
+        return float(similarity) > 0.45
     except Exception:
         return False
 
