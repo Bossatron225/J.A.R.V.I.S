@@ -173,7 +173,7 @@ return outputLines as text
                         window_title = str(windows[0].get("title") or "")
                         window_id = windows[0].get("window_id")
         if not target_id:
-            basis = [target_type, browser, target, window_title, app_name]
+            basis = [target_type, browser, target, window_title, app_name, index_or_blank(window_id)]
             slug = "|".join(part for part in basis if part)
             target_id = hashlib.sha1(slug.encode("utf-8")).hexdigest()[:12]
 
@@ -195,6 +195,7 @@ return outputLines as text
             index=_coerce_index(params.get("index")),
             window_title=window_title,
             app_name=app_name,
+            window_id=window_id,
             interval_seconds=max(1.0, min(interval, 60.0)),
             enabled=bool(params.get("enabled", True)),
         )
