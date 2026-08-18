@@ -1,10 +1,33 @@
 import asyncio
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
+import pytest
+
+import auth as auth_module
 from actions import file_controller as file_controller_module
 import main as main_module
 import ui as ui_module
 from ui import ManageProfilesOverlay
+
+requires_face_module = pytest.mark.skipif(
+    not auth_module._HAS_FACE_MODULE, reason="cv2.face requires opencv-contrib-python"
+)
+
+
+def _fake_extract_for_training(base_face):
+    """Return a monkeypatch target standing in for auth._extract_face_for_training:
+    each "sample" is the same underlying face with a small deterministic amount of
+    per-sample noise, mirroring the lighting/pose variance real enrollment frames have."""
+
+    def _fake(image_bytes):
+        seed = image_bytes[0] if image_bytes else 0
+        noise = np.random.default_rng(seed).integers(-8, 8, size=base_face.shape)
+        return np.clip(base_face.astype(int) + noise, 0, 255).astype(np.uint8)
+
+    return _fake
 
 
 def test_enroll_biometric_profile_stores_voice_and_visual_signatures(monkeypatch) -> None:
