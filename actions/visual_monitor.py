@@ -23,6 +23,7 @@ class VisualTarget:
     index: int | None = None
     window_title: str = ""
     app_name: str = ""
+    window_id: int | None = None
     interval_seconds: float = 3.5
     enabled: bool = True
 
