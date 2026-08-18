@@ -63,14 +63,13 @@
     "voice_upgrade_error": {
       "value": "Experienced voice upgrade error during TTS switch attempt",
       "updated": "2026-08-10"
+    },
+    "girlfriend_documents_context": {
+      "value": "Documents analyzed relate to girlfriend's workplace grievance and personal reflection.",
+      "updated": "2026-08-18"
     }
   },
   "sessions": [
-    {
-      "date": "2026-08-18",
-      "summary": "The user discussed running system diagnostics and self-improvement protocols, and instructed the AI to fetch the news and attempt to access a biometric-locked USB drive.",
-      "language": "English"
-    },
     {
       "date": "2026-08-18",
       "summary": "The user reviewed market headlines and daily news with JARVIS, but the system was unable to locate or access a biometrically encrypted USB drive named \"Private.\"",
