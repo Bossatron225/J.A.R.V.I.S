@@ -601,6 +601,18 @@ print(json.dumps({"image_b64": base64.b64encode(data).decode("ascii")}))
 """
 
 
+# macOS's hardened runtime refuses to even prompt for kTCCServiceCamera unless
+# the requesting binary's own code signature carries the
+# com.apple.security.device.camera entitlement — the stock venv interpreter
+# (a symlink into Apple's signed Python.framework) doesn't have it, and no
+# amount of subprocess/thread restructuring changes that. bin/jarvis_python is
+# a standalone copy of that same interpreter, ad-hoc re-signed with the
+# entitlement added (see bin/jarvis_python_entitlements.plist) — it has the
+# system framework's site-packages (cv2/PIL), not the venv's, so it's used
+# only for this one isolated capture call, never to run the app itself.
+_CAMERA_PYTHON = Path(__file__).resolve().parent.parent / "bin" / "jarvis_python"
+
+
 def _capture_camera() -> tuple[bytes, str]:
     if not _CV2:
         raise RuntimeError("OpenCV (cv2) is not installed. Run: pip install opencv-python")
@@ -613,9 +625,10 @@ def _capture_camera() -> tuple[bytes, str]:
     # asyncio worker threads), that handshake fails silently no matter how
     # it's retried. A short-lived, single-threaded subprocess sidesteps that
     # entirely — it's the same shape of process that reliably works standalone.
+    python_bin = str(_CAMERA_PYTHON) if _CAMERA_PYTHON.exists() else sys.executable
     try:
         proc = subprocess.run(
-            [sys.executable, "-c", _CAMERA_SUBPROCESS_SRC,
+            [python_bin, "-c", _CAMERA_SUBPROCESS_SRC,
              str(index), str(backend), str(_IMG_MAX_W), str(_IMG_MAX_H), str(_JPEG_Q)],
             capture_output=True, text=True, timeout=15,
         )
