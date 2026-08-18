@@ -1556,6 +1556,11 @@ class ManageProfilesOverlay(QWidget):
         except Exception:
             pass
         try:
+            if self._visual_capture_timer is not None:
+                self._visual_capture_timer.stop()
+        except Exception:
+            pass
+        try:
             if self._camera_cap is not None:
                 self._camera_cap.release()
         except Exception:
