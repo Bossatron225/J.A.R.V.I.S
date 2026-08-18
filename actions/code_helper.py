@@ -159,9 +159,7 @@ def _detect_intent(description: str, file_path: str, code: str) -> str:
                 "  build        = write code, run it, and iterate until it works\n"
                 "  screen_debug = analyze an error currently visible on the user's screen\n"
                 "  optimize     = refactor / clean up / speed up existing code\n"
-                "  test         = write and run unit tests for existing code or file\n"
-                "  security_check = execute BiometricLock_Protocol (voice recognition & visual person detection)\n"
-                "  security_profile = manage, set up, add, or list authorized biometric profiles\n\n"
+                "  test         = write and run unit tests for existing code or file\n\n"
                 "Reply with ONLY the intent word, nothing else."
             )
             ans = _extract_text(_get_gemini().generate_content(prompt)).strip().lower()
