@@ -368,6 +368,24 @@ def _verify_reference_face_match() -> tuple[bool, str]:
         return False, f"verify-error:{exc}"
 
 
+def _load_primary_face_model():
+    try:
+        from auth import load_face_model
+
+        return load_face_model("primary")
+    except Exception:
+        return None
+
+
+def _verify_live_face_with_trained_model(recognizer) -> tuple[bool, str]:
+    try:
+        from auth import verify_face_against_model
+
+        return verify_face_against_model(recognizer)
+    except Exception as exc:
+        return False, f"verify-error:{exc}"
+
+
 def _verify_live_voice_with_gemini(audio_bytes: bytes, target_identity: str) -> bool:
     if not audio_bytes:
         return False
