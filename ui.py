@@ -4483,13 +4483,15 @@ class MainWindow(QMainWindow):
         ov.manage_requested.connect(self._open_manage_profiles)
         ov.show()
         self._biometric_overlay = ov
+        self._biometric_locked = True
         self._log.append_log("SYS: BiometricLock_Protocol initiated. Profile voice and visual verification pending.")
 
     def is_biometric_lock_active(self) -> bool:
-        return self._biometric_overlay is not None and self._biometric_overlay.isVisible()
+        return self._biometric_locked
 
     def _handle_biometric_failure(self):
         self._log.append_log("SYS: BiometricLock_Protocol failed. Security shutdown initiated.")
+        self._biometric_locked = True
         self._apply_state("LOCKED")
         if self.on_biometric_failure:
             self.on_biometric_failure()
@@ -4497,6 +4499,7 @@ class MainWindow(QMainWindow):
     def _on_biometric_done(self, ov: BiometricLockOverlay):
         ov.hide()
         self._biometric_overlay = None
+        self._biometric_locked = False
         self._apply_state("LISTENING")
         self._assistant_name = _read_full_config().get("assistant_name", "JARVIS") or "JARVIS"
         self._log.append_log(f"SYS: BiometricLock_Protocol cleared. {self._assistant_name} online with Stark security profiles.")
