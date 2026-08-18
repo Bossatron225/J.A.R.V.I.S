@@ -2479,6 +2479,7 @@ class MainWindow(QMainWindow):
         self._current_file: str | None = None
         self._security_overlay: QWidget | None = None
         self._biometric_overlay: BiometricLockOverlay | None = None
+        self._biometric_locked: bool = True
         self._manage_profiles_overlay: ManageProfilesOverlay | None = None
         self._remote_overlay: RemoteKeyOverlay | None = None
         self._customize_overlay: CustomizeOverlay | None = None
