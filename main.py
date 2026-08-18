@@ -2715,8 +2715,25 @@ class JarvisLive:
 
         return url, sec
 
+    @staticmethod
+    def _extract_override_code(text: str) -> str | None:
+        """Recognizes an 'unlock <code>' command so the manual override code can clear
+        BiometricLock_Protocol remotely (dashboard/VPS bridge/text) when locked — this is
+        the only command honored while locked, and only while locked."""
+        if not isinstance(text, str):
+            return None
+        stripped = text.strip()
+        if stripped.lower().startswith("unlock "):
+            return stripped[len("unlock "):].strip()
+        return None
+
     def _on_text_command(self, text: str):
         if getattr(self.ui, "is_biometric_lock_active", lambda: False)():
+            override_code = self._extract_override_code(text)
+            if override_code is not None:
+                success, message = self.ui.unlock_via_override(override_code)
+                self.ui.write_log(f"SYS: {message}")
+                return
             self.ui.write_log("SYS: Biometric lock active — input blocked until verification completes.")
             return
         self._predictive_daemon.record_text_command(text)
