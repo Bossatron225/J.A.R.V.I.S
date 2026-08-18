@@ -228,6 +228,7 @@ return outputLines as text
             index=target.index,
             window_title=target.window_title,
             app_name=target.app_name,
+            window_id=target.window_id,
         )
 
     def poll_once(self) -> list[dict]:
