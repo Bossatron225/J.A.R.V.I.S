@@ -4718,6 +4718,17 @@ class JarvisLive:
         if self._remote_bridge is None:
             asyncio.create_task(self._run_vps_local_worker())
 
+        if vps_url and self._remote_bridge is None:
+            # Pure Mac-side worker for a VPS-hosted brain: no local mic, no local
+            # Gemini Live session, no wake word. This Mac only acts when the VPS
+            # hands it a task via _run_vps_local_worker, which drives its own
+            # brief per-task HUD indicator (see _on_local_task_state) instead of
+            # ever entering the LISTENING/SLEEPING voice-session cycle below.
+            self.ui.write_log("SYS: Remote worker mode — local voice assistant disabled; awaiting VPS tasks.")
+            self.ui.set_state(self._WORKER_IDLE_STATE)
+            while True:
+                await asyncio.sleep(3600)
+
         while True:
             try:
                 print("[JARVIS] Connecting...")
