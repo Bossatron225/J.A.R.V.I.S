@@ -4564,6 +4564,8 @@ class JarvisLive:
         while True:
             try:
                 await asyncio.sleep(interval)
+                if self._local_speech_gate_active():
+                    continue
                 with self._speaking_lock:
                     speaking = self._is_speaking
                 recent_speech = (time.monotonic() - self._last_user_speech) < silence_window
