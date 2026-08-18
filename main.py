@@ -1613,6 +1613,8 @@ class JarvisLive:
 
     def _enqueue_tts_sentence(self, sentence: str) -> None:
         """Queue a sentence for external TTS; drops if the queue is not available."""
+        if self._local_speech_gate_active():
+            return
         if self._tts_sentence_queue and sentence.strip():
             try:
                 self._tts_sentence_queue.put_nowait(sentence.strip())
@@ -1620,7 +1622,7 @@ class JarvisLive:
                 pass
 
     async def _speak_external_tts(self, text: str) -> None:
-        if not text or not self._tts_player:
+        if not text or not self._tts_player or self._local_speech_gate_active():
             return
         self.set_speaking(True)
         try:
