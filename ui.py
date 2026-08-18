@@ -64,6 +64,15 @@ def _base_dir() -> Path:
         return Path(sys.executable).parent
     return Path(__file__).resolve().parent
 
+
+def _is_worker_mode() -> bool:
+    """Mirrors main.py's _resolve_jarvis_mode(): only an explicit JARVIS_MODE=worker
+    (set by JarvisWorker.app's launchd wrapper) means unattended, no-one-at-the-Mac
+    operation. JARVIS_VPS_URL alone does NOT mean that — both run_local.sh
+    (interactive) and JarvisWorker.app (worker) set it, since the local Mac stays
+    linked to the VPS for memory sync either way."""
+    return str(os.getenv("JARVIS_MODE") or "").strip().lower() == "worker"
+
 BASE_DIR   = _base_dir()
 CONFIG_DIR = BASE_DIR / "config"
 API_FILE   = CONFIG_DIR / "api_keys.json"
