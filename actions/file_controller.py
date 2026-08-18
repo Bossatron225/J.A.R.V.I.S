@@ -1144,12 +1144,12 @@ def file_controller(
     session_memory=None,
 ) -> str:
     params = parameters or {}
-    
-    # Stark Protocol BiometricLock_Protocol Validation Check (Voice Recognition & Visual Person Detection)
-    voice_print = params.get("voice_print", "")
-    visual_signature = params.get("visual_signature", "")
-    if not verify_biometric_security(voice_print, visual_signature):
-        return "Access Denied: BiometricLock_Protocol verification failed. Voice print or visual person detection signature does not match authorized Stark personnel."
+
+    # BiometricLock_Protocol is enforced upstream, in JarvisLive._execute_tool, against the
+    # real (live-scan or override-code verified) lock state before this function is ever
+    # called. It used to be re-checked here against voice_print/visual_signature params —
+    # those are never populated by the tool schema the model is given, so that check always
+    # failed and denied every real file operation regardless of actual lock state.
 
     action = params.get("action", "").lower().strip()
     path   = params.get("path", "desktop")
