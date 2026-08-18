@@ -3263,6 +3263,12 @@ class JarvisLive:
                 if action == "add":
                     target = self._visual_monitor.add_target(args)
                     result = f"Watching {target.label} ({target.target_type}) as {target.target_id}."
+                elif action == "add_all":
+                    summary = self._visual_monitor.add_all(args)
+                    result = (
+                        f"Now watching every open tab and app window in the background "
+                        f"({summary.get('added', 0)} target(s)). Ask me about any of them anytime."
+                    )
                 elif action == "list":
                     items = self._visual_monitor.list_targets()
                     if not items:
