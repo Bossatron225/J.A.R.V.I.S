@@ -1426,28 +1426,6 @@ def dev_agent(
     require_approval = bool(p.get("require_approval", True))
     self_reboot = bool(p.get("self_reboot", True))
 
-    biometric_action = str(p.get("biometric_action", "") or "").strip().lower()
-    profile_name = str(p.get("profile_name", "") or "").strip()
-    profile_role = str(p.get("profile_role", "") or "").strip()
-    clearance_level = int(p.get("clearance_level", 5))
-    voice_sig = str(p.get("voice_sig", "") or "").strip()
-    visual_sig = str(p.get("visual_sig", "") or "").strip()
-
-    if biometric_action or "biometric" in description.lower() or "biometriclock" in description.lower():
-        if not biometric_action:
-            biometric_action = "status"
-        result_msg = _manage_biometric_profile(
-            action=biometric_action,
-            name=profile_name,
-            role=profile_role,
-            clearance=clearance_level,
-            voice_sig=voice_sig,
-            visual_sig=visual_sig
-        )
-        if speak:
-            speak("BiometricLock protocol profile management executed, sir.")
-        return result_msg
-
     if isinstance(target_files, str):
         target_files = [item.strip() for item in target_files.split(",") if item.strip()]
 
