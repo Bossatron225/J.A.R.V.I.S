@@ -1576,8 +1576,12 @@ class ManageProfilesOverlay(QWidget):
         if primary.get("name"):
             voice_samples = ", ".join(primary.get("voice_prints", []) or [])
             visual_samples = ", ".join(primary.get("visual_signatures", []) or [])
+            sample_count = len(primary.get("visual_samples") or [])
+            visual_display = visual_samples or "n/a"
+            if sample_count:
+                visual_display += f" ({sample_count} angle/distance samples)"
             lines.append(
-                f"• PRIMARY: {primary.get('name')} | Voice: {voice_samples or 'n/a'} | Visual: {visual_samples or 'n/a'}"
+                f"• PRIMARY: {primary.get('name')} | Voice: {voice_samples or 'n/a'} | Visual: {visual_display}"
             )
 
         for profile_id, profile in authorized.items():
