@@ -157,6 +157,7 @@ return outputLines as text
         window_title = str(params.get("window_title", "") or "").strip()
         app_name = str(params.get("app_name", "") or "").strip()
         app_index = _coerce_index(params.get("app_index"))
+        window_id = _coerce_index(params.get("window_id"))
         label = str(params.get("label", "") or "").strip()
         target_id = str(params.get("target_id", "") or "").strip()
 
@@ -169,7 +170,8 @@ return outputLines as text
                 if target_type == "window" and not window_title:
                     windows = chosen.get("windows") or []
                     if windows:
-                        window_title = str(windows[0])
+                        window_title = str(windows[0].get("title") or "")
+                        window_id = windows[0].get("window_id")
         if not target_id:
             basis = [target_type, browser, target, window_title, app_name]
             slug = "|".join(part for part in basis if part)
