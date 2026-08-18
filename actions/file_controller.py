@@ -560,20 +560,22 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
         model_match, model_reason = _verify_live_face_with_trained_model(trained_model)
         visual_detected = bool(model_match)
         reference_face_reason = model_reason
-    elif voice_detected:
+    else:
         # No trained model yet (profile hasn't been re-enrolled with the guided
         # multi-angle capture) — fall back to the legacy signals unchanged.
-        reference_face_match, reference_face_reason = _verify_reference_face_match()
-        if image_bytes and face_detected and (_verify_live_face_with_gemini(image_bytes, identity_name) or reference_face_match):
-            visual_detected = True
-        elif reference_face_match:
-            visual_detected = True
-        elif image_bytes and face_detected and stored_visual_sample:
-            try:
-                baseline_image = base64.b64decode(str(stored_visual_sample))
-            except Exception:
-                baseline_image = b""
-            visual_detected = _visual_matches_baseline(image_bytes, baseline_image)
+        if voice_detected:
+            reference_face_match, reference_face_reason = _verify_reference_face_match()
+        if image_bytes:
+            if face_detected and (_verify_live_face_with_gemini(image_bytes, identity_name) or reference_face_match):
+                visual_detected = True
+            elif reference_face_match:
+                visual_detected = True
+            elif face_detected and stored_visual_sample:
+                try:
+                    baseline_image = base64.b64decode(str(stored_visual_sample))
+                except Exception:
+                    baseline_image = b""
+                visual_detected = _visual_matches_baseline(image_bytes, baseline_image)
 
     live_signal_detected = bool(voice_detected and visual_detected)
     granted = bool(identity_match and live_signal_detected)
