@@ -45,6 +45,11 @@ _SAFE_ROOTS: tuple[Path, ...] = (
     Path.home(),
 )
 
+
+def _config_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "config"
+
+
 # Stark Security Protocol Layer: BiometricLock_Protocol (Enhanced for Voice Recognition & Visual Person Detection with optimized RAM footprint)
 _SECURITY_ENABLED = True
 _AUTHORIZED_PERSONNEL = {"james", "james lumsden", "jarvis"}
