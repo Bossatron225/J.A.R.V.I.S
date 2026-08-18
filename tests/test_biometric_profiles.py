@@ -514,6 +514,59 @@ def test_enroll_biometric_profile_trains_model_from_visual_samples(monkeypatch) 
     assert len(primary["visual_samples"]) == 3
 
 
+def test_jarvis_ui_forwards_biometric_lock_state() -> None:
+    """Regression: JarvisUI is a hand-written forwarding wrapper around MainWindow
+    with no __getattr__ fallback. is_biometric_lock_active/unlock_via_override were
+    missing from that forwarding surface, so every `getattr(self.ui, "is_biometric_lock_active",
+    lambda: False)()` check in main.py silently evaluated to "unlocked" on the real
+    desktop app — the lock UI showed, but nothing was actually enforced."""
+
+    class StubWindow:
+        def __init__(self) -> None:
+            self.locked = True
+
+        def is_biometric_lock_active(self) -> bool:
+            return self.locked
+
+        def unlock_via_override(self, code: str):
+            return (code == "correct-code", "unlock message")
+
+    wrapper = ui_module.JarvisUI.__new__(ui_module.JarvisUI)
+    wrapper._window_alive = True
+    wrapper._win = StubWindow()
+
+    assert wrapper.is_biometric_lock_active() is True
+    wrapper._win.locked = False
+    assert wrapper.is_biometric_lock_active() is False
+    assert wrapper.unlock_via_override("correct-code") == (True, "unlock message")
+
+
+def test_jarvis_ui_fails_closed_when_window_gone() -> None:
+    wrapper = ui_module.JarvisUI.__new__(ui_module.JarvisUI)
+    wrapper._window_alive = False
+    wrapper._win = None
+
+    assert wrapper.is_biometric_lock_active() is True
+    ok, _ = wrapper.unlock_via_override("anything")
+    assert ok is False
+
+
+def test_local_speech_gate_active_through_real_jarvis_ui_wrapper() -> None:
+    """End-to-end version of the regression above, through JarvisLive itself."""
+
+    class StubWindow:
+        def is_biometric_lock_active(self) -> bool:
+            return True
+
+    wrapper = ui_module.JarvisUI.__new__(ui_module.JarvisUI)
+    wrapper._window_alive = True
+    wrapper._win = StubWindow()
+
+    live = main_module.JarvisLive(wrapper)
+
+    assert live._local_speech_gate_active() is True
+
+
 def test_local_speech_gate_active_when_desktop_locked() -> None:
     class DummyDesktopUI:
         def is_biometric_lock_active(self) -> bool:
