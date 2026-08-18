@@ -626,44 +626,5 @@ def code_helper(
     elif action == "screen_debug":
         return _screen_debug_action(description, file_path, player, speak)
 
-    elif action == "security_check":
-        if player:
-            player.write_log("[Security] Executing BiometricLock_Protocol: Voice recognition & visual person detection...")
-        authorized, message = verify_security_biometrics(voice_sample_path=voice_sample)
-        if speak:
-            speak(message)
-        return f"BiometricLock_Protocol Status: {'AUTHORIZED'}\nDetails: {message}" if authorized else f"BiometricLock_Protocol Status: {'DENIED'}\nDetails: {message}"
-
-    elif action == "security_profile":
-        if not profile_action:
-            if description:
-                desc_lower = description.lower()
-                if "setup" in desc_lower or "primary" in desc_lower:
-                    profile_action = "setup_primary"
-                elif "add" in desc_lower or "create" in desc_lower:
-                    profile_action = "add"
-                elif "list" in desc_lower or "show" in desc_lower:
-                    profile_action = "list"
-                elif "remove" in desc_lower or "delete" in desc_lower:
-                    profile_action = "remove"
-                else:
-                    profile_action = "list"
-            else:
-                profile_action = "list"
-        
-        if player:
-            player.write_log(f"[Security] Managing Biometric Profile [{profile_action}]...")
-        success, message = manage_security_profile(
-            action=profile_action,
-            profile_id=profile_id,
-            name=profile_name or description,
-            clearance=profile_clearance,
-            descriptors=profile_descriptors,
-            voice_notes=profile_voice_notes
-        )
-        if speak:
-            speak(message)
-        return f"Biometric Profile Management [{profile_action.upper()}]: {'SUCCESS' if success else 'FAILED'}\nDetails: {message}"
-
     else:
-        return f"Unknown action: '{action}'. Use write, edit, explain, run, build, optimize, test, screen_debug, security_check, or security_profile."
+        return f"Unknown action: '{action}'. Use write, edit, explain, run, build, optimize, test, or screen_debug."
