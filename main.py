@@ -5122,11 +5122,11 @@ def _acquire_single_instance(lock_path: str | None = None, mode: str = "interact
 
 
 def main():
-    lock_handle = _acquire_single_instance()
+    vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
+    lock_handle = _acquire_single_instance(mode="worker" if vps_url else "interactive")
     if lock_handle is None:
         raise SystemExit(1)
 
-    vps_url = (os.getenv("JARVIS_VPS_URL") or "").strip()
     headless_requested = str(os.getenv("JARVIS_HEADLESS") or "").strip().lower() in {"1", "true", "yes", "on"}
     if headless_requested:
         ui = _HeadlessUI()
