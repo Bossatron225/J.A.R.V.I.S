@@ -69,7 +69,7 @@ def _similarity_metrics(reference_face, live_face):
 def _is_face_match(corr: float, mse: float) -> bool:
     # Calibrated gates: reject low-correlation accidental matches while allowing lighting variance.
     strong_match = corr >= 0.36 and mse <= 0.17
-    balanced_match = corr >= 0.24 and mse <= 0.13
+    balanced_match = corr >= 0.30 and mse <= 0.13
     return bool(strong_match or balanced_match)
 
 
