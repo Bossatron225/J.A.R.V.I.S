@@ -135,6 +135,25 @@ def add_authorized_profile(profile_id: str, name: str, voice_print: str, visual_
     return f"BiometricLock_Protocol: Successfully added authorized profile for '{name}' with ID '{profile_id}'."
 
 
+def _train_and_save_face_model(profile_key: str, visual_samples: list[bytes]) -> str:
+    """Best-effort: (re)train the profile's LBPH model from multi-angle/distance
+    enrollment samples. Never raises — enrollment must still succeed if training
+    fails (e.g. contrib module missing); the caller falls back to legacy matching."""
+    try:
+        from auth import train_face_model, save_face_model
+    except Exception as exc:
+        return f"model training unavailable: {exc}"
+
+    ok, model_bytes, message = train_face_model(visual_samples)
+    if not ok or model_bytes is None:
+        return f"model not trained: {message}"
+    try:
+        save_face_model(profile_key, model_bytes)
+    except Exception as exc:
+        return f"model not saved: {exc}"
+    return f"model trained: {message}"
+
+
 def enroll_biometric_profile(
     profile_id: str,
     name: str,
@@ -144,8 +163,14 @@ def enroll_biometric_profile(
     make_primary: bool = False,
     voice_sample: bytes | None = None,
     visual_sample: bytes | None = None,
+    visual_samples: list[bytes] | None = None,
 ) -> str:
-    """Enrolls a biometric profile with stored voice and visual signature hints for later verification."""
+    """Enrolls a biometric profile with stored voice and visual signature hints for later verification.
+
+    `visual_samples`, when provided, should span multiple head angles/distances captured
+    during a guided enrollment; they are used to train a per-profile LBPH face model in
+    addition to the legacy single `visual_sample` snapshot.
+    """
     global _AUTHORIZED_PROFILES
 
     profile_key = (profile_id or name).strip().lower().replace(" ", "_")
@@ -164,6 +189,11 @@ def enroll_biometric_profile(
     if visual_sample is not None:
         entry["visual_sample"] = base64.b64encode(visual_sample).decode("ascii")
 
+    model_status = ""
+    if visual_samples:
+        entry["visual_samples"] = [base64.b64encode(sample).decode("ascii") for sample in visual_samples]
+        model_status = _train_and_save_face_model(profile_key if not make_primary else "primary", visual_samples)
+
     if make_primary:
         _AUTHORIZED_PROFILES["primary"] = entry
     else:
@@ -177,7 +207,8 @@ def enroll_biometric_profile(
 
     verify_biometric_security.cache_clear()
     _save_profiles_to_disk()
-    return f"Enrolled biometric profile for {normalized_name} with voice and visual signatures."
+    suffix = f" ({model_status})" if model_status else ""
+    return f"Enrolled biometric profile for {normalized_name} with voice and visual signatures.{suffix}"
 
 def remove_authorized_profile(profile_id: str) -> str:
     """Removes an authorized profile from the BiometricLock_Protocol registry."""
