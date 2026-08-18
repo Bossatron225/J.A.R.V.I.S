@@ -78,7 +78,7 @@ from memory.remote_sync import (
     load_memory_with_vps_sync,
     push_memory_to_vps,
 )
-from local_worker import LocalWorker
+from local_worker import LocalWorker, QUIET_ACTIONS as _LOCAL_WORKER_QUIET_ACTIONS
 from memory.document_ingestion import (
     ingest_document,
     index_codebase,
