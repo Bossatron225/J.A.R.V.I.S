@@ -46,11 +46,16 @@ from PyQt6.QtWidgets import (
 )
 
 from actions.file_controller import (
+    check_override_rate_limit,
     enroll_biometric_profile,
     establish_biometric_baseline,
     evaluate_live_biometric_security,
     get_authorized_profiles,
+    has_override_code_configured,
+    record_override_attempt,
     verify_biometric_security,
+    verify_override_code,
+    _append_override_audit_log,
 )
 
 def _base_dir() -> Path:
