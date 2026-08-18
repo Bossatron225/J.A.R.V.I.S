@@ -607,6 +607,41 @@ class _BrowserSession:
         pages = self._context.pages
         return pages[0] if pages else await self._context.new_page()
 
+    async def _try_cdp_attach(self) -> bool:
+        """
+        Attach to an already-running real browser via Chrome DevTools
+        Protocol instead of launching a fresh automation-only window. Once
+        attached, every tab across every window of that real browser becomes
+        visible and individually screenshot-able in the background — this is
+        what lets JARVIS see tabs the user opened themselves, not only ones
+        it launched. Safari/WebKit has no CDP support and never reaches here.
+        """
+        if self._spec is None or self._spec.get("engine") not in ("chromium", "firefox"):
+            return False
+        if not _cdp_attach_enabled():
+            return False
+        port = _CDP_PORTS.get(self.browser_name)
+        if port is None or not await asyncio.to_thread(_cdp_endpoint_reachable, port):
+            return False
+
+        engine_obj = getattr(self._pw, self._spec["engine"])
+        try:
+            browser = await engine_obj.connect_over_cdp(f"http://127.0.0.1:{port}")
+        except Exception as e:
+            print(f"[Browser] CDP attach failed for {self.browser_name}: {e}")
+            return False
+
+        context = browser.contexts[0] if browser.contexts else await browser.new_context(no_viewport=True)
+        pages   = context.pages
+        page    = pages[0] if pages else await context.new_page()
+
+        self._cdp_browser  = browser
+        self._context      = context
+        self._page         = page
+        self._cdp_attached = True
+        print(f"[Browser] ✅ Attached to real {self.browser_name} via CDP (port {port}) — {len(pages)} tab(s) visible")
+        return True
+
     async def _launch(self):
         """
         Tarayıcıyı gerçek kullanıcı profiliyle başlatır.
@@ -619,6 +654,9 @@ class _BrowserSession:
             raise RuntimeError(
                 f"'{self.browser_name}' bu platformda ({_OS}) desteklenmiyor."
             )
+
+        if await self._try_cdp_attach():
+            return
 
         engine_name = self._spec["engine"]
         exe         = self._spec["exe"]
