@@ -2612,6 +2612,19 @@
           "content": "def launch_on_startup(): return 'ready' def track_hours(): print('hours recorded')"
         }
       ]
+    },
+    {
+      "status": "indexed",
+      "path": "/private/var/folders/zf/0rxnqzk13cl5yjryllz4g4_40000gn/T/pytest-of-jameslumsden/pytest-65/test_index_pptx_file0/deck.pptx",
+      "source_name": "deck",
+      "kind": ".pptx",
+      "added_at": "2026-08-19T19:40:56Z",
+      "chunks": [
+        {
+          "id": "deck.pptx:1",
+          "content": "not a real pptx file"
+        }
+      ]
     }
   ]
 }
