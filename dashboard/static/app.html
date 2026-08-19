@@ -414,6 +414,22 @@
   </style>
 </head>
 <body>
+  <div id="bio-lock">
+    <div class="bio-card">
+      <div class="bio-title">Biometric Lock</div>
+      <div class="bio-sub" id="bio-sub">Checking status…</div>
+      <div class="bio-progress" id="bio-progress"></div>
+      <div class="bio-video-wrap">
+        <video id="bio-video" class="bio-video" autoplay playsinline muted></video>
+        <button class="bio-flip" id="bio-flip" type="button" onclick="_bioFlipCamera()" title="Switch camera">🔄</button>
+      </div>
+      <div class="bio-status" id="bio-status">Requesting camera…</div>
+      <div class="bio-row">
+        <button class="bio-btn ghost" id="bio-secondary" type="button" style="display:none;"></button>
+        <button class="bio-btn" id="bio-primary" type="button"></button>
+      </div>
+    </div>
+  </div>
   <div id="toast"></div>
   <header>
     <div class="logo"><em>J</em>ARVIS</div>
