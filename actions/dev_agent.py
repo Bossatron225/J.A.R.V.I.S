@@ -1590,27 +1590,14 @@ def dev_agent(
         is_self_improve = True
 
     if is_self_improve:
-        if approval_action == "propose":
-            return _queue_self_improvement_plan(
-                description=description,
-                target_files=target_files,
-                speak=speak,
-            )
-
-        if require_approval:
-            return _queue_self_improvement_plan(
-                description=description,
-                target_files=target_files,
-                speak=speak,
-            )
-
-        return _self_improve_project(
+        # Self-improvement always goes through propose -> apply with an
+        # approval_id; require_approval is intentionally ignored here so a
+        # voice/tool-call parameter can never skip the approval queue and
+        # write straight to live source.
+        return _queue_self_improvement_plan(
             description=description,
             target_files=target_files,
-            timeout=timeout,
-            self_reboot=self_reboot,
             speak=speak,
-            player=player,
         )
 
     return _build_project(
