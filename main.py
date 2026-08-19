@@ -5033,6 +5033,7 @@ class JarvisLive:
                                 tg.create_task(self._run_mail_monitor())
                             tg.create_task(self._run_proactive_mode())
                             tg.create_task(self._run_predictive_automation())
+                            tg.create_task(self._run_self_improvement_cycle())
                             tg.create_task(self._run_diagnostics_stream())
                             tg.create_task(self._run_visual_monitor())
                             if self._dashboard:
