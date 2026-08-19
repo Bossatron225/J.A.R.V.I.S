@@ -553,6 +553,7 @@
     const camVideo = document.getElementById('cam-preview');
     const camState = document.getElementById('cam-status');
     let _camStream = null;
+    let _camFacing = 'environment';
     let _cameraAnalysisInFlight = false;
     const _handledCameraRequests = new Set();
     let ws = null;
