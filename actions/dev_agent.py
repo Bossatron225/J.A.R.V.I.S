@@ -1461,7 +1461,10 @@ def dev_agent(
         )
 
     if not description:
-        description = "Initiate BiometricLock_Protocol integration for enhanced security posture and optimized performance, integrating voice recognition and visual person detection. Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint."
+        description = (
+            "Review the codebase for reliability, safety, correctness, and performance "
+            "improvements, and suggest new features worth building."
+        )
         is_self_improve = True
 
     if is_self_improve:
