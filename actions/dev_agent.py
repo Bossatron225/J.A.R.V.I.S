@@ -435,7 +435,10 @@ def _apply_queued_self_improvement(
         player.write_log(f"[DevAgent] {full}")
         player.show_content("Self-improvement apply", full)
     if speak:
-        speak("BiometricLock Protocol integration executed successfully, sir. Security protocols and voice/visual recognition are fully engaged.")
+        if applied_count > 0:
+            speak(f"Self-improvement plan applied, sir. {applied_count} file{'s' if applied_count != 1 else ''} updated and verified in sandbox.")
+        else:
+            speak("The self-improvement plan did not apply cleanly, sir. Check the report for details.")
     return full
 
 
