@@ -2883,6 +2883,26 @@ class JarvisLive:
             return False
         return bool(getattr(self.ui, "is_biometric_lock_active", lambda: False)())
 
+    def _conversation_source(self) -> str:
+        """"vps" for the headless VPS worker, "mac" for the local desktop app —
+        tags every persisted conversation turn so cross-platform recall can tell
+        which device a past exchange happened on."""
+        return "vps" if isinstance(self.ui, _HeadlessUI) else "mac"
+
+    def _log_turn_async(self, role: str, text: str) -> None:
+        """Fire-and-forget persistence of one conversation turn — never blocks
+        the live session loop. Embedding happens in a background thread inside
+        conversation_log.append_turn itself."""
+        if not self._conversation_session_id:
+            return
+        asyncio.create_task(asyncio.to_thread(
+            _log_conversation_turn,
+            self._conversation_session_id,
+            self._conversation_source(),
+            role,
+            text,
+        ))
+
     def _handle_biometric_failure(self) -> None:
         self.ui.write_log("SYS: Biometric verification failed — initiating fail-closed shutdown.")
         self._schedule_shutdown("biometric verification failed")
