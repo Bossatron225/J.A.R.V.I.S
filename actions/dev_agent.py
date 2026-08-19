@@ -1501,6 +1501,7 @@ def dev_agent(
     approval_id = str(p.get("approval_id", "") or "").strip()
     require_approval = bool(p.get("require_approval", True))
     self_reboot = bool(p.get("self_reboot", True))
+    history_limit = int(p.get("history_limit", 10) or 10)
 
     if isinstance(target_files, str):
         target_files = [item.strip() for item in target_files.split(",") if item.strip()]
@@ -1511,6 +1512,27 @@ def dev_agent(
     ) or (
         "source code" in lowered and ("improve" in lowered or "modify" in lowered)
     )
+
+    is_history_query = approval_action == "history" or any(
+        phrase in lowered
+        for phrase in (
+            "what have you changed",
+            "what did you change",
+            "what have you implemented",
+            "what did you implement",
+            "what have you built",
+            "what did you build",
+            "what have you done recently",
+            "recent changes",
+            "recently implemented",
+            "recently changed",
+            "recently improved",
+            "self-improvements you",
+            "self improvements you",
+        )
+    )
+    if is_history_query and not approval_action:
+        approval_action = "history"
 
     if integrate_project or "integrate" in lowered:
         name = project_name or description.replace("integrate", "").strip()
