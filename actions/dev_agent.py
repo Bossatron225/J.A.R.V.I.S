@@ -1435,10 +1435,6 @@ def dev_agent(
         "self" in lowered and ("improve" in lowered or "modify" in lowered or "source" in lowered)
     ) or (
         "source code" in lowered and ("improve" in lowered or "modify" in lowered)
-    ) or (
-        "security" in lowered and ("voice" in lowered or "visual" in lowered or "recognition" in lowered or "person" in lowered)
-    ) or (
-        "biometriclock" in lowered or "biometric" in lowered
     )
 
     if integrate_project or "integrate" in lowered:
