@@ -5004,6 +5004,7 @@ class JarvisLive:
                         ):
                             connected = True
                             self.session          = session
+                            self._conversation_session_id = uuid.uuid4().hex
                             self.audio_in_queue   = asyncio.Queue(maxsize=int(self._audio_cfg.get("speaker_queue_max_chunks", 72)))
                             self.out_queue        = asyncio.Queue(maxsize=int(self._audio_cfg.get("mic_queue_max_chunks", 24)))
                             self._turn_done_event = asyncio.Event()
