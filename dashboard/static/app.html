@@ -637,7 +637,253 @@
         }
       };
     }
-    _openWs();
+
+    // ── Biometric lock (face scan gate before the WS session opens) ─────────────
+    const bioVideo = document.getElementById('bio-video');
+    let _bioStream = null;
+    let _bioFacing = 'user';
+    let _bioEnrollFrames = [];
+    let _bioEnrollStep = 0;
+    const _bioPoses = [
+      'Look straight at the camera',
+      'Turn your head slightly left',
+      'Turn your head slightly right',
+      'Tilt your head up a little',
+      'Move a little closer',
+      'Move a little farther back',
+    ];
+
+    function _bioSetStatus(text, cls) {
+      const el = document.getElementById('bio-status');
+      el.textContent = text;
+      el.className = 'bio-status' + (cls ? ' ' + cls : '');
+    }
+
+    async function _bioStartCamera(facing) {
+      if (_bioStream) {
+        _bioStream.getTracks().forEach(t => t.stop());
+        _bioStream = null;
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        _bioSetStatus('Camera API not available in this browser.', 'err');
+        return false;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facing, width: { ideal: 720 }, height: { ideal: 960 } },
+          audio: false,
+        });
+        _bioStream = stream;
+        bioVideo.srcObject = stream;
+        bioVideo.classList.toggle('rear', facing !== 'user');
+        return true;
+      } catch (e) {
+        _bioSetStatus('Could not start camera: ' + (e?.message || 'permission denied'), 'err');
+        return false;
+      }
+    }
+
+    function _bioStopCamera() {
+      if (_bioStream) {
+        _bioStream.getTracks().forEach(t => t.stop());
+        _bioStream = null;
+      }
+      bioVideo.srcObject = null;
+    }
+
+    async function _bioFlipCamera() {
+      _bioFacing = _bioFacing === 'user' ? 'environment' : 'user';
+      await _bioStartCamera(_bioFacing);
+    }
+
+    function _bioCaptureFrame() {
+      if (!bioVideo.videoWidth || !bioVideo.videoHeight) return null;
+      const canvas = document.createElement('canvas');
+      const maxWidth = 720;
+      const scale = Math.min(1, maxWidth / bioVideo.videoWidth);
+      canvas.width = Math.max(1, Math.round(bioVideo.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(bioVideo.videoHeight * scale));
+      canvas.getContext('2d').drawImage(bioVideo, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/jpeg', 0.85).split(',', 2)[1];
+    }
+
+    function _bioRenderProgress(total) {
+      const wrap = document.getElementById('bio-progress');
+      wrap.style.display = 'flex';
+      wrap.innerHTML = '';
+      for (let i = 0; i < total; i++) {
+        const d = document.createElement('div');
+        d.className = 'bio-dot';
+        wrap.appendChild(d);
+      }
+    }
+
+    function _bioUpdateProgress(doneCount) {
+      document.querySelectorAll('#bio-progress .bio-dot').forEach((d, i) => {
+        d.classList.toggle('done', i < doneCount);
+        d.classList.toggle('active', i === doneCount);
+      });
+    }
+
+    async function _bioInit() {
+      document.getElementById('bio-lock').classList.add('show');
+      document.getElementById('bio-progress').style.display = 'none';
+      _bioSetStatus('Checking biometric status…');
+      let status;
+      try {
+        const r = await _authFetch('/api/biometric/status');
+        status = await r.json();
+      } catch (e) {
+        status = null;
+      }
+      if (!status || !status.ok) {
+        document.getElementById('bio-sub').textContent = 'Could not reach JARVIS to check the biometric lock.';
+        _bioSetStatus('Connection error.', 'err');
+        const primary = document.getElementById('bio-primary');
+        primary.textContent = 'Retry';
+        primary.disabled = false;
+        primary.onclick = _bioInit;
+        document.getElementById('bio-secondary').style.display = 'none';
+        return;
+      }
+      if (!status.enrolled) {
+        _bioShowEnrollIntro();
+        return;
+      }
+      if (status.verified) {
+        _bioUnlock();
+        return;
+      }
+      _bioShowVerify();
+    }
+
+    async function _bioShowEnrollIntro() {
+      document.getElementById('bio-sub').textContent =
+        'No face is enrolled for this dashboard yet. Enroll now — only this face will be able to unlock it.';
+      document.getElementById('bio-progress').style.display = 'none';
+      const ok = await _bioStartCamera(_bioFacing);
+      if (!ok) return;
+      _bioSetStatus('Tap Start to begin a guided capture (6 steps).');
+      const primary = document.getElementById('bio-primary');
+      primary.textContent = 'Start Enrollment';
+      primary.disabled = false;
+      primary.onclick = _bioBeginEnrollFlow;
+      document.getElementById('bio-secondary').style.display = 'none';
+    }
+
+    function _bioBeginEnrollFlow() {
+      _bioEnrollFrames = [];
+      _bioEnrollStep = 0;
+      _bioRenderProgress(_bioPoses.length);
+      _bioUpdateProgress(0);
+      _bioSetStatus(_bioPoses[0]);
+      const primary = document.getElementById('bio-primary');
+      primary.textContent = 'Capture';
+      primary.onclick = _bioCaptureEnrollStep;
+    }
+
+    function _bioCaptureEnrollStep() {
+      const frame = _bioCaptureFrame();
+      if (!frame) {
+        _bioSetStatus('Camera frame not ready — hold still and try again.', 'err');
+        return;
+      }
+      _bioEnrollFrames.push(frame);
+      _bioEnrollStep++;
+      _bioUpdateProgress(_bioEnrollStep);
+      if (_bioEnrollStep >= _bioPoses.length) {
+        _bioFinishEnrollment();
+        return;
+      }
+      _bioSetStatus(_bioPoses[_bioEnrollStep]);
+    }
+
+    async function _bioFinishEnrollment() {
+      _bioSetStatus('Training face model…');
+      const primary = document.getElementById('bio-primary');
+      primary.disabled = true;
+      let result;
+      try {
+        const r = await _authFetch('/api/biometric/enroll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ frames: _bioEnrollFrames }),
+        });
+        result = await r.json();
+      } catch (e) {
+        result = null;
+      }
+      primary.disabled = false;
+      if (!result || !result.ok) {
+        _bioSetStatus('Enrollment failed: ' + (result?.error || 'connection error'), 'err');
+        primary.textContent = 'Try Again';
+        primary.onclick = _bioBeginEnrollFlow;
+        return;
+      }
+      _bioSetStatus('Face enrolled. Now scan to unlock.', 'ok');
+      document.getElementById('bio-progress').style.display = 'none';
+      setTimeout(_bioShowVerify, 900);
+    }
+
+    async function _bioShowVerify() {
+      document.getElementById('bio-sub').textContent = 'Scan your face to unlock the dashboard.';
+      document.getElementById('bio-progress').style.display = 'none';
+      const ok = await _bioStartCamera(_bioFacing);
+      if (!ok) return;
+      _bioSetStatus('Center your face in frame and tap Scan.');
+      const primary = document.getElementById('bio-primary');
+      primary.textContent = 'Scan Face';
+      primary.disabled = false;
+      primary.onclick = _bioRunVerify;
+      const secondary = document.getElementById('bio-secondary');
+      secondary.style.display = 'block';
+      secondary.textContent = 'Re-enroll';
+      secondary.disabled = false;
+      secondary.onclick = _bioShowEnrollIntro;
+    }
+
+    async function _bioRunVerify() {
+      const primary = document.getElementById('bio-primary');
+      primary.disabled = true;
+      _bioSetStatus('Scanning… hold still.');
+      const frames = [];
+      for (let i = 0; i < 6; i++) {
+        const f = _bioCaptureFrame();
+        if (f) frames.push(f);
+        await new Promise(res => setTimeout(res, 180));
+      }
+      if (!frames.length) {
+        _bioSetStatus('No camera frame captured — try again.', 'err');
+        primary.disabled = false;
+        return;
+      }
+      let result;
+      try {
+        const r = await _authFetch('/api/biometric/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ frames }),
+        });
+        result = await r.json();
+      } catch (e) {
+        result = null;
+      }
+      primary.disabled = false;
+      if (result && result.ok) {
+        _bioSetStatus('Face matched.', 'ok');
+        setTimeout(_bioUnlock, 400);
+      } else {
+        _bioSetStatus((result && result.error) || 'Face did not match. Try again.', 'err');
+      }
+    }
+
+    function _bioUnlock() {
+      _bioStopCamera();
+      document.getElementById('bio-lock').classList.remove('show');
+      _openWs();
+    }
+
+    _bioInit();
 
     function _heatClass(v) {
       if (typeof v !== 'number') return '';
