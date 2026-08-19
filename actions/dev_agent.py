@@ -350,6 +350,69 @@ def _clear_approvals(approval_id: str | None = None) -> str:
     return "Cleared all pending approvals."
 
 
+def _load_changelog_store() -> dict:
+    try:
+        if CHANGELOG_PATH.exists():
+            data = json.loads(CHANGELOG_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                entries = data.get("entries")
+                if isinstance(entries, list):
+                    return {"entries": entries}
+    except Exception:
+        pass
+    return {"entries": []}
+
+
+def _save_changelog_store(store: dict) -> None:
+    CHANGELOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CHANGELOG_PATH.write_text(json.dumps(store, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _record_change(
+    file_rel: str,
+    change: str,
+    reason: str = "",
+    approval_id: str | None = None,
+    source: str = "self_improve",
+) -> None:
+    store = _load_changelog_store()
+    entries = store.get("entries", [])
+    entries.append(
+        {
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "file": file_rel,
+            "change": change,
+            "reason": reason,
+            "approval_id": approval_id,
+            "source": source,
+        }
+    )
+    store["entries"] = entries[-200:]
+    _save_changelog_store(store)
+
+
+def _format_changelog(limit: int = 10) -> str:
+    store = _load_changelog_store()
+    entries = store.get("entries", [])
+    if not entries:
+        return "I haven't applied any self-improvement changes yet, sir."
+
+    limit = max(1, min(int(limit or 10), 50))
+    recent = list(reversed(entries))[:limit]
+
+    lines = [f"Recent self-improvements ({len(recent)} of {len(entries)} total):"]
+    for item in recent:
+        ts = str(item.get("timestamp", ""))
+        file_rel = str(item.get("file", ""))
+        change = str(item.get("change", ""))
+        reason = str(item.get("reason", "") or "")
+        line = f"- [{ts}] {file_rel}: {change}"
+        if reason:
+            line += f" ({reason})"
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def _apply_queued_self_improvement(
     approval_id: str | None,
     timeout: int = 30,
