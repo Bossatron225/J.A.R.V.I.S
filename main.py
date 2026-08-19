@@ -1547,6 +1547,7 @@ class JarvisLive:
         self._live_model_backoff_until: dict[str, float] = {}
         self._last_user_speech = time.monotonic()  # updated on every user utterance
         self._session_log: list[str] = []          # conversation turns for end-of-session summary
+        self._conversation_session_id: str | None = None  # ties turns to one persisted session in conversation_log
         self._tts_player = None
         self._use_external_tts = False
         self._vertex_project = ""
