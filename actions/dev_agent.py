@@ -413,6 +413,24 @@ def _format_changelog(limit: int = 10) -> str:
     return "\n".join(lines)
 
 
+def _format_changelog_spoken(limit: int = 3) -> str:
+    store = _load_changelog_store()
+    entries = store.get("entries", [])
+    if not entries:
+        return "I haven't applied any self-improvement changes yet, sir."
+
+    limit = max(1, min(int(limit or 3), 10))
+    recent = list(reversed(entries))[:limit]
+    total = len(entries)
+
+    parts = [f"I've made {total} self-improvement change{'s' if total != 1 else ''} so far, sir. Most recently:"]
+    for item in recent:
+        file_rel = str(item.get("file", ""))
+        change = str(item.get("change", "")) or "an update"
+        parts.append(f"{file_rel} — {change}.")
+    return " ".join(parts)
+
+
 def _apply_queued_self_improvement(
     approval_id: str | None,
     timeout: int = 30,
