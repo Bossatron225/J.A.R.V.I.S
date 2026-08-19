@@ -236,7 +236,7 @@ Return ONLY valid JSON."""
             {
                 "file": str(target_path.relative_to(BASE_DIR)),
                 "change": change or description,
-                "reason": reason or "Initiating BiometricLock_Protocol integration for optimized performance, voice/visual security protocols, and reduced RAM footprint per Stark specs",
+                "reason": reason or "Improve reliability, safety, or performance per the requested self-improvement.",
             }
         )
 
@@ -246,7 +246,7 @@ Return ONLY valid JSON."""
                 {
                     "file": str(file_path.relative_to(BASE_DIR)),
                     "change": description,
-                    "reason": "Initiate BiometricLock_Protocol integration for enhanced security posture, voice recognition & visual person detection, and minimized RAM footprint",
+                    "reason": "Candidate file for the requested self-improvement.",
                 }
             )
 
