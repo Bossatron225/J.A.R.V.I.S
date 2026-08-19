@@ -220,6 +220,54 @@ def verify_face_against_model(
         return False, f"Face verification failed: {exc}"
 
 
+def has_face_model(profile_key: str) -> bool:
+    """Whether a trained LBPH model file exists for this profile, without loading it."""
+    return _model_path(profile_key).exists()
+
+
+def verify_face_against_model_bytes(
+    recognizer,
+    frames: list,
+    threshold: float | None = None,
+) -> Tuple[bool, str]:
+    """Match a burst of already-captured frames (e.g. uploaded from a browser) against
+    a trained per-profile LBPH model. Same best-of-burst matching as
+    verify_face_against_model, but sourced from provided image bytes instead of a
+    local cv2.VideoCapture, so it works for cameras the server process can't open
+    directly (a phone's camera arriving over HTTP)."""
+    if recognizer is None:
+        return False, "no-model"
+    if cv2 is None or np is None:
+        return False, "opencv-unavailable"
+
+    gate = _lbph_threshold() if threshold is None else threshold
+    detector = _load_detector()
+    best_confidence = None
+    face_seen = False
+
+    for image_bytes in frames or []:
+        face = _extract_face_for_training(image_bytes)
+        if face is None:
+            continue
+        face_seen = True
+        try:
+            _, confidence = recognizer.predict(face)
+        except Exception:
+            continue
+        if best_confidence is None or confidence < best_confidence:
+            best_confidence = confidence
+        if best_confidence is not None and best_confidence <= gate:
+            break
+
+    if not face_seen:
+        return False, "no-face-detected"
+    if best_confidence is None:
+        return False, "predict-failed"
+    if best_confidence <= gate:
+        return True, f"Face matched trained model (confidence={best_confidence:.1f}, threshold={gate:.1f})"
+    return False, f"Face did not match trained model (confidence={best_confidence:.1f}, threshold={gate:.1f})"
+
+
 def _similarity_metrics(reference_face, live_face):
     ref_norm = cv2.equalizeHist(cv2.resize(reference_face, (160, 160)))
     live_norm = cv2.equalizeHist(cv2.resize(live_face, (160, 160)))
