@@ -20,6 +20,7 @@ def get_base_dir() -> Path:
 BASE_DIR         = get_base_dir()
 API_CONFIG_PATH  = BASE_DIR / "config" / "api_keys.json"
 APPROVALS_PATH   = BASE_DIR / "memory" / "dev_agent_approvals.json"
+CHANGELOG_PATH   = BASE_DIR / "memory" / "dev_agent_changelog.json"
 PROJECTS_DIR     = Path.home() / "Desktop" / "JarvisProjects"
 MAX_FIX_ATTEMPTS = 5
 MODEL_PLANNER    = "models/gemini-flash-lite-latest"
