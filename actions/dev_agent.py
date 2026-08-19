@@ -1544,11 +1544,18 @@ def dev_agent(
             player=player,
         )
 
-    if approval_action in {"status", "clear", "apply"}:
+    if approval_action in {"status", "clear", "apply", "history"}:
         if approval_action == "status":
             return _approval_status()
         if approval_action == "clear":
             return _clear_approvals(approval_id or None)
+        if approval_action == "history":
+            result = _format_changelog(limit=history_limit)
+            if speak:
+                speak(result)
+            if player:
+                player.show_content("Recent self-improvements", result)
+            return result
         return _apply_queued_self_improvement(
             approval_id=approval_id or None,
             timeout=timeout,
