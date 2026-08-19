@@ -50,6 +50,28 @@ def test_dev_agent_honors_approval_action_even_without_self_improve_keyword(monk
     assert calls["called"] is True
 
 
+def test_dev_agent_ignores_require_approval_false_and_still_queues(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_queue_plan(**kwargs):
+        calls["queued"] = kwargs
+        return "queued plan"
+
+    monkeypatch.setattr(dev_agent_module, "_queue_self_improvement_plan", fake_queue_plan)
+
+    result = dev_agent_module.dev_agent(
+        {
+            "description": "Improve self",
+            "self_improve": True,
+            "require_approval": False,
+        }
+    )
+
+    assert result == "queued plan"
+    assert calls["queued"]["description"] == "Improve self"
+    assert not hasattr(dev_agent_module, "_self_improve_project")
+
+
 def test_apply_queued_self_improvement_uses_single_pending_plan_for_unknown_id(monkeypatch) -> None:
     calls: dict[str, object] = {}
 
