@@ -653,6 +653,16 @@ def create_app() -> Flask:
             return ""
         return token if dashboard._is_fully_authorized(token) else ""
 
+    def _ws_reject_code() -> int:
+        """4003 = key/token fine, just needs the face scan (client should show the
+        lock overlay, not log out). 4001 = token itself is invalid/expired (client
+        should return to /login)."""
+        token = str(request.args.get("token") or "").strip()
+        dashboard = orchestrator.dashboard_server
+        if dashboard is not None and hasattr(dashboard, "_is_token_valid") and dashboard._is_token_valid(token):
+            return 4003
+        return 4001
+
     def _valid_worker_token() -> bool:
         expected = orchestrator.worker_token()
         supplied = str(request.headers.get("x-jarvis-worker-token") or "").strip()
