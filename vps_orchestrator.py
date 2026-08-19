@@ -1038,7 +1038,7 @@ def create_app() -> Flask:
             return jsonify({"error": "remote command queue unavailable"}), 503
 
         tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
-        if not tok or not dashboard._is_token_valid(tok):
+        if not tok or not dashboard._is_fully_authorized(tok):
             return jsonify({"error": "Unauthorized"}), 401
 
         data = request.get_json(silent=True) or {}
@@ -1070,7 +1070,7 @@ def create_app() -> Flask:
             return jsonify({"error": "remote dashboard unavailable"}), 503
 
         tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
-        if not tok or not dashboard._is_token_valid(tok):
+        if not tok or not dashboard._is_fully_authorized(tok):
             return jsonify({"error": "Unauthorized"}), 401
 
         result = orchestrator.runtime_bridge.request_local_action("capture_camera", {}, timeout=20.0)
@@ -1083,7 +1083,7 @@ def create_app() -> Flask:
             return jsonify({"error": "remote dashboard unavailable"}), 503
 
         tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
-        if not tok or not dashboard._is_token_valid(tok):
+        if not tok or not dashboard._is_fully_authorized(tok):
             return jsonify({"error": "Unauthorized"}), 401
 
         data = request.get_json(silent=True) or {}
@@ -1133,7 +1133,7 @@ def create_app() -> Flask:
             return jsonify({"error": "remote dashboard unavailable"}), 503
 
         tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
-        if not tok or not dashboard._is_token_valid(tok):
+        if not tok or not dashboard._is_fully_authorized(tok):
             return jsonify({"error": "Unauthorized"}), 401
 
         if getattr(dashboard, "_wake_callback", None):
