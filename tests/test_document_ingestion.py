@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from memory import document_ingestion
 from memory.document_ingestion import (
     index_codebase,
@@ -7,6 +9,11 @@ from memory.document_ingestion import (
     recall_document_details,
     search_document_index,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_index(tmp_path, monkeypatch):
+    monkeypatch.setattr(document_ingestion, "INDEX_PATH", tmp_path / "document_index.json")
 
 
 def test_ingest_markdown_and_recall(tmp_path):
