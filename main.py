@@ -4639,6 +4639,50 @@ class JarvisLive:
             except Exception as e:
                 print(f"[Predictive] ⚠️ {e}")
 
+    async def _run_self_improvement_cycle(self) -> None:
+        if not self._self_improve_cfg.get("enabled", True):
+            return
+        if dev_agent is None:
+            return
+        interval = int(self._self_improve_cfg.get("interval_seconds", 21600) or 21600)
+
+        await asyncio.sleep(120)
+        while True:
+            try:
+                await asyncio.sleep(interval)
+                if self._local_speech_gate_active():
+                    continue
+
+                loop = asyncio.get_running_loop()
+                result = await loop.run_in_executor(
+                    None,
+                    lambda: dev_agent(
+                        parameters={
+                            "self_improve": True,
+                            "approval_action": "propose",
+                            "require_approval": True,
+                            "description": (
+                                "Periodic autonomous review: scan the codebase for reliability, "
+                                "safety, correctness, and performance improvements worth proposing."
+                            ),
+                        },
+                        player=self.ui,
+                    ),
+                )
+                self.ui.write_log(f"[SelfImprove] Autonomous proposal queued:\n{result}")
+
+                if self._self_improve_cfg.get("voice_announce", True):
+                    self.speak(
+                        "I've queued a new self-improvement proposal for your review, sir. "
+                        "Ask for the dev agent approval status when you'd like to look it over."
+                    )
+            except RuntimeError as e:
+                if "cannot schedule new futures after shutdown" in str(e).lower():
+                    return
+                print(f"[SelfImprove] ⚠️ {e}")
+            except Exception as e:
+                print(f"[SelfImprove] ⚠️ {e}")
+
     # ── Phone audio relay ────────────────────────────────────────────────        
 
     async def _relay_phone_audio(self) -> None:
