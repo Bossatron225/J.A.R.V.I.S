@@ -160,12 +160,9 @@ def test_mutable_vps_memory_supports_external_data_directory():
 
 
 def test_conversations_sync_endpoint_merges_and_snapshot_returns_turns(tmp_path, monkeypatch):
-    monkeypatch.setenv('JARVIS_DATA_DIR', str(tmp_path))
     import memory.conversation_log as conversation_log
     monkeypatch.setattr(conversation_log, 'DATA_DIR', tmp_path)
     monkeypatch.setattr(conversation_log, 'CONV_PATH', tmp_path / 'conversations.jsonl')
-    monkeypatch.setattr(vps_module, 'list_recent_turns', conversation_log.list_recent_turns)
-    monkeypatch.setattr(vps_module, 'merge_turns_into_store', conversation_log.merge_turns_into_store)
 
     app = create_app()
     client = app.test_client()
