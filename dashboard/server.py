@@ -416,6 +416,9 @@ class DashboardServer:
         self._tokens: set[str]            = set()
         self._token_keys: dict[str, str]  = {}   # auth_token → session_key
         self._token_expiry: dict[str, float] = {}  # auth_token → unix expiry
+        self._token_biometric_ok: dict[str, bool] = {}  # auth_token → face scan passed
+        self._biometric_attempts: dict[str, list[float]] = {}
+        self._biometric_blocked_until: dict[str, float] = {}
         self._aes_cache:  dict[str, bytes]= {}   # session_key → AES bytes
         self._public_url_callback = None
         self._clients: set[WebSocket]     = set()
