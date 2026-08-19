@@ -84,6 +84,12 @@ from memory.obsidian_memory import (
 from memory.remote_sync import (
     load_memory_with_vps_sync,
     push_memory_to_vps,
+    push_conversations_to_vps,
+)
+from memory.conversation_log import (
+    append_turn as _log_conversation_turn,
+    get_session_turns as _get_conversation_session_turns,
+    recall_with_vps_sync as _recall_conversations,
 )
 from local_worker import LocalWorker, QUIET_ACTIONS as _LOCAL_WORKER_QUIET_ACTIONS
 from memory.document_ingestion import (
