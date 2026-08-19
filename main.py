@@ -2141,6 +2141,23 @@ class JarvisLive:
         return cfg
 
     @staticmethod
+    def _load_self_improvement_config() -> dict:
+        cfg = {
+            "enabled": True,
+            "interval_seconds": 21600,  # 6 hours
+            "voice_announce": True,
+        }
+        try:
+            with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            cfg["enabled"] = bool(raw.get("self_improve_autonomous_enabled", cfg["enabled"]))
+            cfg["interval_seconds"] = max(1800, min(int(raw.get("self_improve_interval_seconds", cfg["interval_seconds"]) or 21600), 86400))
+            cfg["voice_announce"] = bool(raw.get("self_improve_voice_announce", cfg["voice_announce"]))
+        except Exception:
+            pass
+        return cfg
+
+    @staticmethod
     def _load_visual_watch_config() -> dict:
         cfg = {
             "enabled": True,
