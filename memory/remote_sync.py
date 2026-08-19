@@ -77,3 +77,48 @@ def load_memory_with_vps_sync(local_memory: dict | None = None, base_url: str | 
     if not remote:
         return local_memory or {}
     return merge_memory(local_memory or {}, remote)
+
+
+def merge_conversation_turns(local_turns: list, remote_turns: list) -> list:
+    local = deepcopy(local_turns or [])
+    remote = deepcopy(remote_turns or [])
+
+    seen = {turn.get('id') for turn in local if isinstance(turn, dict)}
+    for turn in remote:
+        if not isinstance(turn, dict) or not turn.get('id'):
+            continue
+        if turn['id'] in seen:
+            continue
+        local.append(turn)
+        seen.add(turn['id'])
+
+    local.sort(key=lambda t: str(t.get('ts', '')))
+    return local
+
+
+def fetch_remote_conversations(base_url: str, since: str | None = None) -> list:
+    url = f"{base_url.rstrip('/')}/api/conversations"
+    if since:
+        url += f"?since={since}"
+    try:
+        with request.urlopen(url, timeout=10) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+            if isinstance(payload, dict) and isinstance(payload.get('turns'), list):
+                return payload['turns']
+            if isinstance(payload, list):
+                return payload
+            return []
+    except (error.URLError, TimeoutError, ValueError):
+        return []
+
+
+def push_conversations_to_vps(base_url: str, turns: list) -> dict:
+    url = f"{base_url.rstrip('/')}/api/conversations/sync"
+    payload = json.dumps({'turns': turns, 'source': 'mac-client'}).encode('utf-8')
+    req = request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+    try:
+        with request.urlopen(req, timeout=15) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            return data if isinstance(data, dict) else {'status': 'synced'}
+    except (error.URLError, TimeoutError, ValueError):
+        return {'status': 'sync_failed'}
