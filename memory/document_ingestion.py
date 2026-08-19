@@ -231,6 +231,8 @@ def search_document_index(query: str, limit: int = 5) -> list[dict]:
     if not tokens:
         return []
 
+    query_vector = embed_text(q, task_type="RETRIEVAL_QUERY")
+
     matches: list[dict] = []
     index = _load_index()
     for document in index.get("documents", []):
@@ -238,12 +240,16 @@ def search_document_index(query: str, limit: int = 5) -> list[dict]:
             content = str(chunk.get("content", "")).strip()
             if not content:
                 continue
-            score = 0
-            for token in tokens:
-                if token in content.lower():
-                    score += 1
-            if score == 0:
+
+            embedding = chunk.get("embedding")
+            if query_vector and isinstance(embedding, list) and embedding:
+                score = _cosine(query_vector, embedding)
+            else:
+                hits = sum(1 for token in tokens if token in content.lower())
+                score = 1.0 if hits else 0.0
+            if score <= 0:
                 continue
+
             snippet = content[:500].strip()
             matches.append({
                 "source": document.get("source_name") or document.get("path"),
