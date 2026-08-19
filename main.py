@@ -55,6 +55,7 @@ import threading
 import time
 import traceback
 import urllib.request
+import uuid
 from datetime import datetime
 from pathlib import Path
 from functools import lru_cache
