@@ -1101,7 +1101,13 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "dev_agent",
-        "description": "Builds complete multi-file projects from scratch or safely improves Jarvis's own source code. For self-improvement, it supports approval-based propose/apply workflows and sandbox validation before workspace writes.",
+        "description": (
+            "Builds complete multi-file projects from scratch or safely improves Jarvis's own source code. "
+            "For self-improvement, it supports approval-based propose/apply workflows and sandbox validation "
+            "before workspace writes. Also call this with approval_action='history' whenever the user asks what "
+            "Jarvis has changed, implemented, updated, fixed, or built about himself recently — it returns a real "
+            "log of applied self-improvement changes, not a guess."
+        ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -1113,10 +1119,11 @@ TOOL_DECLARATIONS = [
                 "target_files": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "Optional repo-relative Python files to improve"},
                 "sandbox":      {"type": "BOOLEAN", "description": "Run validation in a temporary sandbox before applying changes (default: true)"},
                 "require_approval": {"type": "BOOLEAN", "description": "For self_improve: true queues a proposal that requires explicit apply approval (default: true)"},
-                "approval_action": {"type": "STRING", "description": "For self_improve: propose | apply | status | clear"},
+                "approval_action": {"type": "STRING", "description": "For self_improve: propose | apply | status | clear | history (history = what Jarvis has actually changed recently)"},
                 "approval_id": {"type": "STRING", "description": "Approval ID returned by propose, used by apply or clear"},
                 "self_reboot": {"type": "BOOLEAN", "description": "For self_improve apply runs: restart Jarvis automatically after successful code writes (default: true)"},
                 "integrate_project": {"type": "BOOLEAN", "description": "Set to true to analyse a JarvisProjects project and generate a plan to integrate it into Jarvis's own codebase"},
+                "history_limit": {"type": "INTEGER", "description": "For approval_action='history': how many recent changes to list (default: 10)"},
             },
             "required": []
         }
