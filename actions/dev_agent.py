@@ -479,6 +479,7 @@ def _apply_queued_self_improvement(
             change_note=change,
             reason=reason,
             next_step="Try the updated behavior and request another approved pass if needed.",
+            approval_id=str(selected.get("approval_id", "") or "") or None,
         )
         if success:
             log_lines.append(f"✓ {rel_file} — {report}")
