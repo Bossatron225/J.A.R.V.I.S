@@ -649,9 +649,9 @@ def create_app() -> Flask:
     def _valid_ws_token() -> str:
         token = str(request.args.get("token") or "").strip()
         dashboard = orchestrator.dashboard_server
-        if dashboard is None or not hasattr(dashboard, "_is_token_valid"):
+        if dashboard is None or not hasattr(dashboard, "_is_fully_authorized"):
             return ""
-        return token if dashboard._is_token_valid(token) else ""
+        return token if dashboard._is_fully_authorized(token) else ""
 
     def _valid_worker_token() -> bool:
         expected = orchestrator.worker_token()
