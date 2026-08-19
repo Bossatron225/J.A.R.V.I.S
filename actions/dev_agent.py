@@ -635,6 +635,7 @@ def _sandbox_test_and_apply(
     change_note: str = "",
     reason: str = "",
     next_step: str = "",
+    approval_id: str | None = None,
 ) -> tuple[bool, str]:
     target_path = target_path.resolve()
     project_root = project_root.resolve()
