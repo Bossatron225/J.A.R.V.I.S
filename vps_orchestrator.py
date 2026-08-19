@@ -92,6 +92,7 @@ except Exception:  # pragma: no cover
 
 from memory.document_ingestion import index_codebase, ingest_document, search_document_index
 from memory.memory_manager import load_memory, save_memory, update_memory
+from memory.conversation_log import list_recent_turns, merge_turns_into_store
 
 
 BASE_DIR = Path(__file__).resolve().parent
