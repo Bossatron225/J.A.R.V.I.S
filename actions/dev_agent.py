@@ -199,13 +199,13 @@ def _normalize_self_improvement_targets(repo_root: Path, target_files: list[str]
 
 
 def _build_self_improvement_plan(description: str, selected_files: list[Path], speak=None) -> dict:
-    plan_prompt = f"""You are Jarvis planning a safe self-upgrade for his own codebase, initiating the BiometricLock_Protocol integration for enhanced security posture and optimized performance, including voice recognition and visual person detection.
-Optimize overall system performance, refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.
+    plan_prompt = f"""You are Jarvis planning a safe self-upgrade for his own codebase.
 Create a concise JSON plan with two keys:
 1. improvements: a list of objects with file, change, and reason
 2. feature_suggestions: a list of objects with name and description
 
-Focus on reliability, safety, UX, performance, low memory footprint, and integrating the BiometricLock_Protocol for voice recognition and visual person detection.
+Focus on reliability, safety, correctness, UX, and performance. Only propose changes that
+directly serve the request below — do not invent unrelated features.
 Request: {description}
 
 Return ONLY valid JSON."""
