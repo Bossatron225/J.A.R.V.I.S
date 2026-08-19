@@ -28,6 +28,13 @@ LOGIN_WINDOW_SECS = 60 * 5
 LOGIN_MAX_ATTEMPTS = 8
 LOGIN_LOCKOUT_SECS = 60 * 10
 
+# Face model profile key for the web dashboard's biometric lock. Deliberately
+# separate from the local Mac desktop app's "primary" profile (config/biometric_models/)
+# since they're enrolled from different cameras (phone vs Mac webcam) and are
+# independent per-deployment security state, same as the override code.
+BIOMETRIC_PROFILE_KEY = "vps_web"
+BIOMETRIC_MIN_ENROLL_SAMPLES = 4
+
 _DEPS_OK = False
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
