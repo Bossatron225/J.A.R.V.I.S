@@ -591,6 +591,11 @@
           _invalidateSession('websocket auth rejected');
           return;
         }
+        if (evt && evt.code === 4003) {
+          sys('Biometric lock re-engaged — face scan required.');
+          _bioInit();
+          return;
+        }
         sys('Connection lost — reconnecting…');
         if (!_wsReconnectTimer) {
           _wsReconnectTimer = setTimeout(() => {
