@@ -154,6 +154,7 @@ def _index_document_entry(path: Path, source_name: str | None = None) -> dict:
         chunks.append({
             "id": f"{path.name}:{idx}",
             "content": chunk,
+            "embedding": embed_text(chunk, task_type="RETRIEVAL_DOCUMENT"),
         })
 
     return {
