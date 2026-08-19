@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from memory import document_ingestion
 from memory.document_ingestion import (
     index_codebase,
     ingest_document,
