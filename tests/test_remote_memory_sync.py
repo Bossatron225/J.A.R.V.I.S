@@ -1,7 +1,14 @@
 import json
 from unittest.mock import patch
 
-from memory.remote_sync import fetch_remote_memory, merge_memory, push_memory_to_vps
+from memory.remote_sync import (
+    fetch_remote_conversations,
+    fetch_remote_memory,
+    merge_conversation_turns,
+    merge_memory,
+    push_conversations_to_vps,
+    push_memory_to_vps,
+)
 
 
 def test_merge_memory_prefers_remote_long_term_data():
