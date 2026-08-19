@@ -850,6 +850,111 @@ def create_app() -> Flask:
             return jsonify({"ok": True, "token": token, "key": key})
         return jsonify({"ok": False, "error": "Invalid or expired key"}), 401
 
+    def _flask_client_ip() -> str:
+        xff = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        return xff or request.remote_addr or "unknown"
+
+    @app.get("/api/biometric/status")
+    def api_biometric_status():
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None:
+            return jsonify({"ok": False, "error": "remote access not initialized"}), 503
+        tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+        if not tok or not dashboard._is_token_valid(tok):
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        enrolled = dashboard._biometric_enrolled()
+        return jsonify({
+            "ok": True,
+            "enrolled": enrolled,
+            "verified": dashboard._is_biometric_verified(tok) if enrolled else True,
+        })
+
+    @app.post("/api/biometric/verify")
+    def api_biometric_verify():
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None:
+            return jsonify({"ok": False, "error": "remote access not initialized"}), 503
+        tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+        if not tok or not dashboard._is_token_valid(tok):
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+        ip = _flask_client_ip()
+        blocked, retry_after = dashboard._is_biometric_blocked(ip)
+        if blocked:
+            return jsonify({"ok": False, "error": "Too many failed attempts", "retry_after": retry_after}), 429
+
+        if not dashboard._biometric_enrolled():
+            return jsonify({"ok": False, "error": "not-enrolled"}), 400
+
+        data = request.get_json(silent=True) or {}
+        frames_b64 = data.get("frames") or []
+        if not isinstance(frames_b64, list) or not frames_b64 or len(frames_b64) > 16:
+            return jsonify({"ok": False, "error": "expected 1-16 frames"}), 400
+
+        frames = []
+        for item in frames_b64:
+            try:
+                raw = base64.b64decode(str(item), validate=True)
+            except Exception:
+                continue
+            if 0 < len(raw) <= 3 * 1024 * 1024:
+                frames.append(raw)
+        if not frames:
+            return jsonify({"ok": False, "error": "no valid frames"}), 400
+
+        try:
+            from auth import load_face_model, verify_face_against_model_bytes
+            from dashboard.server import BIOMETRIC_PROFILE_KEY
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"biometric module unavailable: {exc}"}), 500
+
+        recognizer = load_face_model(BIOMETRIC_PROFILE_KEY)
+        ok, reason = verify_face_against_model_bytes(recognizer, frames)
+        dashboard._record_biometric_attempt(ip, ok)
+        if ok:
+            dashboard._mark_biometric_verified(tok)
+            return jsonify({"ok": True, "reason": reason})
+        return jsonify({"ok": False, "error": reason}), 401
+
+    @app.post("/api/biometric/enroll")
+    def api_biometric_enroll():
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None:
+            return jsonify({"ok": False, "error": "remote access not initialized"}), 503
+        tok = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+        if not tok or not dashboard._is_token_valid(tok):
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+        data = request.get_json(silent=True) or {}
+        frames_b64 = data.get("frames") or []
+        if not isinstance(frames_b64, list) or not frames_b64 or len(frames_b64) > 24:
+            return jsonify({"ok": False, "error": "expected 1-24 frames"}), 400
+
+        frames = []
+        for item in frames_b64:
+            try:
+                raw = base64.b64decode(str(item), validate=True)
+            except Exception:
+                continue
+            if 0 < len(raw) <= 3 * 1024 * 1024:
+                frames.append(raw)
+
+        try:
+            from auth import train_face_model, save_face_model
+            from dashboard.server import BIOMETRIC_PROFILE_KEY, BIOMETRIC_MIN_ENROLL_SAMPLES
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"biometric module unavailable: {exc}"}), 500
+
+        ok, model_bytes, message = train_face_model(frames, min_samples=BIOMETRIC_MIN_ENROLL_SAMPLES)
+        if not ok or not model_bytes:
+            return jsonify({"ok": False, "error": message}), 400
+        save_face_model(BIOMETRIC_PROFILE_KEY, model_bytes)
+        # Re-enrolling invalidates any already-passed face scans (including this
+        # session's) so a stale/compromised token can't skip the new check.
+        for t in list(dashboard._token_biometric_ok.keys()):
+            dashboard._token_biometric_ok[t] = False
+        return jsonify({"ok": True, "message": message})
+
     @app.post("/api/device-login")
     def device_login_post():
         dashboard = orchestrator.dashboard_server
