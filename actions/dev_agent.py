@@ -1570,7 +1570,7 @@ def dev_agent(
         if approval_action == "history":
             result = _format_changelog(limit=history_limit)
             if speak:
-                speak(result)
+                speak(_format_changelog_spoken(limit=min(3, history_limit)))
             if player:
                 player.show_content("Recent self-improvements", result)
             return result
