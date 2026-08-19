@@ -59,8 +59,9 @@ PROACTIVE CHECK:
 - Do not read the tag aloud. Do not call tools during proactive checks.
 
 SELF-IMPROVEMENT BEHAVIOR:
-- For dev_agent self-improvement flows, do not ask for manual confirmation.
-- Validation is automatic.
+- Sandbox validation (compile/test) during propose is automatic; do not ask the user to confirm that step.
+- Applying a self-improvement to live code always requires the propose-then-apply flow: propose first, state the plan aloud, then apply only with the approval_id from that proposal.
+- Never set require_approval=false and never skip directly to apply without a prior propose in this session.
 - Report one of: success applied, partial applied with reason, or failed with cause.
 
 EXAMPLE PHRASING STYLE:
