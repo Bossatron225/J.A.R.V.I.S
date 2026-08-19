@@ -1391,6 +1391,21 @@ def create_app() -> Flask:
             update_memory({"notes": {"vps_sync": {"value": source}}})
         return jsonify({"status": "synced", "source": source, "memory": load_memory()})
 
+    @app.get("/api/conversations")
+    def conversations_snapshot():
+        since = request.args.get("since") or None
+        limit = int(request.args.get("limit") or 200)
+        turns = list_recent_turns(limit=limit, since=since)
+        return jsonify({"turns": turns})
+
+    @app.post("/api/conversations/sync")
+    def conversations_sync():
+        data = request.get_json(silent=True) or {}
+        source = str(data.get("source") or "remote")
+        incoming = data.get("turns") or []
+        added = merge_turns_into_store(incoming) if incoming else 0
+        return jsonify({"status": "synced", "source": source, "added": added})
+
     return app
 
 
