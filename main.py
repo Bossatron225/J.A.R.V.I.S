@@ -2998,6 +2998,21 @@ class JarvisLive:
         if name == "screen_process" and self._remote_bridge is not None:
             target_type = str(args.get("target_type") or args.get("angle") or "screen").strip().lower()
             if target_type in {"camera", "webcam", "device_camera"}:
+                _now = time.monotonic()
+                _cooldown = 6.0  # covers the browser capture/upload/analysis round trip
+                if (_now - self._vision_last_time) < _cooldown:
+                    _wait = max(0, _cooldown - (_now - self._vision_last_time))
+                    return types.FunctionResponse(
+                        id=fc.id,
+                        name=name,
+                        response={
+                            "result": (
+                                "A device camera request is still in progress. "
+                                f"Do not call this again for {_wait:.1f}s."
+                            ),
+                        },
+                    )
+                self._vision_last_time = _now
                 prompt = str(args.get("text") or "Analyze the logged-in device camera clearly.").strip()
                 request_id = f"camera-{fc.id}"
                 client_id = self._remote_bridge.publish_to_latest_client({
