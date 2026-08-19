@@ -356,6 +356,56 @@
     }
     .cam-btn:active { transform: scale(0.97); }
 
+    /* ── BIOMETRIC LOCK ── */
+    #bio-lock {
+      position: fixed; inset: 0; z-index: 9999;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(7,9,15,0.97);
+      padding: 20px;
+    }
+    #bio-lock.show { display: flex; }
+    .bio-card {
+      width: min(94vw, 380px);
+      padding: 28px 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      text-align: center;
+    }
+    .bio-title { font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+    .bio-sub { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+    .bio-progress { display: none; gap: 5px; justify-content: center; margin-bottom: 14px; }
+    .bio-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
+    .bio-dot.done { background: var(--green); }
+    .bio-dot.active { background: var(--accent); }
+    .bio-video-wrap { position: relative; margin-bottom: 14px; }
+    .bio-video {
+      width: 100%; aspect-ratio: 3 / 4; max-height: 340px;
+      object-fit: cover; border-radius: 16px;
+      background: #02050b; border: 1px solid rgba(255,255,255,0.12);
+      transform: scaleX(-1);
+    }
+    .bio-video.rear { transform: none; }
+    .bio-flip {
+      position: absolute; top: 10px; right: 10px;
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(7,9,15,0.6); border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; font-size: 15px; display: grid; place-items: center; cursor: pointer;
+    }
+    .bio-flip:active { transform: scale(0.94); }
+    .bio-status { font-size: 12px; color: var(--muted); min-height: 32px; margin-bottom: 12px; line-height: 1.4; }
+    .bio-status.err { color: #f87171; }
+    .bio-status.ok  { color: var(--green); }
+    .bio-row { display: flex; gap: 8px; }
+    .bio-btn {
+      flex: 1; padding: 13px; border: none; border-radius: 12px;
+      font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;
+      background: var(--accent); color: #fff; transition: opacity 0.15s, transform 0.1s;
+    }
+    .bio-btn:disabled { opacity: 0.5; cursor: default; }
+    .bio-btn.ghost { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
+    .bio-btn:active { transform: scale(0.97); }
+
     @media (max-width: 560px) {
       .diag-wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .cam-panel { flex-direction: column; }
