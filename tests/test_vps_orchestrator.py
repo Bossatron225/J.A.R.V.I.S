@@ -152,9 +152,41 @@ def test_mutable_vps_memory_supports_external_data_directory():
     root = Path(__file__).resolve().parents[1]
     ingestion = (root / 'memory' / 'document_ingestion.py').read_text(encoding='utf-8')
     manager = (root / 'memory' / 'memory_manager.py').read_text(encoding='utf-8')
+    conversations = (root / 'memory' / 'conversation_log.py').read_text(encoding='utf-8')
 
     assert 'os.getenv("JARVIS_DATA_DIR")' in ingestion
     assert 'os.getenv("JARVIS_DATA_DIR")' in manager
+    assert 'os.getenv("JARVIS_DATA_DIR")' in conversations
+
+
+def test_conversations_sync_endpoint_merges_and_snapshot_returns_turns(tmp_path, monkeypatch):
+    monkeypatch.setenv('JARVIS_DATA_DIR', str(tmp_path))
+    import memory.conversation_log as conversation_log
+    monkeypatch.setattr(conversation_log, 'DATA_DIR', tmp_path)
+    monkeypatch.setattr(conversation_log, 'CONV_PATH', tmp_path / 'conversations.jsonl')
+    monkeypatch.setattr(vps_module, 'list_recent_turns', conversation_log.list_recent_turns)
+    monkeypatch.setattr(vps_module, 'merge_turns_into_store', conversation_log.merge_turns_into_store)
+
+    app = create_app()
+    client = app.test_client()
+
+    turn = {
+        'id': 'turn-1',
+        'session_id': 'session-1',
+        'source': 'mac-client',
+        'role': 'user',
+        'text': 'hello from the mac',
+        'ts': '2026-01-01T00:00:00Z',
+        'embedding': None,
+    }
+    sync_resp = client.post('/api/conversations/sync', json={'turns': [turn], 'source': 'mac-client'})
+    assert sync_resp.status_code == 200
+    assert sync_resp.get_json()['added'] == 1
+
+    snapshot_resp = client.get('/api/conversations')
+    assert snapshot_resp.status_code == 200
+    turns = snapshot_resp.get_json()['turns']
+    assert any(t['id'] == 'turn-1' for t in turns)
 
 
 def test_vps_exposes_dashboard_websocket_route():
