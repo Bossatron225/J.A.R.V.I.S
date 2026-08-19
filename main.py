@@ -1419,6 +1419,22 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "recall_conversation",
+        "description": (
+            "Actively searches every past conversation Jarvis and the user have had — on the local Mac app "
+            "AND on the VPS remote uplink webpage — to recall what was actually discussed, not just a "
+            "compressed summary. Use this when the user references something said earlier or on another "
+            "device, or asks 'what did we talk about' / 'did I already tell you' style questions."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "query": {"type": "STRING", "description": "What to search for in past conversations"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
         "name": "document_memory",
         "description": (
             "Indexes local PDFs, markdown notes, and codebases for later recall. "
