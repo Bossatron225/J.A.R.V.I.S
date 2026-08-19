@@ -52,3 +52,57 @@ def test_index_pptx_file(tmp_path):
 
     result = ingest_document(str(pptx_path), source_name="deck")
     assert result["status"] in {"indexed", "empty", "missing"}
+
+
+def _fake_embed(text: str, task_type: str = "RETRIEVAL_DOCUMENT"):
+    if task_type == "RETRIEVAL_QUERY":
+        return [0.9, 0.1]
+    if "espresso" in text:
+        return [1.0, 0.0]
+    if "printer" in text:
+        return [0.0, 1.0]
+    return None
+
+
+def test_ingest_document_stores_chunk_embeddings(tmp_path, monkeypatch):
+    monkeypatch.setattr(document_ingestion, "embed_text", _fake_embed)
+
+    note = tmp_path / "note.md"
+    note.write_text("I enjoy a fresh espresso every morning.\n", encoding="utf-8")
+
+    indexed = ingest_document(str(note), source_name="note")
+    assert indexed["status"] == "indexed"
+
+    index = document_ingestion._load_index()
+    doc = next(d for d in index["documents"] if d["path"] == str(note.resolve()))
+    assert doc["chunks"][0]["embedding"] == [1.0, 0.0]
+
+
+def test_search_document_index_ranks_semantic_match_over_keyword_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(document_ingestion, "embed_text", _fake_embed)
+
+    espresso_note = tmp_path / "espresso.md"
+    espresso_note.write_text("I enjoy a fresh espresso every morning.\n", encoding="utf-8")
+    printer_note = tmp_path / "printer.md"
+    printer_note.write_text("The office printer needs a new coffee-colored toner cartridge.\n", encoding="utf-8")
+
+    ingest_document(str(espresso_note), source_name="espresso")
+    ingest_document(str(printer_note), source_name="printer")
+
+    matches = search_document_index("beverage preference")
+    assert matches
+    assert matches[0]["source"] == "espresso"
+
+
+def test_search_document_index_falls_back_to_keyword_without_query_embedding(tmp_path, monkeypatch):
+    monkeypatch.setattr(document_ingestion, "embed_text", _fake_embed)
+
+    note = tmp_path / "printer.md"
+    note.write_text("The office printer needs a new coffee-colored toner cartridge.\n", encoding="utf-8")
+    ingest_document(str(note), source_name="printer")
+
+    monkeypatch.setattr(document_ingestion, "embed_text", lambda text, task_type="RETRIEVAL_DOCUMENT": None)
+
+    matches = search_document_index("printer")
+    assert matches
+    assert "printer" in matches[0]["content"].lower()
