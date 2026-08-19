@@ -714,6 +714,15 @@ def _sandbox_test_and_apply(
             target_path, project_root,
             f"Jarvis: {target_path.relative_to(project_root)} — {change_note[:60]}",
         )
+        try:
+            _record_change(
+                file_rel=str(target_path.relative_to(project_root)),
+                change=change_note or summary_prefix,
+                reason=reason,
+                approval_id=approval_id,
+            )
+        except Exception:
+            pass
         if player:
             player.write_log(f"[DevAgent] {summary_prefix}Updated {target_path.relative_to(project_root)}")
             player.show_content(
