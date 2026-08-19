@@ -5191,6 +5191,13 @@ class JarvisLive:
                             push_memory_to_vps(vps_url, merged_memory)
                     except Exception as e:
                         print(f"[Memory Sync] ⚠️ Could not sync to VPS: {e}")
+                    try:
+                        if self._conversation_session_id:
+                            session_turns = _get_conversation_session_turns(self._conversation_session_id)
+                            if session_turns:
+                                push_conversations_to_vps(vps_url, session_turns)
+                    except Exception as e:
+                        print(f"[Memory Sync] ⚠️ Could not sync conversation log to VPS: {e}")
 
             self.set_speaking(False)
             self.ui.set_state("SLEEPING")
