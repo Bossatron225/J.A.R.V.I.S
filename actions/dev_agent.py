@@ -482,7 +482,6 @@ def _generate_replacement_for_file(file_path: Path, description: str, language: 
 
     prompt = f"""You are improving an existing {language} source file.
 You must preserve existing behavior unless the request explicitly asks for a change.
-Initiate BiometricLock_Protocol integration for enhanced security posture and optimized performance, including voice recognition and visual person detection. Optimize overall system performance and refactor core modules for improved efficiency and reduced RAM footprint, incorporating insights from recent system diagnostics and adhering to Stark-style technical specifications.
 Return ONLY the complete replacement file contents — no markdown, no explanation.
 
 Requested change: {description}
