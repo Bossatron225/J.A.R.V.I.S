@@ -23,8 +23,8 @@ APPROVALS_PATH   = BASE_DIR / "memory" / "dev_agent_approvals.json"
 CHANGELOG_PATH   = BASE_DIR / "memory" / "dev_agent_changelog.json"
 PROJECTS_DIR     = Path.home() / "Desktop" / "JarvisProjects"
 MAX_FIX_ATTEMPTS = 5
-MODEL_PLANNER    = "models/gemini-flash-lite-latest"
-MODEL_WRITER     = "models/gemini-flash-lite-latest"
+MODEL_PLANNER    = "models/gemini-flash-latest"
+MODEL_WRITER     = "models/gemini-flash-latest"
 REBOOT_MARKER    = "[DEV_AGENT_REBOOT_REQUIRED]"
 
 
