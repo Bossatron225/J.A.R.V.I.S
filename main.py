@@ -3258,6 +3258,28 @@ class JarvisLive:
                 response={"result": result, "silent": True}
             )
 
+        if name == "recall_conversation":
+            query = str(args.get("query", "") or "").strip()
+            if not query:
+                result = "No query provided."
+            else:
+                matches = await asyncio.to_thread(
+                    _recall_conversations, query, os.getenv('JARVIS_VPS_URL')
+                )
+                if not matches:
+                    result = f"No past conversation found matching '{query}'."
+                else:
+                    lines = [f"Past conversation matches for '{query}':"]
+                    for m in matches:
+                        who = "User" if m.get("role") == "user" else self._asst_name
+                        device = "Mac" if m.get("source") == "mac" else "VPS webpage"
+                        lines.append(f"- [{m.get('ts', '')} · {device}] {who}: {m.get('text', '')}")
+                    result = "\n".join(lines)
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": result, "silent": True}
+            )
+
         if name == "document_memory":
             action = str(args.get("action", "") or "").strip().lower()
             path = str(args.get("path", "") or "").strip()
