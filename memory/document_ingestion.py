@@ -4,6 +4,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from memory.conversation_log import _cosine, embed_text
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("JARVIS_DATA_DIR") or (BASE_DIR / "memory")).expanduser()
