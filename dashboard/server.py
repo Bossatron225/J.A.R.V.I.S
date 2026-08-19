@@ -645,6 +645,7 @@ class DashboardServer:
         self._tokens.add(tok)
         self._token_keys[tok] = session_key
         self._token_expiry[tok] = time.time() + TOKEN_TTL_SECS
+        self._token_biometric_ok[tok] = False
         self._aes_key(session_key)
         return tok
 
@@ -655,6 +656,7 @@ class DashboardServer:
             self._tokens.discard(tok)
             self._token_expiry.pop(tok, None)
             self._token_keys.pop(tok, None)
+            self._token_biometric_ok.pop(tok, None)
 
     def _is_token_valid(self, tok: str) -> bool:
         self._prune_tokens()
@@ -663,8 +665,55 @@ class DashboardServer:
             self._tokens.discard(tok)
             self._token_expiry.pop(tok, None)
             self._token_keys.pop(tok, None)
+            self._token_biometric_ok.pop(tok, None)
             return False
         return tok in self._tokens
+
+    def _mark_biometric_verified(self, tok: str) -> None:
+        if tok in self._tokens:
+            self._token_biometric_ok[tok] = True
+
+    def _is_biometric_verified(self, tok: str) -> bool:
+        return bool(self._token_biometric_ok.get(tok, False))
+
+    def _biometric_enrolled(self) -> bool:
+        try:
+            from auth import has_face_model
+            return has_face_model(BIOMETRIC_PROFILE_KEY)
+        except Exception:
+            return False
+
+    def _is_fully_authorized(self, tok: str) -> bool:
+        """Token is valid AND, if a face model is enrolled, has passed the face scan.
+        Fails closed once a model exists (mirrors the desktop app's lock philosophy);
+        with no model enrolled yet there's nothing to check against, so key-login alone
+        still governs — same fallback behavior as the Mac's pre-enrollment state."""
+        if not self._is_token_valid(tok):
+            return False
+        if not self._biometric_enrolled():
+            return True
+        return self._is_biometric_verified(tok)
+
+    def _is_biometric_blocked(self, ip: str) -> tuple[bool, int]:
+        now = time.time()
+        until = self._biometric_blocked_until.get(ip, 0)
+        if until > now:
+            return True, int(until - now)
+        if ip in self._biometric_blocked_until:
+            self._biometric_blocked_until.pop(ip, None)
+        return False, 0
+
+    def _record_biometric_attempt(self, ip: str, success: bool) -> None:
+        now = time.time()
+        if success:
+            self._biometric_attempts.pop(ip, None)
+            self._biometric_blocked_until.pop(ip, None)
+            return
+        bucket = [t for t in self._biometric_attempts.get(ip, []) if now - t <= LOGIN_WINDOW_SECS]
+        bucket.append(now)
+        self._biometric_attempts[ip] = bucket
+        if len(bucket) >= LOGIN_MAX_ATTEMPTS:
+            self._biometric_blocked_until[ip] = now + LOGIN_LOCKOUT_SECS
 
     def _client_ip(self, req: Request) -> str:
         xff = (req.headers.get("x-forwarded-for") or "").split(",")[0].strip()
