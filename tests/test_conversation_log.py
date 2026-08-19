@@ -3,10 +3,23 @@ import json
 import memory.conversation_log as conversation_log
 
 
+class _ImmediateThread:
+    """Runs the target synchronously so tests don't race the background
+    embedding thread spawned by append_turn."""
+
+    def __init__(self, target=None, **_kwargs):
+        self._target = target
+
+    def start(self):
+        if self._target:
+            self._target()
+
+
 def _isolate(tmp_path, monkeypatch):
     conv_path = tmp_path / "conversations.jsonl"
     monkeypatch.setattr(conversation_log, "DATA_DIR", tmp_path)
     monkeypatch.setattr(conversation_log, "CONV_PATH", conv_path)
+    monkeypatch.setattr(conversation_log.threading, "Thread", _ImmediateThread)
     return conv_path
 
 
