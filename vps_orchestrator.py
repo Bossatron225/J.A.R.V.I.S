@@ -675,7 +675,7 @@ def create_app() -> Flask:
             tok = _valid_ws_token()
             if not tok:
                 try:
-                    ws.close(code=4001)
+                    ws.close(code=_ws_reject_code())
                 except Exception:
                     pass
                 return
@@ -755,7 +755,7 @@ def create_app() -> Flask:
             tok = _valid_ws_token()
             if not tok:
                 try:
-                    ws.close(code=4001)
+                    ws.close(code=_ws_reject_code())
                 except Exception:
                     pass
                 return
