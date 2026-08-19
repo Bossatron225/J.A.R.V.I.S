@@ -949,7 +949,7 @@
       }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: _camFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         });
         _camStream = stream;
@@ -968,6 +968,14 @@
       }
       camVideo.srcObject = null;
       camState.textContent = 'Camera is off. Start the feed when you want to inspect the scene.';
+    }
+
+    async function flipPhoneCamera() {
+      _camFacing = _camFacing === 'environment' ? 'user' : 'environment';
+      if (_camStream) {
+        stopPhoneCamera();
+        await startPhoneCamera();
+      }
     }
 
     async function analyzeCameraNow(requestPrompt = '', echoUser = true, requestId = '') {
