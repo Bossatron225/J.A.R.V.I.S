@@ -363,10 +363,10 @@ def test_audio_callbacks_are_blocked_during_biometric_lock() -> None:
     assert live.audio_in_queue.empty()
 
 
-@requires_face_module
+@requires_sface
 def test_train_face_model_learns_from_multiple_angle_samples(monkeypatch, tmp_path) -> None:
-    base_face = _make_synthetic_face()
-    monkeypatch.setattr(auth_module, "_extract_face_for_training", _fake_extract_for_training(base_face))
+    base_embedding = _make_synthetic_embedding(seed=1)
+    monkeypatch.setattr(auth_module, "_embed_image_bytes", _fake_embed_bytes(base_embedding))
 
     samples = [bytes([i]) for i in range(6)]
     ok, model_bytes, message = auth_module.train_face_model(samples)
@@ -380,23 +380,23 @@ def test_train_face_model_learns_from_multiple_angle_samples(monkeypatch, tmp_pa
         assert saved_path.exists()
         loaded = auth_module.load_face_model("test_profile")
         assert loaded is not None
+        assert loaded.shape == (6, 128)
 
-        matching_gray = np.clip(
-            base_face.astype(int) + np.random.default_rng(99).integers(-8, 8, size=base_face.shape), 0, 255
-        ).astype(np.uint8)
-        _, matching_confidence = loaded.predict(matching_gray)
+        sface = auth_module._load_sface_recognizer()
+        matching_embedding = _fake_embed_bytes(base_embedding)(bytes([99]))
+        matching_score = auth_module._best_cosine_match(sface, matching_embedding, loaded)
 
-        different_gray = _make_synthetic_face(freq_x=0.7, freq_y=2.1, phase=1.3)
-        _, different_confidence = loaded.predict(different_gray)
+        different_embedding = _make_synthetic_embedding(seed=42)
+        different_score = auth_module._best_cosine_match(sface, different_embedding, loaded)
 
-        assert matching_confidence <= auth_module._LBPH_DEFAULT_THRESHOLD
-        assert different_confidence > matching_confidence
+        assert matching_score >= auth_module._SFACE_DEFAULT_THRESHOLD
+        assert different_score < matching_score
     finally:
         saved_path.unlink(missing_ok=True)
 
 
 def test_train_face_model_rejects_too_few_samples(monkeypatch) -> None:
-    monkeypatch.setattr(auth_module, "_extract_face_for_training", lambda image_bytes: np.zeros((200, 200), dtype=np.uint8))
+    monkeypatch.setattr(auth_module, "_embed_image_bytes", lambda image_bytes: np.zeros(128, dtype=np.float32))
 
     ok, model_bytes, message = auth_module.train_face_model([b"only-one"])
 
@@ -405,21 +405,15 @@ def test_train_face_model_rejects_too_few_samples(monkeypatch) -> None:
     assert "need at least" in message
 
 
-@requires_face_module
+@requires_sface
 def test_verify_face_against_model_matches_and_rejects(monkeypatch) -> None:
-    base_face = _make_synthetic_face()
-    monkeypatch.setattr(auth_module, "_extract_face_for_training", _fake_extract_for_training(base_face))
+    base_embedding = _make_synthetic_embedding(seed=2)
+    monkeypatch.setattr(auth_module, "_embed_image_bytes", _fake_embed_bytes(base_embedding))
 
     samples = [bytes([i]) for i in range(5)]
     ok, model_bytes, _ = auth_module.train_face_model(samples)
     assert ok is True
-
-    recognizer = auth_module.cv2.face.LBPHFaceRecognizer_create()
-    with tempfile.NamedTemporaryFile(suffix=".yml") as tmp:
-        Path(tmp.name).write_bytes(model_bytes)
-        recognizer.read(tmp.name)
-
-    monkeypatch.setattr(auth_module, "_extract_primary_face", lambda gray, detector: gray)
+    stored = auth_module.np.load(auth_module.io.BytesIO(model_bytes), allow_pickle=False)
 
     class FakeCapture:
         def __init__(self, frame):
@@ -438,18 +432,17 @@ def test_verify_face_against_model_matches_and_rejects(monkeypatch) -> None:
         def release(self):
             pass
 
-    matching_gray = np.clip(
-        base_face.astype(int) + np.random.default_rng(3).integers(-8, 8, size=base_face.shape), 0, 255
-    ).astype(np.uint8)
-    matching_frame = np.stack([matching_gray] * 3, axis=-1).astype(np.uint8)
-    monkeypatch.setattr(auth_module.cv2, "VideoCapture", lambda idx: FakeCapture(matching_frame))
-    matched, reason = auth_module.verify_face_against_model(recognizer, num_frames=1)
+    blank_frame = np.zeros((4, 4, 3), dtype=np.uint8)
+    monkeypatch.setattr(auth_module.cv2, "VideoCapture", lambda idx: FakeCapture(blank_frame))
+
+    matching_embedding = _fake_embed_bytes(base_embedding)(bytes([7]))
+    monkeypatch.setattr(auth_module, "_detect_and_embed", lambda frame: matching_embedding)
+    matched, reason = auth_module.verify_face_against_model(stored, num_frames=1)
     assert matched is True, reason
 
-    different_gray = _make_synthetic_face(freq_x=0.7, freq_y=2.1, phase=1.3)
-    different_frame = np.stack([different_gray] * 3, axis=-1).astype(np.uint8)
-    monkeypatch.setattr(auth_module.cv2, "VideoCapture", lambda idx: FakeCapture(different_frame))
-    rejected, reason2 = auth_module.verify_face_against_model(recognizer, num_frames=1)
+    different_embedding = _make_synthetic_embedding(seed=99)
+    monkeypatch.setattr(auth_module, "_detect_and_embed", lambda frame: different_embedding)
+    rejected, reason2 = auth_module.verify_face_against_model(stored, num_frames=1)
     assert rejected is False, reason2
 
 
