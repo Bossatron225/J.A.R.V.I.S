@@ -42,3 +42,9 @@ gevent
 gunicorn
 
 twilio
+
+# Local voice cloning (offline TTS) — see voice_clone/
+torch
+soundfile
+kokoro>=0.9
+rvc-python
