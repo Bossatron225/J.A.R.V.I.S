@@ -83,27 +83,43 @@ def _trim_if_needed() -> None:
     _write_all_turns(turns[-MAX_TURNS:])
 
 
+def _embed_text_direct(text: str, task_type: str) -> list[float] | None:
+    from google import genai as _genai
+    from google.genai import types as _types
+
+    client = _genai.Client(api_key=_get_api_key())
+    resp = client.models.embed_content(
+        model=EMBED_MODEL,
+        contents=text[:TEXT_MAX_CHARS],
+        config=_types.EmbedContentConfig(
+            output_dimensionality=EMBED_DIMENSIONALITY,
+            task_type=task_type,
+        ),
+    )
+    if resp.embeddings:
+        return list(resp.embeddings[0].values)
+    return None
+
+
 def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list[float] | None:
     """One Gemini embedding call. Returns None on any failure — callers must
-    tolerate turns without an embedding and fall back to substring matching."""
+    tolerate turns without an embedding and fall back to substring matching.
+
+    Embeddings are geo-restricted for this VPS's datacenter region ("User location is
+    not supported for the API use") but work fine from the Mac — see
+    core/local_relay.py. Route there when running headless on the VPS."""
     text = (text or "").strip()
     if not text:
         return None
     try:
-        from google import genai as _genai
-        from google.genai import types as _types
-
-        client = _genai.Client(api_key=_get_api_key())
-        resp = client.models.embed_content(
-            model=EMBED_MODEL,
-            contents=text[:TEXT_MAX_CHARS],
-            config=_types.EmbedContentConfig(
-                output_dimensionality=EMBED_DIMENSIONALITY,
-                task_type=task_type,
-            ),
-        )
-        if resp.embeddings:
-            return list(resp.embeddings[0].values)
+        from core import local_relay
+        if local_relay.is_available():
+            result = local_relay.call("gemini_relay", {"kind": "embed", "text": text, "task_type": task_type}, timeout=20.0)
+            payload = result.get("result") if isinstance(result, dict) else None
+            if isinstance(payload, dict) and payload.get("ok") and payload.get("values"):
+                return payload["values"]
+            return None
+        return _embed_text_direct(text, task_type)
     except Exception as e:
         print(f"[ConversationLog] ⚠️ Embedding failed: {e}")
     return None
