@@ -5371,7 +5371,6 @@ class JarvisLive:
                             tg.create_task(self._run_self_improvement_cycle())
                             tg.create_task(self._run_diagnostics_stream())
                             tg.create_task(self._run_visual_monitor())
-                            tg.create_task(self._run_visitor_watch())
                             if self._dashboard:
                                 tg.create_task(self._relay_phone_audio())
                             tg.create_task(self._flush_pending_commands())
