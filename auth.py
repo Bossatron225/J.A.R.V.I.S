@@ -337,13 +337,13 @@ def verify_face(reference_image: str | os.PathLike[str] | None = None, camera_in
         return False, "OpenCV/numpy are not available in this environment"
 
     try:
-        detector = _load_detector()
+        detectors = _load_detectors()
 
         reference_bgr = cv2.imread(str(ref_path))
         if reference_bgr is None:
             return False, "Unable to read the reference image"
         reference_gray = cv2.cvtColor(reference_bgr, cv2.COLOR_BGR2GRAY)
-        reference_face = _extract_primary_face(reference_gray, detector)
+        reference_face = _extract_primary_face(reference_gray, detectors)
         if reference_face is None:
             return False, "No face was detected in the reference image"
 
