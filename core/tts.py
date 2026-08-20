@@ -600,6 +600,95 @@ class ElevenLabsTTSEngine:
         raise RuntimeError(f"ElevenLabs TTS failed for all candidate voices: {last_error}") from last_error
 
 
+class ClonedVoiceEngine:
+    """Fully offline voice clone: Kokoro (fast, local, already-offline TTS)
+    synthesizes speech, then a locally-trained RVC voice-conversion model
+    reshapes it to sound like Jarvis's original ElevenLabs voice. No network
+    call — the RVC model was trained once, elsewhere (see voice_clone/), and
+    only the small resulting .pth/.index files live on this machine.
+
+    v1 deliberately converts each full utterance in one pass rather than
+    streaming per-chunk like KokoroTTSEngine does on its own — RVC conversion
+    on tiny chunks risks pitch/click artifacts at chunk boundaries. This adds
+    a "thinking" pause (synthesis + conversion time) before Jarvis starts
+    speaking, traded for correctness/robustness in this first version.
+    """
+
+    def __init__(
+        self,
+        model_path: str,
+        index_path: str = "",
+        kokoro_voice: str = "af_heart",
+        kokoro_speed: float = 1.0,
+        device: str = "cpu",
+        audio_sink: Optional[Callable[[bytes], None]] = None,
+    ):
+        model_file = Path(model_path)
+        if not model_file.exists():
+            raise ValueError(
+                f"RVC model not found at {model_path}. Train it via "
+                "voice_clone/train_rvc_colab.ipynb and place the .pth/.index "
+                "files in voice_clone/rvc_models/ first."
+            )
+
+        try:
+            from rvc_python.infer import RVCInference
+        except Exception as exc:
+            raise RuntimeError(
+                "rvc-python is not installed. Run: pip install rvc-python"
+            ) from exc
+
+        self.audio_sink = audio_sink
+        self._kokoro = KokoroTTSEngine(voice=kokoro_voice, speed=kokoro_speed)
+
+        self._rvc = RVCInference(device=device)
+        try:
+            if index_path and Path(index_path).exists():
+                self._rvc.load_model(str(model_file), str(index_path))
+            else:
+                self._rvc.load_model(str(model_file))
+        except TypeError:
+            # Some rvc-python versions only accept a single model-path arg.
+            self._rvc.load_model(str(model_file))
+
+    def speak(self, text: str) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            raw_path = str(Path(tmp_dir) / "kokoro_raw.wav")
+            converted_path = str(Path(tmp_dir) / "jarvis_cloned.wav")
+
+            self._synthesize_to_wav(text, raw_path)
+            self._rvc.infer_file(raw_path, converted_path)
+
+            audio_bytes = Path(converted_path).read_bytes()
+            if self.audio_sink is not None:
+                self.audio_sink(audio_bytes)
+            else:
+                _play_audio_bytes(audio_bytes)
+
+    def _synthesize_to_wav(self, text: str, out_path: str) -> None:
+        """Run Kokoro's pipeline directly (bypassing its own playback/sink
+        path) and write the full utterance to a single WAV file."""
+        chunks: list[np.ndarray] = []
+        with self._kokoro._lock:
+            if self._kokoro._pipeline is None:
+                self._kokoro._init()
+            for _, _, audio in self._kokoro._pipeline(
+                text, voice=self._kokoro.voice, speed=self._kokoro.speed
+            ):
+                if audio is not None:
+                    chunks.append(_to_numpy(audio))
+
+        arr = np.concatenate(chunks) if chunks else np.zeros(1, dtype=np.float32)
+        pcm16 = (np.clip(arr, -1.0, 1.0) * 32767).astype(np.int16)
+        with wave.open(out_path, "wb") as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(24000)
+            wav_file.writeframes(pcm16.tobytes())
+
+
 # ---------------------------------------------------------------------------
 # Thread-safe player wrapper
 # ---------------------------------------------------------------------------
