@@ -73,20 +73,32 @@ def _center_face_crop(gray_frame):
     return gray_frame[y1:y2, x1:x2]
 
 
-def _extract_primary_face(gray_frame, detector):
-    if detector is None:
-        return _center_face_crop(gray_frame)
+def _extract_primary_face(gray_frame, detectors):
+    """detectors is a (frontal, profile) tuple. Frontal is tried first (best quality
+    crop); if it finds nothing — which happens whenever the head is turned or tilted,
+    since the frontal cascade is frontal-only — profile is tried against the frame as-is
+    and against a horizontally flipped copy, so both left- and right-facing turns are
+    covered. Only falls back to an uncentered guess if no cascade found anything at all."""
+    frontal, profile = detectors if isinstance(detectors, tuple) else (detectors, None)
 
-    faces = detector.detectMultiScale(
-        gray_frame,
-        scaleFactor=1.1,
-        minNeighbors=6,
-        minSize=(64, 64),
-    )
-    if len(faces) == 0:
-        return _center_face_crop(gray_frame)
-    x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
-    return gray_frame[y : y + h, x : x + w]
+    faces = _detect_faces(gray_frame, frontal)
+    if faces:
+        x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+        return gray_frame[y : y + h, x : x + w]
+
+    faces = _detect_faces(gray_frame, profile)
+    if faces:
+        x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+        return gray_frame[y : y + h, x : x + w]
+
+    if profile is not None:
+        flipped = cv2.flip(gray_frame, 1)
+        faces = _detect_faces(flipped, profile)
+        if faces:
+            x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+            return flipped[y : y + h, x : x + w]
+
+    return _center_face_crop(gray_frame)
 
 
 def _biometric_models_dir() -> Path:
