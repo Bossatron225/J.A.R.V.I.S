@@ -25,6 +25,7 @@ final class JarvisWebSocket: NSObject, URLSessionWebSocketDelegate {
     private var task: URLSessionWebSocketTask?
     private var session: URLSession?
     var onMessage: ((JarvisWSMessage) -> Void)?
+    var onAudioChunk: ((Data) -> Void)?
     var onClose: ((JarvisWSCloseReason) -> Void)?
 
     func connect() throws {
