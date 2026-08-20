@@ -98,6 +98,9 @@ struct ChatView: View {
     }
 
     private func connect() {
+        socket.onAudioChunk = { [audioPlayer] data in
+            audioPlayer.enqueue(pcm16Data: data)
+        }
         socket.onMessage = { message in
             DispatchQueue.main.async {
                 switch message.type {
