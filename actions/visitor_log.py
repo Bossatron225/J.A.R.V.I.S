@@ -25,12 +25,55 @@ DATA_DIR         = Path(os.getenv("JARVIS_DATA_DIR") or (BASE_DIR / "memory")).e
 LOG_PATH         = DATA_DIR / "visitor_log.jsonl"
 CLUSTERS_PATH    = DATA_DIR / "visitor_clusters.json"
 SNAPSHOTS_DIR    = DATA_DIR / "visitor_snapshots"
+WATCH_STATE_PATH = DATA_DIR / "visitor_watch_state.json"
 
 MAX_LOG_ENTRIES     = 2000
 MAX_SNAPSHOT_FILES  = 500
 DEFAULT_CLUSTER_WINDOW_DAYS = 30
 
 _lock = threading.Lock()
+
+# Runtime start/stop state for the "Nanny-cam protocol" — checked by main.py's
+# continuous monitor thread every cycle (in-memory, so that read is cheap),
+# and set here so it's reachable identically whether this module's
+# visitor_log() is called directly on the Mac or delegated from the VPS
+# dashboard via local_worker.py — both paths call this exact function.
+_watch_state_lock = threading.Lock()
+_watch_active: bool | None = None  # lazily loaded from WATCH_STATE_PATH on first check
+
+
+def is_watch_active() -> bool:
+    global _watch_active
+    with _watch_state_lock:
+        if _watch_active is None:
+            _watch_active = _load_watch_state()
+        return _watch_active
+
+
+def set_watch_active(active: bool) -> None:
+    global _watch_active
+    with _watch_state_lock:
+        _watch_active = bool(active)
+        _save_watch_state(_watch_active)
+
+
+def _load_watch_state() -> bool:
+    try:
+        if WATCH_STATE_PATH.exists():
+            data = json.loads(WATCH_STATE_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and "active" in data:
+                return bool(data["active"])
+    except Exception:
+        pass
+    return True  # default: engaged, matching visitor_watch_enabled's own default
+
+
+def _save_watch_state(active: bool) -> None:
+    try:
+        WATCH_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        WATCH_STATE_PATH.write_text(json.dumps({"active": active}), encoding="utf-8")
+    except Exception:
+        pass
 
 
 def _now_iso() -> str:
