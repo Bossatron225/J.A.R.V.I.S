@@ -53,6 +53,7 @@ ACTION_HANDLERS = {
     'reminder': ('actions.reminder', 'reminder'),
     'send_message': ('actions.send_message', 'send_message'),
     'system_status': ('actions.system_monitor', 'get_system_status'),
+    'visitor_log': ('actions.visitor_log', 'visitor_log'),
     'youtube_video': ('actions.youtube_video', 'youtube_video'),
     'capture_camera': ('actions.screen_processor', 'capture_camera_b64'),
     'capture_visual': ('actions.screen_processor', 'capture_targeted_visual_b64'),
