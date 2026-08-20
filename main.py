@@ -274,6 +274,9 @@ else:
     find_my = None
     alexa_routines = None
     ifttt_webhooks = None
+    visitor_log = None
+    record_unknown_sighting = None
+    list_recent_sightings = None
 
 
     # Headless Linux still supports cloud/network and code capabilities. Import
