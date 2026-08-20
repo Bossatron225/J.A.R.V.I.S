@@ -59,19 +59,29 @@ final class JarvisWebSocket: NSObject, URLSessionWebSocketDelegate {
             case .failure:
                 return // delegate's didCloseWith handles the close reason
             case .success(let message):
-                if case .string(let text) = message, let data = text.data(using: .utf8),
-                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let type = obj["type"] as? String ?? ""
-                    if type == "ping" {
-                        self.task?.send(.string("{\"type\":\"pong\"}")) { _ in }
-                    } else {
-                        self.onMessage?(JarvisWSMessage(
-                            type: type,
-                            speaker: obj["speaker"] as? String,
-                            text: obj["text"] as? String,
-                            state: obj["state"] as? String
-                        ))
+                switch message {
+                case .data(let audioData):
+                    // Binary frames are raw PCM16 audio, same as app.html's
+                    // `e.data instanceof ArrayBuffer` branch — never JSON, so this
+                    // must be checked before attempting to parse as text/JSON below.
+                    self.onAudioChunk?(audioData)
+                case .string(let text):
+                    if let data = text.data(using: .utf8),
+                       let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        let type = obj["type"] as? String ?? ""
+                        if type == "ping" {
+                            self.task?.send(.string("{\"type\":\"pong\"}")) { _ in }
+                        } else {
+                            self.onMessage?(JarvisWSMessage(
+                                type: type,
+                                speaker: obj["speaker"] as? String,
+                                text: obj["text"] as? String,
+                                state: obj["state"] as? String
+                            ))
+                        }
                     }
+                @unknown default:
+                    break
                 }
                 self.listen()
             }
