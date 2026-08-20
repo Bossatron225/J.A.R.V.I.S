@@ -1,4 +1,17 @@
-from local_worker import LocalWorker
+from local_worker import ACTION_HANDLERS, LOCAL_ACTIONS, LocalWorker
+
+
+def test_every_local_action_has_a_handler_or_is_special_cased():
+    # 'status' is handled inline in execute_local_action rather than via ACTION_HANDLERS.
+    special_cased = {'status'}
+    missing = LOCAL_ACTIONS - special_cased - ACTION_HANDLERS.keys()
+    assert not missing, f"Local actions with no ACTION_HANDLERS entry (would fail as 'unavailable' when relayed from the VPS): {missing}"
+
+
+def test_security_biometrics_and_capture_screen_resolve_to_real_handlers():
+    worker = LocalWorker()
+    assert callable(worker._load_handler('security_biometrics'))
+    assert callable(worker._load_handler('capture_screen'))
 
 
 def test_local_worker_accepts_only_local_actions():
