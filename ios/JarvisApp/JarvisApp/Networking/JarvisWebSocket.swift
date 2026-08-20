@@ -51,12 +51,6 @@ final class JarvisWebSocket: NSObject, URLSessionWebSocketDelegate {
         session = nil
     }
 
-    func send(text: String) {
-        let payload: [String: Any] = ["type": "status_request"]
-        _ = payload // parity with app.html's initial status_request send; not required by the server
-        task?.send(.string(text)) { _ in }
-    }
-
     private func listen() {
         task?.receive { [weak self] result in
             guard let self else { return }
