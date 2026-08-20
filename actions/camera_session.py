@@ -7,6 +7,29 @@ except Exception:  # pragma: no cover - optional dependency
     cv2 = None
 
 
+# Requested capture resolution for every camera-using feature (person/visitor
+# detection, continuous monitoring, vision capture). This is a *request*, not
+# a requirement: UVC/AVFoundation camera drivers clamp an unsupported request
+# down to the device's nearest supported mode rather than failing, so asking
+# for 4K is safe even on a camera that only supports 1080p or lower — it just
+# gets that camera's best available resolution instead.
+TARGET_FRAME_WIDTH = 3840
+TARGET_FRAME_HEIGHT = 2160
+
+
+def apply_target_resolution(capture) -> None:
+    """Ask an opened cv2.VideoCapture for the target resolution. Best-effort —
+    swallow errors so a camera/backend that rejects the property set still
+    works at whatever resolution it already opened with."""
+    if capture is None:
+        return
+    try:
+        capture.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_FRAME_WIDTH)
+        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_FRAME_HEIGHT)
+    except Exception:
+        pass
+
+
 class CameraSession:
     """Owns one physical camera's cv2.VideoCapture handle, keeping it open across
     many get_frame() calls instead of opening/closing per call. Opening a camera
