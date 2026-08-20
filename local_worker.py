@@ -21,6 +21,7 @@ LOCAL_ACTIONS = {
     'computer_settings',
     'file_controller',
     'find_my',
+    'gemini_relay',
     'imessage_control',
     'mail_control',
     'reminder',
@@ -38,6 +39,7 @@ QUIET_ACTIONS = {
     'capture_screen',
     'system_status',
     'find_my',
+    'gemini_relay',
 }
 
 ACTION_HANDLERS = {
