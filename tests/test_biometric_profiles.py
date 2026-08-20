@@ -1,6 +1,4 @@
 import asyncio
-import tempfile
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -11,10 +9,6 @@ from actions import file_controller as file_controller_module
 import main as main_module
 import ui as ui_module
 from ui import ManageProfilesOverlay
-
-requires_face_module = pytest.mark.skipif(
-    not auth_module._HAS_FACE_MODULE, reason="cv2.face requires opencv-contrib-python"
-)
 
 
 requires_sface = pytest.mark.skipif(
