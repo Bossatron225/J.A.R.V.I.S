@@ -310,6 +310,26 @@ def identify_face(
     return None, best_score
 
 
+def check_frame_for_visitor(
+    frame,
+    profile_keys: list,
+    threshold: float | None = None,
+) -> dict | None:
+    """Given one already-captured frame, detect a face and match it against every
+    enrolled profile. Returns {"status": "known", "profile_key", "score"},
+    {"status": "unknown", "embedding", "score", "frame"}, or None if no face was
+    found in this frame. Shared core used by both the one-shot check below and
+    the continuous visitor-watch monitor (main.py) so detection logic lives in
+    exactly one place."""
+    embedding = _detect_and_embed(frame)
+    if embedding is None:
+        return None
+    profile_key, score = identify_face(embedding, profile_keys, threshold)
+    if profile_key is not None:
+        return {"status": "known", "profile_key": profile_key, "score": score}
+    return {"status": "unknown", "embedding": embedding, "score": score, "frame": frame}
+
+
 def capture_unknown_visitor_check(
     profile_keys: list,
     camera_index: int = 0,
@@ -317,36 +337,21 @@ def capture_unknown_visitor_check(
     threshold: float | None = None,
 ) -> dict | None:
     """Passive poll (not a security decision, so a short burst is enough): grab a
-    few frames, detect the first face, and check it against every enrolled
-    profile. Returns {"status": "known", "profile_key", "score"},
-    {"status": "unknown", "embedding", "score", "frame"}, or None if no face
-    was seen in the burst at all."""
+    few frames from the shared camera session and check the first face seen
+    against every enrolled profile."""
     if cv2 is None or not _HAS_SFACE:
         return None
 
     try:
-        with _camera_lock:
-            capture = cv2.VideoCapture(camera_index)
-            if not capture.isOpened():
-                capture.release()
-                return None
-
-            result = None
-            for _ in range(num_frames):
-                ok, frame = capture.read()
-                if not ok or frame is None:
-                    continue
-                embedding = _detect_and_embed(frame)
-                if embedding is None:
-                    continue
-                profile_key, score = identify_face(embedding, profile_keys, threshold)
-                if profile_key is not None:
-                    result = {"status": "known", "profile_key": profile_key, "score": score}
-                else:
-                    result = {"status": "unknown", "embedding": embedding, "score": score, "frame": frame}
-                break
-            capture.release()
-        return result
+        session = get_camera_session(camera_index)
+        for _ in range(num_frames):
+            frame = session.get_frame()
+            if frame is None:
+                continue
+            result = check_frame_for_visitor(frame, profile_keys, threshold)
+            if result is not None:
+                return result
+        return None
     except Exception:
         return None
 
