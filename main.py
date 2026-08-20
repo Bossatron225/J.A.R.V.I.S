@@ -2220,6 +2220,27 @@ class JarvisLive:
         return cfg
 
     @staticmethod
+    def _load_visitor_watch_config() -> dict:
+        cfg = {
+            "enabled": True,
+            "interval_seconds": 45,
+            "camera_index": 0,
+            "realert_cooldown_seconds": 1800,
+            "cluster_window_days": 30,
+        }
+        try:
+            with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            cfg["enabled"] = bool(raw.get("visitor_watch_enabled", cfg["enabled"]))
+            cfg["interval_seconds"] = max(15, min(int(raw.get("visitor_watch_interval_seconds", cfg["interval_seconds"]) or 45), 600))
+            cfg["camera_index"] = int(raw.get("visitor_watch_camera_index", cfg["camera_index"]) or 0)
+            cfg["realert_cooldown_seconds"] = max(300, min(int(raw.get("visitor_watch_realert_cooldown_seconds", cfg["realert_cooldown_seconds"]) or 1800), 86400))
+            cfg["cluster_window_days"] = max(1, int(raw.get("visitor_watch_cluster_window_days", cfg["cluster_window_days"]) or 30))
+        except Exception:
+            pass
+        return cfg
+
+    @staticmethod
     def _load_visual_watch_config() -> dict:
         cfg = {
             "enabled": True,
