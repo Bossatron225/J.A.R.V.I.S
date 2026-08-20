@@ -319,6 +319,9 @@ else:
         "find_my": ("actions.find_my", "find_my"),
         "alexa_routines": ("actions.alexa_routines", "alexa_routines"),
         "ifttt_webhooks": ("actions.alexa_routines", "ifttt_webhooks"),
+        "visitor_log": ("actions.visitor_log", "visitor_log"),
+        "record_unknown_sighting": ("actions.visitor_log", "record_unknown_sighting"),
+        "list_recent_sightings": ("actions.visitor_log", "list_recent_sightings"),
     }
     for _target_name, (_module_name, _attribute_name) in _HEADLESS_SAFE_ACTIONS.items():
         try:
