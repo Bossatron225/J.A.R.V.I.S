@@ -2284,6 +2284,25 @@ class JarvisLive:
         return cfg
 
     @staticmethod
+    def _load_turn_detection_config() -> dict:
+        """Tunable end-of-turn sensitivity — how long Jarvis waits after you stop
+        talking before it decides you're done and starts responding. Lower
+        silence_duration_ms = faster responses but more risk of jumping in
+        during a natural mid-sentence pause; raise it back if that happens."""
+        cfg = {
+            "silence_duration_ms": 500,
+            "prefix_padding_ms": 150,
+        }
+        try:
+            with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            cfg["silence_duration_ms"] = max(100, min(int(raw.get("vad_silence_duration_ms", cfg["silence_duration_ms"]) or 500), 3000))
+            cfg["prefix_padding_ms"] = max(0, min(int(raw.get("vad_prefix_padding_ms", cfg["prefix_padding_ms"]) or 150), 1000))
+        except Exception:
+            pass
+        return cfg
+
+    @staticmethod
     def _load_audio_tuning_config() -> tuple[str, dict]:
         profile_name = "balanced"
         try:
