@@ -57,6 +57,8 @@ ACTION_HANDLERS = {
     'youtube_video': ('actions.youtube_video', 'youtube_video'),
     'capture_camera': ('actions.screen_processor', 'capture_camera_b64'),
     'capture_visual': ('actions.screen_processor', 'capture_targeted_visual_b64'),
+    'capture_screen': ('actions.screen_processor', 'capture_targeted_visual_b64'),
+    'security_biometrics': ('actions.file_controller', 'security_biometrics'),
 }
 
 
