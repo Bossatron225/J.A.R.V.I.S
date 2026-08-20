@@ -1537,8 +1537,11 @@ TOOL_DECLARATIONS = [
     {
         "name": "visitor_log",
         "description": (
-            "Reports on unrecognized visitors Jarvis has logged at the camera (not enrolled household "
-            "members). Use for asks like 'has anyone been seen', 'any visitors today', 'who's been at the door'. "
+            "Controls and reports on the 'Nanny-cam protocol' — continuous camera monitoring for "
+            "unrecognized visitors (not enrolled household members). Use for asks like 'has anyone "
+            "been seen', 'any visitors today', 'who's been at the door', 'start/engage the nanny-cam "
+            "protocol', 'stop/disengage the nanny-cam protocol', or 'is the nanny-cam protocol on'. "
+            "Works identically whether spoken to on the Mac or sent via the VPS dashboard. "
             "Never used to identify a stranger's real name or run a background check — logging and alerting only."
         ),
         "parameters": {
@@ -1546,7 +1549,12 @@ TOOL_DECLARATIONS = [
             "properties": {
                 "action": {
                     "type": "STRING",
-                    "description": "recent (default) — list recent unrecognized-visitor sightings"
+                    "description": (
+                        "recent (default) — list recent unrecognized-visitor sightings. "
+                        "start_watch — engage the nanny-cam protocol. "
+                        "stop_watch — disengage the nanny-cam protocol. "
+                        "watch_status — report whether it's currently engaged."
+                    )
                 },
                 "limit": {
                     "type": "INTEGER",
