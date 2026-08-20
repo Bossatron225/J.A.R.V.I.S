@@ -31,6 +31,33 @@ def _load_detector():
     return detector
 
 
+def _load_profile_detector():
+    """haarcascade_profileface.xml is trained on left-facing profiles; the caller
+    also tries it against a horizontally flipped frame to catch right-facing turns."""
+    classifier = getattr(cv2, "CascadeClassifier", None)
+    if classifier is None:
+        return None
+    detector = classifier(str(Path(cv2.data.haarcascades) / "haarcascade_profileface.xml"))
+    if hasattr(detector, "empty") and detector.empty():
+        return None
+    return detector
+
+
+def _load_detectors():
+    return _load_detector(), _load_profile_detector()
+
+
+def _detect_faces(gray_frame, detector):
+    if detector is None:
+        return []
+    return list(detector.detectMultiScale(
+        gray_frame,
+        scaleFactor=1.1,
+        minNeighbors=6,
+        minSize=(64, 64),
+    ))
+
+
 def _center_face_crop(gray_frame):
     h, w = gray_frame.shape[:2]
     side = int(min(h, w) * 0.58)
