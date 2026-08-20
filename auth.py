@@ -285,7 +285,7 @@ def identify_face(
     embedding,
     profile_keys: list,
     threshold: float | None = None,
-) -> Tuple["str | None", float]:
+) -> Tuple[str | None, float]:
     """Compare one live embedding against every given profile's stored model and
     return the best-matching profile_key (or None if nobody matches) plus its
     score. Reuses load_face_model/_best_cosine_match per profile — no new
