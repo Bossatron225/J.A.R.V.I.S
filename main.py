@@ -92,6 +92,7 @@ from memory.conversation_log import (
     get_session_turns as _get_conversation_session_turns,
     recall_with_vps_sync as _recall_conversations,
 )
+from actions.notify import notify_user
 from local_worker import LocalWorker, QUIET_ACTIONS as _LOCAL_WORKER_QUIET_ACTIONS
 from memory.document_ingestion import (
     ingest_document,
