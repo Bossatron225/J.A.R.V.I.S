@@ -16,7 +16,6 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     np = None
 
-_HAS_FACE_MODULE = bool(cv2 is not None and hasattr(cv2, "face"))
 _HAS_SFACE = bool(cv2 is not None and hasattr(cv2, "FaceDetectorYN") and hasattr(cv2, "FaceRecognizerSF"))
 
 _FACE_MODELS_DIR = Path(__file__).resolve().parent / "config" / "face_models"
