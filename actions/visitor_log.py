@@ -279,6 +279,18 @@ def visitor_log(
     action = str(p.get("action", "recent") or "recent").strip().lower()
     limit = int(p.get("limit", 10) or 10)
 
+    if action in {"start_watch", "start", "engage", "activate", "resume"}:
+        set_watch_active(True)
+        return "Nanny-cam protocol engaged, sir. I'm watching the camera and will let you know if anyone unrecognized shows up."
+
+    if action in {"stop_watch", "stop", "disengage", "deactivate", "pause"}:
+        set_watch_active(False)
+        return "Nanny-cam protocol disengaged, sir. I've stopped watching the camera."
+
+    if action in {"watch_status", "engaged_status"}:
+        state = "engaged" if is_watch_active() else "disengaged"
+        return f"Nanny-cam protocol is currently {state}, sir."
+
     if action in {"recent", "status", "list"}:
         entries = list_recent_sightings(limit=limit)
         return _format_sightings_summary(entries)
