@@ -376,9 +376,11 @@ def _capture_live_visual_frame() -> tuple[bytes | None, bool]:
     if cv2 is None:
         return None, False
     try:
+        from actions.camera_session import apply_target_resolution
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
             return None, False
+        apply_target_resolution(cap)
         for _ in range(8):
             cap.read()
         ok, frame = cap.read()
