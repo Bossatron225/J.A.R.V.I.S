@@ -4846,97 +4846,176 @@ class JarvisLive:
                 print(f"[SelfImprove] ⚠️ {e}")
 
     async def _run_visitor_watch(self) -> None:
-        """Periodically polls the local webcam for faces that don't match any
-        enrolled household profile, logs a timestamped snapshot, and speaks a
-        one-off alert (per-visitor cooldown, not per-poll). Only the real Mac
-        app has a physical camera in the room — the VPS-embedded brain instance
-        no-ops here."""
+        """Starts (once, for the app's whole lifetime) a continuous background
+        thread that holds the camera open and tracks people entering/leaving —
+        opening the camera measured at ~1.4s on this hardware, so real continuous
+        monitoring means holding the device open rather than polling a fresh
+        frame every N seconds. Only the real Mac app has a physical camera in the
+        room — the VPS-embedded brain instance no-ops here."""
         if isinstance(self.ui, _HeadlessUI):
             return
         if not self._visitor_watch_cfg.get("enabled", True):
             return
         if record_unknown_sighting is None or get_authorized_profiles is None:
             return
+        if self._visitor_monitor_thread is not None and self._visitor_monitor_thread.is_alive():
+            return
 
-        interval = int(self._visitor_watch_cfg.get("interval_seconds", 45) or 45)
-        camera_index = int(self._visitor_watch_cfg.get("camera_index", 0) or 0)
-        cooldown = float(self._visitor_watch_cfg.get("realert_cooldown_seconds", 1800) or 1800)
-        cluster_window_days = int(self._visitor_watch_cfg.get("cluster_window_days", 30) or 30)
+        self._visitor_monitor_stop = threading.Event()
+        self._visitor_monitor_thread = threading.Thread(
+            target=self._visitor_monitor_loop, daemon=True, name="visitor-monitor",
+        )
+        self._visitor_monitor_thread.start()
 
-        await asyncio.sleep(30)
-        while True:
+    def _visitor_monitor_loop(self) -> None:
+        """Runs on its own thread for as long as Jarvis runs. Cheap frame-diff
+        motion gate — only pays for the expensive SFace detect+match step when
+        something actually changed in view, keeping CPU low on this 8GB/no-GPU
+        Mac during quiet periods."""
+        try:
+            import cv2
+        except Exception:
+            return
+        from auth import check_frame_for_visitor
+        from actions.camera_session import get_camera_session
+
+        cfg = self._visitor_watch_cfg
+        camera_index = int(cfg.get("camera_index", 0) or 0)
+        motion_threshold = int(cfg.get("motion_threshold", 12000) or 12000)
+        debounce = float(cfg.get("presence_debounce_seconds", 8) or 8)
+        cooldown = float(cfg.get("realert_cooldown_seconds", 1800) or 1800)
+        cluster_window_days = int(cfg.get("cluster_window_days", 30) or 30)
+
+        session = get_camera_session(camera_index)
+        prev_gray = None
+        stop = self._visitor_monitor_stop
+
+        while not stop.is_set():
             try:
-                await asyncio.sleep(interval)
                 if self._local_speech_gate_active():
+                    stop.wait(1.0)
                     continue
 
-                from auth import capture_unknown_visitor_check
+                frame = session.get_frame()
+                now = time.monotonic()
+                self._sweep_departed_visitors(now, debounce)
+
+                if frame is None:
+                    stop.wait(1.0)
+                    continue
+
+                gray = cv2.GaussianBlur(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (21, 21), 0)
+                motion_score = 0
+                if prev_gray is not None:
+                    diff = cv2.absdiff(prev_gray, gray)
+                    _, thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
+                    motion_score = int(cv2.countNonZero(thresh))
+                prev_gray = gray
+
+                if motion_score < motion_threshold:
+                    stop.wait(0.4)
+                    continue
 
                 profiles = get_authorized_profiles()
                 profile_keys = ["primary"] + list((profiles.get("authorized") or {}).keys())
-
-                loop = asyncio.get_running_loop()
-                check = await loop.run_in_executor(
-                    None,
-                    lambda: capture_unknown_visitor_check(profile_keys, camera_index=camera_index),
-                )
-                if not check:
+                result = check_frame_for_visitor(frame, profile_keys)
+                if not result:
+                    stop.wait(0.4)
                     continue
 
-                if check.get("status") == "known":
-                    profile_key = str(check.get("profile_key", ""))
-                    now = time.monotonic()
-                    if not _should_alert_visitor(profile_key, self._known_visitor_last_alert, cooldown, now):
-                        continue
-                    self._known_visitor_last_alert[profile_key] = now
-
-                    if profile_key == "primary":
-                        name = (profiles.get("primary") or {}).get("name") or "You"
-                    else:
-                        name = (profiles.get("authorized") or {}).get(profile_key, {}).get("name") or profile_key
-                    notify_user(f"{name} was just seen at the camera.")
-                    continue
-
-                if check.get("status") != "unknown":
-                    continue
-
-                entry = await loop.run_in_executor(
-                    None,
-                    lambda: record_unknown_sighting(
-                        check.get("embedding"),
-                        frame=check.get("frame"),
-                        score=check.get("score", 0.0),
-                        camera_index=camera_index,
-                        cluster_window_days=cluster_window_days,
-                    ),
-                )
-                visitor_id = str(entry.get("visitor_id", ""))
-                self.ui.write_log(f"[VisitorWatch] Unrecognized visitor logged: {visitor_id} (sighting #{entry.get('sighting_count_at_time')})")
-
-                now = time.monotonic()
-                if not _should_alert_visitor(visitor_id, self._visitor_last_alert, cooldown, now):
-                    continue
-                self._visitor_last_alert[visitor_id] = now
-
-                count = entry.get("sighting_count_at_time", 1)
-                repeat_note = f" This is their {count}th sighting." if count > 1 else ""
-                notify_user(f"An unrecognized visitor was just seen at the camera.{repeat_note}")
-
-                if self.session:
-                    prompt = (
-                        f"[SYSTEM_ALERT] An unrecognized visitor was just seen at the camera.{repeat_note} "
-                        "Briefly let the user know, naturally."
-                    )
-                    await self.session.send_client_content(
-                        turns={"parts": [{"text": prompt}]},
-                        turn_complete=True,
-                    )
-            except RuntimeError as e:
-                if "cannot schedule new futures after shutdown" in str(e).lower():
-                    return
-                print(f"[VisitorWatch] ⚠️ {e}")
+                if result.get("status") == "known":
+                    self._handle_known_visitor_seen(result, profiles, now, cooldown, debounce)
+                elif result.get("status") == "unknown":
+                    self._handle_unknown_visitor_seen(result, camera_index, cluster_window_days, now, cooldown, debounce)
             except Exception as e:
                 print(f"[VisitorWatch] ⚠️ {e}")
+
+            stop.wait(0.4)
+
+        session.release()
+
+    def _sweep_departed_visitors(self, now: float, debounce: float) -> None:
+        """Anyone not re-seen within the debounce window is treated as having
+        left — removed from the presence sets and logged (no text by default;
+        arrival is the actionable event)."""
+        for profile_key, last_seen in list(self._present_known.items()):
+            if now - last_seen > debounce:
+                del self._present_known[profile_key]
+                self.ui.write_log(f"[VisitorWatch] {profile_key} left the camera's view.")
+        still_present = []
+        for embedding, visitor_id, last_seen in self._present_unknown:
+            if now - last_seen > debounce:
+                self.ui.write_log(f"[VisitorWatch] Unrecognized visitor {visitor_id} left the camera's view.")
+            else:
+                still_present.append([embedding, visitor_id, last_seen])
+        self._present_unknown = still_present
+
+    def _handle_known_visitor_seen(self, result: dict, profiles: dict, now: float, cooldown: float, debounce: float) -> None:
+        profile_key = str(result.get("profile_key", ""))
+        already_present = profile_key in self._present_known
+        self._present_known[profile_key] = now
+        if already_present:
+            return  # still here, not a new arrival
+
+        if not _should_alert_visitor(profile_key, self._known_visitor_last_alert, cooldown, now):
+            return
+        self._known_visitor_last_alert[profile_key] = now
+
+        if profile_key == "primary":
+            name = (profiles.get("primary") or {}).get("name") or "You"
+        else:
+            name = (profiles.get("authorized") or {}).get(profile_key, {}).get("name") or profile_key
+        notify_user(f"{name} was just seen at the camera.")
+
+    def _handle_unknown_visitor_seen(self, result: dict, camera_index: int, cluster_window_days: int, now: float, cooldown: float, debounce: float) -> str | None:
+        from auth import embedding_similarity, _sface_threshold
+
+        embedding = result.get("embedding")
+        gate = _sface_threshold()
+
+        # Match against faces already tracked as "present" so a lingering visitor
+        # doesn't re-trigger record_unknown_sighting (and a new snapshot file) on
+        # every motion-gated cycle — only a genuinely new arrival does that.
+        for tracked in self._present_unknown:
+            if embedding_similarity(embedding, tracked[0]) >= gate:
+                tracked[2] = now
+                return tracked[1]
+
+        entry = record_unknown_sighting(
+            embedding,
+            frame=result.get("frame"),
+            score=result.get("score", 0.0),
+            camera_index=camera_index,
+            cluster_window_days=cluster_window_days,
+        )
+        visitor_id = str(entry.get("visitor_id", ""))
+        self._present_unknown.append([embedding, visitor_id, now])
+        self.ui.write_log(f"[VisitorWatch] Unrecognized visitor logged: {visitor_id} (sighting #{entry.get('sighting_count_at_time')})")
+
+        if not _should_alert_visitor(visitor_id, self._visitor_last_alert, cooldown, now):
+            return visitor_id
+        self._visitor_last_alert[visitor_id] = now
+
+        count = entry.get("sighting_count_at_time", 1)
+        repeat_note = f" This is their {count}th sighting." if count > 1 else ""
+        notify_user(f"An unrecognized visitor was just seen at the camera.{repeat_note}")
+
+        if self.session and self._loop:
+            prompt = (
+                f"[SYSTEM_ALERT] An unrecognized visitor was just seen at the camera.{repeat_note} "
+                "Briefly let the user know, naturally."
+            )
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    self.session.send_client_content(
+                        turns={"parts": [{"text": prompt}]},
+                        turn_complete=True,
+                    ),
+                    self._loop,
+                )
+            except RuntimeError:
+                pass  # event loop already shutting down
+        return visitor_id
 
     # ── Phone audio relay ────────────────────────────────────────────────        
 
