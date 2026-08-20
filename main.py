@@ -472,6 +472,14 @@ def _error_text(err: BaseException | Exception) -> str:
     return "\n".join(parts).lower()
 
 
+def _should_alert_visitor(visitor_id: str, last_alert: dict, cooldown_seconds: float, now: float) -> bool:
+    """True if this visitor_id hasn't triggered a spoken alert within the cooldown
+    window — keeps a lingering stranger from re-alerting every poll interval while
+    still letting a different, new stranger alert immediately."""
+    last = last_alert.get(visitor_id)
+    return last is None or (now - last) >= cooldown_seconds
+
+
 def _is_live_model_unavailable_error(err: Exception) -> bool:
     msg = _error_text(err)
     return any(k in msg for k in (
