@@ -139,17 +139,62 @@ def _biometric_models_dir() -> Path:
 
 
 def _model_path(profile_key: str) -> Path:
+    """.npy, not .yml — this is a stack of SFace embeddings now, not a serialized LBPH
+    model. The extension change is deliberate: it makes any model trained before this
+    upgrade simply invisible to has_face_model()/load_face_model() rather than being
+    misread, so a stale LBPH-era model can never get compared against a real embedding."""
     safe_key = "".join(ch for ch in profile_key.strip().lower() if ch.isalnum() or ch in ("-", "_")) or "primary"
-    return _biometric_models_dir() / f"{safe_key}.yml"
+    return _biometric_models_dir() / f"{safe_key}.npy"
 
 
-def _normalize_face_crop(gray_face):
-    resized = cv2.resize(gray_face, _LBPH_FACE_SIZE)
-    return cv2.equalizeHist(resized)
+@lru_cache(maxsize=1)
+def _load_yunet_detector():
+    if not _HAS_SFACE or not _YUNET_MODEL_PATH.exists():
+        return None
+    try:
+        return cv2.FaceDetectorYN.create(str(_YUNET_MODEL_PATH), "", (320, 320), _YUNET_SCORE_THRESHOLD, 0.3, 5000)
+    except Exception:
+        return None
 
 
-def _extract_face_for_training(image_bytes: bytes):
-    """Decode an enrollment sample and return a normalized face crop, or None if unusable."""
+@lru_cache(maxsize=1)
+def _load_sface_recognizer():
+    if not _HAS_SFACE or not _SFACE_MODEL_PATH.exists():
+        return None
+    try:
+        return cv2.FaceRecognizerSF.create(str(_SFACE_MODEL_PATH), "")
+    except Exception:
+        return None
+
+
+def _detect_and_embed(frame_bgr):
+    """Detect the largest/most-confident face (YuNet), align it via the detector's own
+    5-point landmarks, and return its 128-d SFace embedding — or None if no usable face
+    was found. Alignment is what makes this robust to head angle/tilt in a way the old
+    LBPH pipeline's raw bounding-box crop never was: it warps the face to a canonical
+    112x112 pose before embedding, rather than comparing whatever rotated/skewed crop
+    the camera happened to capture."""
+    detector = _load_yunet_detector()
+    recognizer = _load_sface_recognizer()
+    if detector is None or recognizer is None or frame_bgr is None:
+        return None
+    try:
+        h, w = frame_bgr.shape[:2]
+        if h < 2 or w < 2:
+            return None
+        detector.setInputSize((w, h))
+        _, faces = detector.detect(frame_bgr)
+        if faces is None or len(faces) == 0:
+            return None
+        best = max(faces, key=lambda f: f[-1])  # highest detection confidence
+        aligned = recognizer.alignCrop(frame_bgr, best)
+        return recognizer.feature(aligned)
+    except Exception:
+        return None
+
+
+def _embed_image_bytes(image_bytes: bytes):
+    """Decode an enrollment/verification sample and return its face embedding, or None."""
     if cv2 is None or np is None or not image_bytes:
         return None
     try:
@@ -157,45 +202,33 @@ def _extract_face_for_training(image_bytes: bytes):
         frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         if frame is None:
             return None
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        face = _extract_primary_face(gray, _load_detectors())
-        if face is None:
-            return None
-        return _normalize_face_crop(face)
+        return _detect_and_embed(frame)
     except Exception:
         return None
 
 
 def train_face_model(sample_images: list, min_samples: int = 3) -> Tuple[bool, "bytes | None", str]:
-    """Train an LBPH recognizer from several enrollment samples (ideally spanning
-    different angles/distances) and return the serialized model bytes."""
-    if not _HAS_FACE_MODULE:
-        return False, None, "cv2.face is unavailable (install opencv-contrib-python)"
+    """Build a per-profile embedding set from several enrollment samples (ideally
+    spanning different angles/distances) and return it serialized as .npy bytes."""
+    if not _HAS_SFACE:
+        return False, None, "cv2 FaceDetectorYN/FaceRecognizerSF are unavailable (need opencv-contrib-python 4.5.4+)"
+    if not _YUNET_MODEL_PATH.exists() or not _SFACE_MODEL_PATH.exists():
+        return False, None, "face recognition model files are missing from config/face_models/"
 
-    faces = []
+    embeddings = []
     for image_bytes in sample_images or []:
-        face = _extract_face_for_training(image_bytes)
-        if face is not None:
-            faces.append(face)
+        emb = _embed_image_bytes(image_bytes)
+        if emb is not None:
+            embeddings.append(emb.reshape(-1))
 
-    if len(faces) < min_samples:
-        return False, None, f"Only {len(faces)} usable face sample(s) captured; need at least {min_samples}"
+    if len(embeddings) < min_samples:
+        return False, None, f"Only {len(embeddings)} usable face sample(s) captured; need at least {min_samples}"
 
     try:
-        recognizer = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=8, grid_x=8, grid_y=8)
-        labels = np.array([_LBPH_LABEL] * len(faces))
-        recognizer.train(faces, labels)
-        with tempfile.NamedTemporaryFile(suffix=".yml", delete=False) as tmp:
-            tmp_path = tmp.name
-        try:
-            recognizer.write(tmp_path)
-            model_bytes = Path(tmp_path).read_bytes()
-        finally:
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-        return True, model_bytes, f"Trained on {len(faces)} face sample(s)"
+        stacked = np.stack(embeddings).astype(np.float32)
+        buf = io.BytesIO()
+        np.save(buf, stacked, allow_pickle=False)
+        return True, buf.getvalue(), f"Trained on {len(embeddings)} face sample(s)"
     except Exception as exc:
         return False, None, f"Training failed: {exc}"
 
@@ -211,25 +244,36 @@ def save_face_model(profile_key: str, model_bytes: bytes) -> Path:
 
 
 def load_face_model(profile_key: str):
-    """Load a previously trained LBPH model for a profile, or None if none exists."""
-    if not _HAS_FACE_MODULE:
+    """Load a previously trained embedding set for a profile, or None if none exists."""
+    if not _HAS_SFACE or np is None:
         return None
     path = _model_path(profile_key)
     if not path.exists():
         return None
     try:
-        recognizer = cv2.face.LBPHFaceRecognizer_create()
-        recognizer.read(str(path))
-        return recognizer
+        return np.load(path, allow_pickle=False)
     except Exception:
         return None
 
 
-def _lbph_threshold() -> float:
+def _sface_threshold() -> float:
     try:
-        return float(os.environ.get("JARVIS_LBPH_THRESHOLD", _LBPH_DEFAULT_THRESHOLD))
+        return float(os.environ.get("JARVIS_SFACE_THRESHOLD", _SFACE_DEFAULT_THRESHOLD))
     except (TypeError, ValueError):
-        return _LBPH_DEFAULT_THRESHOLD
+        return _SFACE_DEFAULT_THRESHOLD
+
+
+def _best_cosine_match(recognizer, live_embedding, stored_embeddings) -> float:
+    best = -1.0
+    for stored in stored_embeddings:
+        score = float(recognizer.match(
+            live_embedding.reshape(1, -1).astype(np.float32),
+            stored.reshape(1, -1).astype(np.float32),
+            cv2.FaceRecognizerSF_FR_COSINE,
+        ))
+        if score > best:
+            best = score
+    return best
 
 
 def verify_face_against_model(
@@ -238,16 +282,23 @@ def verify_face_against_model(
     num_frames: int = 14,
     threshold: float | None = None,
 ) -> Tuple[bool, str]:
-    """Capture a short burst of live frames and match the best face crop against a
-    trained per-profile LBPH model. Robust to head angle/distance because the model
-    was trained on samples spanning those variations, and matching is done against
-    the single best (lowest-distance) frame in the burst rather than one snapshot."""
-    if recognizer is None:
+    """Capture a short burst of live frames; for each, detect+align+embed via
+    YuNet/SFace and compare (cosine similarity) against every stored enrollment
+    embedding. Takes the single best score across the whole burst rather than one
+    snapshot, and stops early once a clear match is found. `recognizer` here is
+    actually the stored embedding array from load_face_model (kept as the parameter
+    name other callers already use)."""
+    stored_embeddings = recognizer
+    if stored_embeddings is None or len(stored_embeddings) == 0:
         return False, "no-model"
-    if cv2 is None or np is None:
+    if not _HAS_SFACE or np is None:
         return False, "opencv-unavailable"
 
-    gate = _lbph_threshold() if threshold is None else threshold
+    sface = _load_sface_recognizer()
+    if sface is None:
+        return False, "opencv-unavailable"
+
+    gate = _sface_threshold() if threshold is None else threshold
 
     try:
         capture = cv2.VideoCapture(camera_index)
@@ -255,42 +306,36 @@ def verify_face_against_model(
             capture.release()
             return False, "no-webcam"
 
-        detectors = _load_detectors()
-        best_confidence = None
+        best_score = None
         face_seen = False
         for _ in range(num_frames):
             ok, frame = capture.read()
             if not ok or frame is None:
                 continue
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            face = _extract_primary_face(gray, detectors)
-            if face is None:
+            embedding = _detect_and_embed(frame)
+            if embedding is None:
                 continue
             face_seen = True
-            normalized = _normalize_face_crop(face)
-            try:
-                _, confidence = recognizer.predict(normalized)
-            except Exception:
-                continue
-            if best_confidence is None or confidence < best_confidence:
-                best_confidence = confidence
-            if best_confidence is not None and best_confidence <= gate:
+            score = _best_cosine_match(sface, embedding, stored_embeddings)
+            if best_score is None or score > best_score:
+                best_score = score
+            if best_score is not None and best_score >= gate:
                 break
         capture.release()
 
         if not face_seen:
             return False, "no-face-detected"
-        if best_confidence is None:
+        if best_score is None:
             return False, "predict-failed"
-        if best_confidence <= gate:
-            return True, f"Face matched trained model (confidence={best_confidence:.1f}, threshold={gate:.1f})"
-        return False, f"Face did not match trained model (confidence={best_confidence:.1f}, threshold={gate:.1f})"
+        if best_score >= gate:
+            return True, f"Face matched trained model (similarity={best_score:.3f}, threshold={gate:.3f})"
+        return False, f"Face did not match trained model (similarity={best_score:.3f}, threshold={gate:.3f})"
     except Exception as exc:
         return False, f"Face verification failed: {exc}"
 
 
 def has_face_model(profile_key: str) -> bool:
-    """Whether a trained LBPH model file exists for this profile, without loading it."""
+    """Whether a trained embedding model file exists for this profile, without loading it."""
     return _model_path(profile_key).exists()
 
 
@@ -300,40 +345,42 @@ def verify_face_against_model_bytes(
     threshold: float | None = None,
 ) -> Tuple[bool, str]:
     """Match a burst of already-captured frames (e.g. uploaded from a browser) against
-    a trained per-profile LBPH model. Same best-of-burst matching as
+    a trained per-profile embedding set. Same best-of-burst matching as
     verify_face_against_model, but sourced from provided image bytes instead of a
     local cv2.VideoCapture, so it works for cameras the server process can't open
     directly (a phone's camera arriving over HTTP)."""
-    if recognizer is None:
+    stored_embeddings = recognizer
+    if stored_embeddings is None or len(stored_embeddings) == 0:
         return False, "no-model"
-    if cv2 is None or np is None:
+    if not _HAS_SFACE or np is None:
         return False, "opencv-unavailable"
 
-    gate = _lbph_threshold() if threshold is None else threshold
-    best_confidence = None
+    sface = _load_sface_recognizer()
+    if sface is None:
+        return False, "opencv-unavailable"
+
+    gate = _sface_threshold() if threshold is None else threshold
+    best_score = None
     face_seen = False
 
     for image_bytes in frames or []:
-        face = _extract_face_for_training(image_bytes)
-        if face is None:
+        embedding = _embed_image_bytes(image_bytes)
+        if embedding is None:
             continue
         face_seen = True
-        try:
-            _, confidence = recognizer.predict(face)
-        except Exception:
-            continue
-        if best_confidence is None or confidence < best_confidence:
-            best_confidence = confidence
-        if best_confidence is not None and best_confidence <= gate:
+        score = _best_cosine_match(sface, embedding, stored_embeddings)
+        if best_score is None or score > best_score:
+            best_score = score
+        if best_score is not None and best_score >= gate:
             break
 
     if not face_seen:
         return False, "no-face-detected"
-    if best_confidence is None:
+    if best_score is None:
         return False, "predict-failed"
-    if best_confidence <= gate:
-        return True, f"Face matched trained model (confidence={best_confidence:.1f}, threshold={gate:.1f})"
-    return False, f"Face did not match trained model (confidence={best_confidence:.1f}, threshold={gate:.1f})"
+    if best_score >= gate:
+        return True, f"Face matched trained model (similarity={best_score:.3f}, threshold={gate:.3f})"
+    return False, f"Face did not match trained model (similarity={best_score:.3f}, threshold={gate:.3f})"
 
 
 def _similarity_metrics(reference_face, live_face):
