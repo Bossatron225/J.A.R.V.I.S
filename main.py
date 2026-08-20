@@ -4950,7 +4950,7 @@ class JarvisLive:
                 still_present.append([embedding, visitor_id, last_seen])
         self._present_unknown = still_present
 
-    def _handle_known_visitor_seen(self, result: dict, profiles: dict, now: float, cooldown: float, debounce: float) -> None:
+    def _handle_known_visitor_seen(self, result: dict, profiles: dict, now: float, cooldown: float) -> None:
         profile_key = str(result.get("profile_key", ""))
         already_present = profile_key in self._present_known
         self._present_known[profile_key] = now
