@@ -4947,9 +4947,11 @@ class JarvisLive:
                     continue
                 self._visitor_last_alert[visitor_id] = now
 
+                count = entry.get("sighting_count_at_time", 1)
+                repeat_note = f" This is their {count}th sighting." if count > 1 else ""
+                notify_user(f"An unrecognized visitor was just seen at the camera.{repeat_note}")
+
                 if self.session:
-                    count = entry.get("sighting_count_at_time", 1)
-                    repeat_note = f" This is their {count}th sighting." if count > 1 else ""
                     prompt = (
                         f"[SYSTEM_ALERT] An unrecognized visitor was just seen at the camera.{repeat_note} "
                         "Briefly let the user know, naturally."
