@@ -4924,9 +4924,9 @@ class JarvisLive:
                     continue
 
                 if result.get("status") == "known":
-                    self._handle_known_visitor_seen(result, profiles, now, cooldown, debounce)
+                    self._handle_known_visitor_seen(result, profiles, now, cooldown)
                 elif result.get("status") == "unknown":
-                    self._handle_unknown_visitor_seen(result, camera_index, cluster_window_days, now, cooldown, debounce)
+                    self._handle_unknown_visitor_seen(result, camera_index, cluster_window_days, now, cooldown)
             except Exception as e:
                 print(f"[VisitorWatch] ⚠️ {e}")
 
