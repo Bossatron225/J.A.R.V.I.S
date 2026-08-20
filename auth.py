@@ -278,6 +278,23 @@ def _best_cosine_match(recognizer, live_embedding, stored_embeddings) -> float:
     return best
 
 
+def embedding_similarity(embedding_a, embedding_b) -> float:
+    """Cosine similarity between two raw face embeddings (not matched against a
+    stored profile) — used by the continuous visitor-watch monitor to tell
+    whether a newly-seen unknown face is the same person still in frame, without
+    needing a durable enrolled profile to compare against."""
+    if embedding_a is None or embedding_b is None or not _HAS_SFACE:
+        return -1.0
+    sface = _load_sface_recognizer()
+    if sface is None:
+        return -1.0
+    return float(sface.match(
+        embedding_a.reshape(1, -1).astype(np.float32),
+        embedding_b.reshape(1, -1).astype(np.float32),
+        cv2.FaceRecognizerSF_FR_COSINE,
+    ))
+
+
 def identify_face(
     embedding,
     profile_keys: list,
