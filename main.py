@@ -190,6 +190,7 @@ if _GUI_IMPORTS_ALLOWED:
         enroll_biometric_profile,
         get_authorized_profiles,
         verify_biometric_security,
+        security_biometrics as security_biometrics_action,
     )
     from actions.code_helper import code_helper
     from actions.dev_agent import dev_agent
