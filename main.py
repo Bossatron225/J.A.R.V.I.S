@@ -299,6 +299,7 @@ else:
         "enroll_biometric_profile": ("actions.file_controller", "enroll_biometric_profile"),
         "get_authorized_profiles": ("actions.file_controller", "get_authorized_profiles"),
         "verify_biometric_security": ("actions.file_controller", "verify_biometric_security"),
+        "security_biometrics_action": ("actions.file_controller", "security_biometrics"),
         "code_helper": ("actions.code_helper", "code_helper"),
         "dev_agent": ("actions.dev_agent", "dev_agent"),
         "REBOOT_MARKER": ("actions.dev_agent", "REBOOT_MARKER"),
