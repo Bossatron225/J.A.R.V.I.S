@@ -10,7 +10,7 @@ struct AskJarvisIntent: AppIntent {
     static var title: LocalizedStringResource = "Ask Jarvis"
     static var description = IntentDescription("Send a command or question to Jarvis and hear the reply.")
 
-    @Parameter(title: "What do you want to ask Jarvis?")
+    @Parameter(title: "What do you want to ask Jarvis?", requestValueDialog: "What would you like to ask Jarvis?")
     var query: String
 
     static var parameterSummary: some ParameterSummary {
