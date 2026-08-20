@@ -102,6 +102,38 @@ def test_capture_unknown_visitor_check_flags_unrecognized_face(monkeypatch) -> N
 
 
 @requires_sface
+def test_check_frame_for_visitor_matches_same_shape_as_capture_check(monkeypatch) -> None:
+    """Regression guard for the capture_unknown_visitor_check extraction: the
+    shared per-frame core must return the exact same shape the old inline logic
+    did, since the continuous monitor (main.py) relies on it directly."""
+    profile_a = _make_synthetic_embedding(seed=1)
+    models = {"primary": np.stack([profile_a])}
+    monkeypatch.setattr(auth_module, "load_face_model", lambda key: models.get(key))
+
+    stranger = _make_synthetic_embedding(seed=99)
+    monkeypatch.setattr(auth_module, "_detect_and_embed", lambda frame: stranger)
+
+    result = auth_module.check_frame_for_visitor(np.zeros((4, 4, 3), dtype=np.uint8), ["primary"])
+
+    assert result["status"] == "unknown"
+    assert "embedding" in result and "score" in result and "frame" in result
+
+    matching = _noisy(profile_a, noise_seed=3)
+    monkeypatch.setattr(auth_module, "_detect_and_embed", lambda frame: matching)
+    result = auth_module.check_frame_for_visitor(np.zeros((4, 4, 3), dtype=np.uint8), ["primary"])
+
+    assert result == {"status": "known", "profile_key": "primary", "score": result["score"]}
+
+
+def test_check_frame_for_visitor_returns_none_when_no_face_detected(monkeypatch) -> None:
+    monkeypatch.setattr(auth_module, "_detect_and_embed", lambda frame: None)
+
+    result = auth_module.check_frame_for_visitor(np.zeros((4, 4, 3), dtype=np.uint8), ["primary"])
+
+    assert result is None
+
+
+@requires_sface
 def test_capture_unknown_visitor_check_recognizes_known_profile(monkeypatch) -> None:
     profile_a = _make_synthetic_embedding(seed=1)
     models = {"primary": np.stack([profile_a])}
