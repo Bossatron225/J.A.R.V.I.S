@@ -413,6 +413,24 @@ AUDIO_TUNING_PROFILES = {
         "speaker_put_timeout_seconds": 0.3,
         "diag_interval_seconds": 1.5,
     },
+    # Same low-latency chunk/queue sizing as "aggressive", but keeps
+    # speaker_drop_policy="preserve" (unlike "aggressive") so a full speaker
+    # queue never drops queued Jarvis speech — fast without ever cutting off
+    # his own audio.
+    "responsive": {
+        "mic_chunk_size": 320,
+        "speaker_chunk_size": 480,
+        "mic_queue_max_chunks": 16,
+        "speaker_queue_max_chunks": 160,
+        "phone_idle_timeout_seconds": 0.22,
+        "incoming_slice_bytes": 1920,
+        "play_batch_cap_bytes": 3840,
+        "input_latency": "low",
+        "output_latency": "low",
+        "speaker_drop_policy": "preserve",
+        "speaker_put_timeout_seconds": 0.2,
+        "diag_interval_seconds": 1.0,
+    },
 }
 
 def _get_api_key() -> str:
