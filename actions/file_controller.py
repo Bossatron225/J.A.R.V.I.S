@@ -136,9 +136,9 @@ def add_authorized_profile(profile_id: str, name: str, voice_print: str, visual_
 
 
 def _train_and_save_face_model(profile_key: str, visual_samples: list[bytes]) -> str:
-    """Best-effort: (re)train the profile's LBPH model from multi-angle/distance
+    """Best-effort: (re)train the profile's SFace embedding model from multi-angle/distance
     enrollment samples. Never raises — enrollment must still succeed if training
-    fails (e.g. contrib module missing); the caller falls back to legacy matching."""
+    fails (e.g. model files missing); the caller falls back to legacy matching."""
     try:
         from auth import train_face_model, save_face_model
     except Exception as exc:
