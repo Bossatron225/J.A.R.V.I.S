@@ -90,7 +90,7 @@ def test_capture_unknown_visitor_check_flags_unrecognized_face(monkeypatch) -> N
     profile_a = _make_synthetic_embedding(seed=1)
     models = {"primary": np.stack([profile_a])}
     monkeypatch.setattr(auth_module, "load_face_model", lambda key: models.get(key))
-    monkeypatch.setattr(auth_module.cv2, "VideoCapture", lambda idx: _FakeCapture(np.zeros((4, 4, 3), dtype=np.uint8)))
+    monkeypatch.setattr(camera_session_module.cv2, "VideoCapture", lambda idx: _FakeCapture(np.zeros((4, 4, 3), dtype=np.uint8)))
 
     stranger = _make_synthetic_embedding(seed=99)
     monkeypatch.setattr(auth_module, "_detect_and_embed", lambda frame: stranger)
@@ -106,7 +106,7 @@ def test_capture_unknown_visitor_check_recognizes_known_profile(monkeypatch) -> 
     profile_a = _make_synthetic_embedding(seed=1)
     models = {"primary": np.stack([profile_a])}
     monkeypatch.setattr(auth_module, "load_face_model", lambda key: models.get(key))
-    monkeypatch.setattr(auth_module.cv2, "VideoCapture", lambda idx: _FakeCapture(np.zeros((4, 4, 3), dtype=np.uint8)))
+    monkeypatch.setattr(camera_session_module.cv2, "VideoCapture", lambda idx: _FakeCapture(np.zeros((4, 4, 3), dtype=np.uint8)))
 
     matching = _noisy(profile_a, noise_seed=3)
     monkeypatch.setattr(auth_module, "_detect_and_embed", lambda frame: matching)
