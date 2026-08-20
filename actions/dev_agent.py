@@ -390,6 +390,9 @@ def _record_change(
     store["entries"] = entries[-200:]
     _save_changelog_store(store)
 
+    from actions.notify import notify_user
+    notify_user(f"Jarvis updated {file_rel}: {change}"[:300])
+
 
 def _format_changelog(limit: int = 10) -> str:
     store = _load_changelog_store()
