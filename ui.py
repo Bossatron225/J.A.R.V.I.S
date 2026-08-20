@@ -4281,10 +4281,10 @@ class MainWindow(QMainWindow):
     def _get_audio_latency_profile(self) -> str:
         cfg = _read_full_config()
         prof = str(cfg.get("audio_latency_profile", "balanced") or "balanced").strip().lower()
-        return prof if prof in {"aggressive", "balanced", "safe"} else "balanced"
+        return prof if prof in {"aggressive", "balanced", "safe", "responsive"} else "balanced"
 
     def _toggle_audio_profile(self):
-        order = ["aggressive", "balanced", "safe"]
+        order = ["aggressive", "balanced", "safe", "responsive"]
         current = self._get_audio_latency_profile()
         try:
             idx = order.index(current)
