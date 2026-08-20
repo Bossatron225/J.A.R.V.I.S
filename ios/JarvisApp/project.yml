@@ -28,5 +28,3 @@ targets:
         TARGETED_DEVICE_FAMILY: "1" # iPhone only
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
         ENABLE_PREVIEWS: true
-    capabilities:
-      - com.apple.developer.usernotifications.time-sensitive: {}
