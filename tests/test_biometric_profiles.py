@@ -85,6 +85,63 @@ def test_verify_biometric_security_matches_enrolled_profile(monkeypatch) -> None
     assert file_controller_module.verify_biometric_security("", "visual scan of james lumsden face") is True
 
 
+def test_security_biometrics_status_reports_primary_profile(monkeypatch) -> None:
+    monkeypatch.setattr(
+        file_controller_module,
+        "_AUTHORIZED_PROFILES",
+        {"primary": {"name": "James Lumsden", "voice_prints": [], "visual_signatures": [], "clearance_level": "omega"}, "authorized": {}},
+    )
+
+    result = file_controller_module.security_biometrics(parameters={"action": "status"})
+
+    assert "James Lumsden" in result
+
+
+def test_security_biometrics_detect_person_matches_enrolled_profile(monkeypatch) -> None:
+    monkeypatch.setattr(
+        file_controller_module,
+        "_AUTHORIZED_PROFILES",
+        {
+            "primary": {
+                "name": "James Lumsden",
+                "voice_prints": [],
+                "visual_signatures": ["james lumsden face"],
+                "clearance_level": "omega",
+            },
+            "authorized": {},
+        },
+    )
+    monkeypatch.setattr(file_controller_module, "_AUTHORIZED_PERSONNEL", {"james lumsden"})
+    file_controller_module.verify_biometric_security.cache_clear()
+
+    result = file_controller_module.security_biometrics(parameters={
+        "action": "detect_person",
+        "target_identity": "james lumsden",
+        "visual_signature": "james lumsden face",
+    })
+
+    assert "identified as authorized user" in result
+
+
+def test_security_biometrics_is_callable_via_local_worker_relay(monkeypatch) -> None:
+    """Same function, reached through the VPS-to-Mac relay path (local_worker.py)
+    instead of main.py's in-process tool dispatch — regression test for the gap
+    where this tool previously had no ACTION_HANDLERS entry."""
+    from local_worker import LocalWorker
+
+    monkeypatch.setattr(
+        file_controller_module,
+        "_AUTHORIZED_PROFILES",
+        {"primary": {"name": "James Lumsden", "voice_prints": [], "visual_signatures": [], "clearance_level": "omega"}, "authorized": {}},
+    )
+
+    worker = LocalWorker()
+    result = worker.execute_local_action("security_biometrics", {"action": "status"})
+
+    assert result["status"] == "completed"
+    assert "James Lumsden" in result["result"]
+
+
 def test_default_profile_registry_contains_only_primary_profile() -> None:
     profiles = file_controller_module.get_authorized_profiles()
 
