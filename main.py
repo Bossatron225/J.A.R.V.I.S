@@ -4878,6 +4878,7 @@ class JarvisLive:
             return
         from auth import check_frame_for_visitor
         from actions.camera_session import get_camera_session
+        from actions.visitor_log import is_watch_active
 
         cfg = self._visitor_watch_cfg
         camera_index = int(cfg.get("camera_index", 0) or 0)
@@ -4888,10 +4889,20 @@ class JarvisLive:
 
         session = get_camera_session(camera_index)
         prev_gray = None
+        was_active = True
         stop = self._visitor_monitor_stop
 
         while not stop.is_set():
             try:
+                if not is_watch_active():
+                    if was_active:
+                        session.release()  # drop the camera + indicator light while disengaged
+                        prev_gray = None
+                        was_active = False
+                    stop.wait(1.0)
+                    continue
+                was_active = True
+
                 if self._local_speech_gate_active():
                     stop.wait(1.0)
                     continue
