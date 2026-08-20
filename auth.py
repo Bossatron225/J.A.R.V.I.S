@@ -495,18 +495,13 @@ def verify_face(reference_image: str | os.PathLike[str] | None = None, camera_in
         if reference_face is None:
             return False, "No face was detected in the reference image"
 
-        capture = cv2.VideoCapture(camera_index)
-        if not capture.isOpened():
-            capture.release()
-            return False, "No webcam was available"
-
+        session = get_camera_session(camera_index)
         frames = []
         # Read a few frames so camera auto-exposure can settle.
         for _ in range(14):
-            ok, frame = capture.read()
-            if ok and frame is not None:
+            frame = session.get_frame()
+            if frame is not None:
                 frames.append(frame)
-        capture.release()
         if not frames:
             return False, "Unable to read a frame from the webcam"
 
