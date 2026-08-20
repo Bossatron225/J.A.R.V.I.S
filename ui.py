@@ -4327,6 +4327,16 @@ class MainWindow(QMainWindow):
                 }}
                 QPushButton:hover {{ background: #001c0d; }}
             """)
+        elif prof == "responsive":
+            self._audio_profile_btn.setText("🎧  AUDIO PROFILE: RESPONSIVE")
+            self._audio_profile_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: #001a14; color: {C.GREEN};
+                    border: 1px solid {C.GREEN}; border-radius: 3px;
+                    text-align: left; padding: 0 8px;
+                }}
+                QPushButton:hover {{ background: #00241c; }}
+            """)
         else:
             self._audio_profile_btn.setText("🎧  AUDIO PROFILE: BALANCED")
             self._audio_profile_btn.setStyleSheet(f"""
