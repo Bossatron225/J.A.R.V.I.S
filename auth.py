@@ -44,7 +44,11 @@ def _load_profile_detector():
     return detector
 
 
+@lru_cache(maxsize=1)
 def _load_detectors():
+    """Cascades are stateless once loaded, and this now runs per-frame in a burst
+    (up to ~16 frames per scan/enrollment sample), so cache instead of re-reading
+    the XML files from disk on every single frame."""
     return _load_detector(), _load_profile_detector()
 
 
