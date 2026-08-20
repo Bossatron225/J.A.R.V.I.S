@@ -334,6 +334,7 @@ class VPSOrchestrator:
         self._brain_thread = None
         self._brain_state = "stopped"
         self._brain_error = ""
+        self._brain_ui = None  # set to the live _HeadlessUI instance once _run_vps_brain starts it
         self.started_at = datetime.now(timezone.utc).isoformat()
         self.public_entry = os.getenv("JARVIS_PUBLIC_URL") or os.getenv("PUBLIC_ENTRY_URL") or "https://jarvis.jarvisyourdomain.com"
         self.mode = "vps"
