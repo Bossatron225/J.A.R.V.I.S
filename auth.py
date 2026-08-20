@@ -284,7 +284,6 @@ def verify_face_against_model_bytes(
         return False, "opencv-unavailable"
 
     gate = _lbph_threshold() if threshold is None else threshold
-    detector = _load_detector()
     best_confidence = None
     face_seen = False
 
