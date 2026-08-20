@@ -407,6 +407,7 @@ class VPSOrchestrator:
 
             ui = _HeadlessUI()
             ui.dashboard = self.dashboard_server
+            self._brain_ui = ui
             jarvis = JarvisLive(
                 ui,
                 dashboard=self.dashboard_server,
