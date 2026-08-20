@@ -857,6 +857,28 @@ def create_app() -> Flask:
         xff = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
         return xff or request.remote_addr or "unknown"
 
+    def _clear_brain_biometric_lock() -> None:
+        """A passed web face-scan only gates the HTTP/WS layer (dashboard._token_biometric_ok);
+        it doesn't by itself clear _HeadlessUI._biometric_locked, which is what Jarvis's own
+        command handling actually checks and — on VPS/headless — otherwise only accepts the
+        manual override code for (see main.py's _HeadlessUI, "no automatic unlock path").
+        Without this, a user who passes the face scan still gets asked for the override code
+        the moment they try to interact. ensure_brain_started() may still be spinning the
+        brain thread up, so poll briefly for orchestrator._brain_ui to appear."""
+        orchestrator.ensure_brain_started()
+        deadline = time.time() + 3.0
+        while time.time() < deadline:
+            brain_ui = orchestrator._brain_ui
+            if brain_ui is not None:
+                unlock_fn = getattr(brain_ui, "unlock_via_biometric", None)
+                if callable(unlock_fn):
+                    try:
+                        unlock_fn()
+                    except Exception:
+                        pass
+                return
+            time.sleep(0.1)
+
     @app.get("/api/biometric/status")
     def api_biometric_status():
         dashboard = orchestrator.dashboard_server
