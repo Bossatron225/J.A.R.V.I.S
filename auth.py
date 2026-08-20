@@ -229,7 +229,7 @@ def verify_face_against_model(
             capture.release()
             return False, "no-webcam"
 
-        detector = _load_detector()
+        detectors = _load_detectors()
         best_confidence = None
         face_seen = False
         for _ in range(num_frames):
@@ -237,7 +237,7 @@ def verify_face_against_model(
             if not ok or frame is None:
                 continue
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            face = _extract_primary_face(gray, detector)
+            face = _extract_primary_face(gray, detectors)
             if face is None:
                 continue
             face_seen = True
