@@ -50,6 +50,7 @@ ACTION_HANDLERS = {
     'desktop_control': ('actions.desktop', 'desktop_control'),
     'file_controller': ('actions.file_controller', 'file_controller'),
     'find_my': ('actions.find_my', 'find_my'),
+    'gemini_relay': ('actions.gemini_relay', 'gemini_relay'),
     'imessage_control': ('actions.imessage_integration', 'imessage_control'),
     'mail_control': ('actions.mail_integration', 'mail_control'),
     'reminder': ('actions.reminder', 'reminder'),
