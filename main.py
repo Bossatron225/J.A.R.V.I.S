@@ -3059,6 +3059,7 @@ class JarvisLive:
             parts.append(personal_context)
         parts.append(sys_prompt)
 
+        turn_cfg = self._load_turn_detection_config()
         cfg_kwargs: dict = dict(
             response_modalities=["AUDIO"],
             output_audio_transcription={},
@@ -3066,6 +3067,14 @@ class JarvisLive:
             system_instruction="\n".join(parts),
             tools=[{"function_declarations": TOOL_DECLARATIONS}],
             session_resumption=types.SessionResumptionConfig(),
+            realtime_input_config=types.RealtimeInputConfig(
+                automatic_activity_detection=types.AutomaticActivityDetection(
+                    start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
+                    end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
+                    prefix_padding_ms=turn_cfg["prefix_padding_ms"],
+                    silence_duration_ms=turn_cfg["silence_duration_ms"],
+                )
+            ),
         )
         # speech_config is only valid when Gemini itself produces audio
         if not self._use_external_tts:
