@@ -22,11 +22,30 @@ _LBPH_LABEL = 1
 _LBPH_DEFAULT_THRESHOLD = 75.0
 
 
+_BUNDLED_CASCADES_DIR = Path(__file__).resolve().parent / "config" / "haarcascades"
+
+
+def _cascade_path(filename: str) -> str:
+    """opencv-contrib-python 5.0.0.93 (the version pinned in requirements.txt) shipped
+    cv2.data.haarcascades as an empty directory — no XML files at all, on both macOS
+    and Linux wheels, confirmed by inspecting the installed package's file list. Every
+    face detection call was silently falling back to a centered guess-crop with zero
+    actual face detection, which is why recognition only ever worked when dead-on and
+    centered. Cascades are bundled here (extracted from opencv-contrib-python
+    4.11.0.86, the last version confirmed to ship them) instead of depending on
+    whatever a given opencv wheel happens to include; cv2.data.haarcascades is still
+    tried first in case a future/different install does ship them."""
+    bundled = _BUNDLED_CASCADES_DIR / filename
+    if bundled.exists():
+        return str(bundled)
+    return str(Path(cv2.data.haarcascades) / filename)
+
+
 def _load_detector():
     classifier = getattr(cv2, "CascadeClassifier", None)
     if classifier is None:
         return None
-    detector = classifier(str(Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml"))
+    detector = classifier(_cascade_path("haarcascade_frontalface_default.xml"))
     if hasattr(detector, "empty") and detector.empty():
         return None
     return detector
@@ -38,7 +57,7 @@ def _load_profile_detector():
     classifier = getattr(cv2, "CascadeClassifier", None)
     if classifier is None:
         return None
-    detector = classifier(str(Path(cv2.data.haarcascades) / "haarcascade_profileface.xml"))
+    detector = classifier(_cascade_path("haarcascade_profileface.xml"))
     if hasattr(detector, "empty") and detector.empty():
         return None
     return detector
