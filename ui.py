@@ -1514,6 +1514,11 @@ class ManageProfilesOverlay(QWidget):
         if not cap.isOpened():
             cap.release()
             return
+        try:
+            from actions.camera_session import apply_target_resolution
+            apply_target_resolution(cap)
+        except Exception:
+            pass
         self._camera_cap = cap
         try:
             if self._preview_timer is None:
