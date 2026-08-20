@@ -49,8 +49,14 @@ struct ChatView: View {
             }
             .padding()
         }
-        .onAppear(perform: connect)
-        .onDisappear { socket.disconnect() }
+        .onAppear {
+            audioPlayer.start()
+            connect()
+        }
+        .onDisappear {
+            socket.disconnect()
+            audioPlayer.stop()
+        }
     }
 
     private var statusBar: some View {
@@ -62,6 +68,16 @@ struct ChatView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             Spacer()
+            Button {
+                audioEnabled.toggle()
+                if audioEnabled {
+                    audioPlayer.start()
+                } else {
+                    audioPlayer.stop()
+                }
+            } label: {
+                Image(systemName: audioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+            }
         }
         .padding(.horizontal)
         .padding(.top, 8)
