@@ -3164,6 +3164,7 @@ class JarvisLive:
             "game_updater": game_updater,
             "flight_finder": flight_finder,
             "system_status": get_system_status,
+            "visitor_log": visitor_log,
         }
         if name in unavailable_handlers and not callable(unavailable_handlers[name]):
             result = (
