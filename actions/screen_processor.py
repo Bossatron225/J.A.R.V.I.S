@@ -654,7 +654,7 @@ def _capture_camera() -> tuple[bytes, str]:
         with get_camera_session(index).request_exclusive():
             proc = subprocess.run(
                 [sys.executable, "-c", _CAMERA_SUBPROCESS_SRC,
-                 str(index), str(backend), str(_IMG_MAX_W), str(_IMG_MAX_H), str(_JPEG_Q)],
+                 str(index), str(backend), str(_CAMERA_IMG_MAX_W), str(_CAMERA_IMG_MAX_H), str(_JPEG_Q)],
                 capture_output=True, text=True, timeout=15,
             )
     except subprocess.TimeoutExpired:
