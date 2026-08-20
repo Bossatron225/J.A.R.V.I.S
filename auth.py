@@ -127,8 +127,7 @@ def _extract_face_for_training(image_bytes: bytes):
         if frame is None:
             return None
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        detector = _load_detector()
-        face = _extract_primary_face(gray, detector)
+        face = _extract_primary_face(gray, _load_detectors())
         if face is None:
             return None
         return _normalize_face_crop(face)
