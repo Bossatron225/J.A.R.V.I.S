@@ -1619,6 +1619,7 @@ class JarvisLive:
         self._visual_watch_cfg = self._load_visual_watch_config()
         self._visitor_watch_cfg = self._load_visitor_watch_config()
         self._visitor_last_alert: dict[str, float] = {}
+        self._known_visitor_last_alert: dict[str, float] = {}
         self._visual_monitor = VisualMonitorRegistry(API_CONFIG_PATH)
         self._visual_error_seen: dict[str, tuple[str, float]] = {}
         self._visual_resync_last: float = 0.0
