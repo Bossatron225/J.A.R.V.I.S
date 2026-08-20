@@ -31,6 +31,10 @@ def _isolate_visitor_storage(tmp_path, monkeypatch):
     monkeypatch.setattr(visitor_log_module, "LOG_PATH", tmp_path / "visitor_log.jsonl")
     monkeypatch.setattr(visitor_log_module, "CLUSTERS_PATH", tmp_path / "visitor_clusters.json")
     monkeypatch.setattr(visitor_log_module, "SNAPSHOTS_DIR", tmp_path / "visitor_snapshots")
+    monkeypatch.setattr(visitor_log_module, "WATCH_STATE_PATH", tmp_path / "visitor_watch_state.json")
+    # The engaged/disengaged flag is cached in-memory after first read — reset
+    # it per test so one test's start/stop doesn't leak into the next.
+    monkeypatch.setattr(visitor_log_module, "_watch_active", None)
     # CameraSession instances are cached per camera index at module scope — clear
     # that cache so each test gets a fresh session instead of reusing whatever a
     # prior test's fake capture left behind.
