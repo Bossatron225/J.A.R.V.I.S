@@ -17,24 +17,32 @@ requires_face_module = pytest.mark.skipif(
 )
 
 
-def _make_synthetic_face(freq_x: float = 1.0, freq_y: float = 1.0, phase: float = 0.0):
-    """LBPH compares *texture*, so a flat/random image has no structure for it to key
-    off of — use a smooth 2D sinusoid instead, which behaves like real face texture
-    for testing purposes (distinct identities => distinct frequencies/phase)."""
-    xx, yy = np.meshgrid(np.linspace(0, 4 * np.pi, 200), np.linspace(0, 4 * np.pi, 200))
-    pattern = 128 + 100 * np.sin(xx * freq_x + phase) * np.cos(yy * freq_y)
-    return np.clip(pattern, 0, 255).astype(np.uint8)
+requires_sface = pytest.mark.skipif(
+    not (auth_module._HAS_SFACE and auth_module._SFACE_MODEL_PATH.exists()),
+    reason="requires opencv-contrib-python's FaceRecognizerSF plus the bundled SFace model file",
+)
 
 
-def _fake_extract_for_training(base_face):
-    """Return a monkeypatch target standing in for auth._extract_face_for_training:
-    each "sample" is the same underlying face with a small deterministic amount of
-    per-sample noise, mirroring the lighting/pose variance real enrollment frames have."""
+def _make_synthetic_embedding(seed: int = 0):
+    """A fake 128-d SFace embedding standing in for one "identity" — deterministic
+    per seed so distinct seeds behave like distinct people."""
+    rng = np.random.default_rng(seed)
+    vec = rng.normal(0, 1, size=128).astype(np.float32)
+    return vec / np.linalg.norm(vec)
+
+
+def _fake_embed_bytes(base_embedding):
+    """Return a monkeypatch target standing in for auth._embed_image_bytes: each
+    "sample" is the same underlying identity embedding with a small deterministic
+    amount of per-sample noise, mirroring real-world lighting/pose variance. Only the
+    (needs a real face image) detect+align+embed step is faked — the actual
+    cosine-similarity matching still runs for real via cv2.FaceRecognizerSF.match."""
 
     def _fake(image_bytes):
         seed = image_bytes[0] if image_bytes else 0
-        noise = np.random.default_rng(seed).integers(-8, 8, size=base_face.shape)
-        return np.clip(base_face.astype(int) + noise, 0, 255).astype(np.uint8)
+        noise = np.random.default_rng(seed).normal(0, 0.02, size=base_embedding.shape)
+        noisy = (base_embedding + noise).astype(np.float32)
+        return noisy / np.linalg.norm(noisy)
 
     return _fake
 
