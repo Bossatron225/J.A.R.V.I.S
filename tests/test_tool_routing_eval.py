@@ -31,6 +31,7 @@ ROUTING_CASES = [
     ("take a look at what's on my screen right now", "screen_process"),
     ("search the web for the latest iPhone price", "web_search"),
     ("what time is it", "get_current_time"),
+    ("has anyone been seen at the door recently", "visitor_log"),
 ]
 
 
