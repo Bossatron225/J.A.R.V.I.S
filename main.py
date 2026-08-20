@@ -5293,7 +5293,7 @@ class _HeadlessUI:
         return True, "Override accepted. BiometricLock_Protocol cleared."
 
     def unlock_via_biometric(self, *, source: str = "web_dashboard_face_scan") -> tuple[bool, str]:
-        """Clears the lock after the web dashboard's own LBPH face match already
+        """Clears the lock after the web dashboard's own SFace embedding match already
         succeeded (auth.verify_face_against_model_bytes, run against the vps_web
         profile in vps_orchestrator.py's /api/biometric/verify) — this method doesn't
         re-check anything, it just records the unlock, mirroring unlock_via_override's
