@@ -25,3 +25,10 @@ bin/python_app_backup/
 voice_clone/dataset/
 voice_clone/rvc_models/*.pth
 voice_clone/rvc_models/*.index
+
+# iOS app — JarvisApp.xcodeproj is generated from project.yml via `xcodegen generate`,
+# not hand-edited, so it's regenerable rather than source (also keeps machine-specific
+# scheme/user-state cruft out of the auto-commit watcher's sweep).
+ios/JarvisApp/JarvisApp.xcodeproj/
+ios/**/DerivedData/
+ios/**/*.xcuserstate
