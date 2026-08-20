@@ -330,6 +330,8 @@ class VPSOrchestrator:
         self.queue = deque()
         self.lock = threading.Lock()
         self.runtime_bridge = VPSRuntimeBridge()
+        from core import local_relay
+        local_relay.set_runtime_bridge(self.runtime_bridge)
         self._brain_lock = threading.Lock()
         self._brain_thread = None
         self._brain_state = "stopped"
