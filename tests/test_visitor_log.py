@@ -201,6 +201,52 @@ def test_visitor_log_tool_summarizes_sightings() -> None:
     assert "unrecognized visitor" in result.lower()
 
 
+# ── Nanny-cam protocol start/stop/status ────────────────────────────────────
+
+def test_is_watch_active_defaults_to_true_when_no_state_saved() -> None:
+    assert visitor_log_module.is_watch_active() is True
+
+
+def test_set_watch_active_persists_across_in_memory_reset(monkeypatch) -> None:
+    visitor_log_module.set_watch_active(False)
+    assert visitor_log_module.is_watch_active() is False
+
+    # Simulate a fresh process: in-memory cache gone, must reload from disk.
+    monkeypatch.setattr(visitor_log_module, "_watch_active", None)
+    assert visitor_log_module.is_watch_active() is False
+
+
+def test_visitor_log_tool_start_watch_engages() -> None:
+    visitor_log_module.set_watch_active(False)
+
+    result = visitor_log_module.visitor_log({"action": "start_watch"})
+
+    assert "engaged" in result.lower()
+    assert visitor_log_module.is_watch_active() is True
+
+
+def test_visitor_log_tool_stop_watch_disengages() -> None:
+    result = visitor_log_module.visitor_log({"action": "stop_watch"})
+
+    assert "disengaged" in result.lower()
+    assert visitor_log_module.is_watch_active() is False
+
+
+def test_visitor_log_tool_watch_status_reports_current_state() -> None:
+    visitor_log_module.set_watch_active(False)
+    result = visitor_log_module.visitor_log({"action": "watch_status"})
+    assert "disengaged" in result.lower()
+
+    visitor_log_module.set_watch_active(True)
+    result = visitor_log_module.visitor_log({"action": "watch_status"})
+    assert "engaged" in result.lower()
+
+
+def test_visitor_log_tool_recognizes_natural_phrasing_aliases() -> None:
+    assert "engaged" in visitor_log_module.visitor_log({"action": "engage"}).lower()
+    assert "disengaged" in visitor_log_module.visitor_log({"action": "disengage"}).lower()
+
+
 # ── main._should_alert_visitor ──────────────────────────────────────────────
 
 def test_should_alert_visitor_first_sighting_alerts() -> None:
