@@ -537,7 +537,7 @@ def _personalize_ddg_query(query: str, mode: str) -> str:
     return query
 
 
-def _gemini_search(query: str) -> str:
+def _gemini_search_direct(query: str) -> str:
     from google import genai
 
     client   = genai.Client(api_key=_get_api_key())
@@ -556,6 +556,26 @@ def _gemini_search(query: str) -> str:
     if not text:
         raise ValueError("Gemini returned an empty response.")
     return text
+
+
+def _gemini_search(query: str) -> str:
+    """Search grounding is geo-restricted for this VPS's datacenter region ("User
+    location is not supported for the API use") but works fine from the Mac — see
+    core/local_relay.py. Route there when running headless on the VPS; call Gemini
+    directly otherwise (this is also what runs *inside* the relay call on the Mac
+    itself, since local_relay.is_available() is only ever true on the VPS)."""
+    from core import local_relay
+    if local_relay.is_available():
+        result = local_relay.call("gemini_relay", {"kind": "search", "query": query}, timeout=25.0)
+        payload = result.get("result") if isinstance(result, dict) else None
+        if isinstance(payload, dict) and payload.get("ok") and payload.get("text"):
+            return payload["text"]
+        raise RuntimeError(
+            (isinstance(payload, dict) and payload.get("error"))
+            or result.get("message")
+            or "local Gemini relay failed"
+        )
+    return _gemini_search_direct(query)
 
 
 def _ddg_search(query: str, max_results: int = 6) -> list[dict]:
