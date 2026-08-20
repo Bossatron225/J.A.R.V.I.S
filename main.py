@@ -3711,6 +3711,10 @@ class JarvisLive:
                     primary_name = str(primary.get("name") or target_identity or "James Lumsden").strip()
                     result = f"Security protocol status: Biometrics online. Primary profile: {primary_name}."
 
+            elif name == "visitor_log":
+                r = await loop.run_in_executor(None, lambda: visitor_log(parameters=args))
+                result = r or "Done."
+
             else:
                 result = f"Unknown tool: {name}"
 
