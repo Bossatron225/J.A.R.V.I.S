@@ -138,6 +138,11 @@ _IMG_MAX_W = 1280
 _IMG_MAX_H = 720
 _JPEG_Q    = 82
 
+# Camera captures (vision Q&A) get their own, higher cap than screen/window
+# captures above — aim for 4K, matching actions/camera_session.py's request.
+_CAMERA_IMG_MAX_W = 3840
+_CAMERA_IMG_MAX_H = 2160
+
 _SYSTEM_PROMPT = (
     "You are JARVIS, James Lumsden's AI assistant. "
     "You are given an image from either the user's screen or their webcam. "
