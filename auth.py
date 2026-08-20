@@ -17,9 +17,16 @@ except Exception:  # pragma: no cover - optional dependency
     np = None
 
 _HAS_FACE_MODULE = bool(cv2 is not None and hasattr(cv2, "face"))
-_LBPH_FACE_SIZE = (200, 200)
-_LBPH_LABEL = 1
-_LBPH_DEFAULT_THRESHOLD = 75.0
+_HAS_SFACE = bool(cv2 is not None and hasattr(cv2, "FaceDetectorYN") and hasattr(cv2, "FaceRecognizerSF"))
+
+_FACE_MODELS_DIR = Path(__file__).resolve().parent / "config" / "face_models"
+_YUNET_MODEL_PATH = _FACE_MODELS_DIR / "face_detection_yunet.onnx"
+_SFACE_MODEL_PATH = _FACE_MODELS_DIR / "face_recognition_sface.onnx"
+
+# Official OpenCV Zoo recommended decision threshold for FaceRecognizerSF cosine
+# similarity (calibrated on LFW) — same identity if score is at or above this.
+_SFACE_DEFAULT_THRESHOLD = 0.363
+_YUNET_SCORE_THRESHOLD = 0.6
 
 
 _BUNDLED_CASCADES_DIR = Path(__file__).resolve().parent / "config" / "haarcascades"
