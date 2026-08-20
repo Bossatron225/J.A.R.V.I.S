@@ -168,8 +168,8 @@ def enroll_biometric_profile(
     """Enrolls a biometric profile with stored voice and visual signature hints for later verification.
 
     `visual_samples`, when provided, should span multiple head angles/distances captured
-    during a guided enrollment; they are used to train a per-profile LBPH face model in
-    addition to the legacy single `visual_sample` snapshot.
+    during a guided enrollment; they are used to train a per-profile SFace embedding model
+    in addition to the legacy single `visual_sample` snapshot.
     """
     global _AUTHORIZED_PROFILES
 
