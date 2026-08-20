@@ -659,19 +659,8 @@ def _gemini_headlines(n: int = 5) -> tuple[list[str], str]:
     Returns (headline_list, raw_text_for_display).
     """
     import re
-    from google import genai
 
-    client = genai.Client(api_key=_get_api_key())
-    response = client.models.generate_content(
-        model="models/gemini-flash-lite-latest",
-        contents=f"Current world news: {n} headlines. Numbered list, titles only.",
-        config={"tools": [{"google_search": {}}]},
-    )
-
-    raw = ""
-    for part in response.candidates[0].content.parts:
-        if hasattr(part, "text") and part.text:
-            raw += part.text
+    raw = _gemini_search(f"Current world news: {n} headlines. Numbered list, titles only.")
 
     headlines = []
     for line in raw.strip().split("\n"):
