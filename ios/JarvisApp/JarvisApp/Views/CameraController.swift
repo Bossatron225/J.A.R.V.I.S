@@ -57,13 +57,16 @@ final class CameraController: NSObject, ObservableObject {
     }
 
     /// Captures one JPEG frame, base64-encoded — the exact shape /api/biometric/verify
-    /// and /api/biometric/enroll expect in their "frames" array.
+    /// and /api/biometric/enroll expect in their "frames" array. Format is forced to
+    /// JPEG explicitly: AVCapturePhotoOutput defaults to HEIC on most modern iPhones,
+    /// which auth.py's cv2.imdecode (OpenCV, no HEIC codec) can't read at all — every
+    /// frame would silently fail to decode server-side with no error surfaced here.
     func captureFrameBase64() async -> String? {
         await withCheckedContinuation { continuation in
             captureCompletion = { data in
                 continuation.resume(returning: data?.base64EncodedString())
             }
-            let settings = AVCapturePhotoSettings()
+            let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
             photoOutput.capturePhoto(with: settings, delegate: self)
         }
     }
