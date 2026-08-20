@@ -938,6 +938,7 @@ def create_app() -> Flask:
         dashboard._record_biometric_attempt(ip, ok)
         if ok:
             dashboard._mark_biometric_verified(tok)
+            _clear_brain_biometric_lock()
             return jsonify({"ok": True, "reason": reason})
         return jsonify({"ok": False, "error": reason}), 401
 
