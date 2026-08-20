@@ -4909,7 +4909,24 @@ class JarvisLive:
                     None,
                     lambda: capture_unknown_visitor_check(profile_keys, camera_index=camera_index),
                 )
-                if not check or check.get("status") != "unknown":
+                if not check:
+                    continue
+
+                if check.get("status") == "known":
+                    profile_key = str(check.get("profile_key", ""))
+                    now = time.monotonic()
+                    if not _should_alert_visitor(profile_key, self._known_visitor_last_alert, cooldown, now):
+                        continue
+                    self._known_visitor_last_alert[profile_key] = now
+
+                    if profile_key == "primary":
+                        name = (profiles.get("primary") or {}).get("name") or "You"
+                    else:
+                        name = (profiles.get("authorized") or {}).get(profile_key, {}).get("name") or profile_key
+                    notify_user(f"{name} was just seen at the camera.")
+                    continue
+
+                if check.get("status") != "unknown":
                     continue
 
                 entry = await loop.run_in_executor(
