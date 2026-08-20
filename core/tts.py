@@ -761,6 +761,15 @@ def create_tts_player(
             voice_id=voice_id,
             audio_sink=audio_sink,
         )
+    elif engine_name == "cloned_voice":
+        base_dir = Path(config.get("cloned_voice_dir", "voice_clone/rvc_models"))
+        engine = ClonedVoiceEngine(
+            model_path=str(base_dir / "jarvis.pth"),
+            index_path=str(base_dir / "jarvis.index"),
+            kokoro_voice=config.get("cloned_voice_base", "af_heart"),
+            device=config.get("cloned_voice_device", "cpu"),
+            audio_sink=audio_sink,
+        )
     else:   # edgetts (default)
         voice  = config.get("tts_voice", "en-US-GuyNeural")
         engine = EdgeTTSEngine(
