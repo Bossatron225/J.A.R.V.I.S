@@ -250,6 +250,7 @@ else:
     enroll_biometric_profile = None
     get_authorized_profiles = None
     verify_biometric_security = None
+    security_biometrics_action = None
     code_helper = None
     dev_agent = None
     REBOOT_MARKER = None
