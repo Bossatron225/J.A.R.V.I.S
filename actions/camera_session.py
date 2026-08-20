@@ -53,6 +53,7 @@ class CameraSession:
         if not cap.isOpened():
             cap.release()
             raise RuntimeError(f"Camera index {self.camera_index} could not be opened.")
+        apply_target_resolution(cap)
         self._capture = cap
 
     def _close_locked(self) -> None:
