@@ -3081,6 +3081,7 @@ class JarvisLive:
             "reminder",
             "security_biometrics",
             "send_message",
+            "visitor_log",
             "youtube_video",
         }
         request_local_action = getattr(self._remote_bridge, "request_local_action", None)
