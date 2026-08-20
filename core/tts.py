@@ -17,6 +17,7 @@ import sys
 import threading
 import wave
 from contextlib import redirect_stderr
+from pathlib import Path
 from typing import Callable, Optional
 
 import numpy as np
