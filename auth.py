@@ -318,7 +318,7 @@ def capture_unknown_visitor_check(
     camera_index: int = 0,
     num_frames: int = 3,
     threshold: float | None = None,
-) -> "dict | None":
+) -> dict | None:
     """Passive poll (not a security decision, so a short burst is enough): grab a
     few frames, detect the first face, and check it against every enrolled
     profile. Returns {"status": "known", "profile_key", "score"},
