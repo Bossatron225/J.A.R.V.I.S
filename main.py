@@ -3759,47 +3759,7 @@ class JarvisLive:
                 result = "Shutting down JARVIS."
 
             elif name == "security_biometrics":
-                action = str(args.get("action", "status")).strip().lower()
-                target_identity = str(args.get("target_identity", "James Lumsden")).strip()
-
-                if action == "enroll":
-                    profile_name = str(args.get("name") or target_identity or "James Lumsden").strip()
-                    profile_id = str(args.get("profile_id") or profile_name.lower().replace(" ", "_")).strip()
-                    voice_text = str(args.get("voice_print") or target_identity or profile_name).strip()
-                    visual_text = str(args.get("visual_signature") or target_identity or profile_name).strip()
-                    make_primary = bool(args.get("make_primary", True))
-                    clearance = str(args.get("clearance_level") or "omega").strip()
-                    result = enroll_biometric_profile(
-                        profile_id=profile_id,
-                        name=profile_name,
-                        voice_print=voice_text,
-                        visual_signature=visual_text,
-                        clearance_level=clearance,
-                        make_primary=make_primary,
-                    )
-                elif action == "detect_person":
-                    visual_text = str(args.get("visual_signature") or target_identity or "").strip()
-                    ok = verify_biometric_security("", visual_text)
-                    result = (
-                        f"Visual Person Detection protocol executed: Person identified as authorized user ({target_identity}). Security clearance verified."
-                        if ok else
-                        f"Visual Person Detection protocol executed: No matching visual profile was found for {target_identity}."
-                    )
-                elif action == "verify_voice":
-                    voice_text = str(args.get("voice_print") or target_identity or "").strip()
-                    ok = verify_biometric_security(voice_text, "")
-                    result = (
-                        f"Voice Recognition protocol executed: Voiceprint matched for {target_identity}. Access granted."
-                        if ok else
-                        f"Voice Recognition protocol executed: No matching voice profile was found for {target_identity}."
-                    )
-                elif action == "calibrate":
-                    result = "Biometric sensors calibrated successfully. Voice print and visual model updated."
-                else:
-                    profiles = get_authorized_profiles()
-                    primary = profiles.get("primary") or {}
-                    primary_name = str(primary.get("name") or target_identity or "James Lumsden").strip()
-                    result = f"Security protocol status: Biometrics online. Primary profile: {primary_name}."
+                result = security_biometrics_action(parameters=args)
 
             elif name == "visitor_log":
                 r = await loop.run_in_executor(None, lambda: visitor_log(parameters=args))
