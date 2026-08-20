@@ -4967,7 +4967,7 @@ class JarvisLive:
             name = (profiles.get("authorized") or {}).get(profile_key, {}).get("name") or profile_key
         notify_user(f"{name} was just seen at the camera.")
 
-    def _handle_unknown_visitor_seen(self, result: dict, camera_index: int, cluster_window_days: int, now: float, cooldown: float, debounce: float) -> str | None:
+    def _handle_unknown_visitor_seen(self, result: dict, camera_index: int, cluster_window_days: int, now: float, cooldown: float) -> str | None:
         from auth import embedding_similarity, _sface_threshold
 
         embedding = result.get("embedding")
