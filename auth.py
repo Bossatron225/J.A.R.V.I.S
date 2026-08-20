@@ -28,6 +28,11 @@ _SFACE_MODEL_PATH = _FACE_MODELS_DIR / "face_recognition_sface.onnx"
 _SFACE_DEFAULT_THRESHOLD = 0.363
 _YUNET_SCORE_THRESHOLD = 0.6
 
+# Only one caller should hold the webcam open at a time — without this, a
+# biometric-lock check and a background visitor-watch poll could both call
+# cv2.VideoCapture(same index) concurrently and glitch each other.
+_camera_lock = threading.Lock()
+
 
 _BUNDLED_CASCADES_DIR = Path(__file__).resolve().parent / "config" / "haarcascades"
 
