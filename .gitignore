@@ -20,3 +20,8 @@ config/override_audit.log
 config/biometric_models/
 bin/jarvis_python
 bin/python_app_backup/
+
+# Local voice clone — generated audio + trained voice model, not source
+voice_clone/dataset/
+voice_clone/rvc_models/*.pth
+voice_clone/rvc_models/*.index
