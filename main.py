@@ -4824,6 +4824,80 @@ class JarvisLive:
             except Exception as e:
                 print(f"[SelfImprove] ⚠️ {e}")
 
+    async def _run_visitor_watch(self) -> None:
+        """Periodically polls the local webcam for faces that don't match any
+        enrolled household profile, logs a timestamped snapshot, and speaks a
+        one-off alert (per-visitor cooldown, not per-poll). Only the real Mac
+        app has a physical camera in the room — the VPS-embedded brain instance
+        no-ops here."""
+        if isinstance(self.ui, _HeadlessUI):
+            return
+        if not self._visitor_watch_cfg.get("enabled", True):
+            return
+        if record_unknown_sighting is None or get_authorized_profiles is None:
+            return
+
+        interval = int(self._visitor_watch_cfg.get("interval_seconds", 45) or 45)
+        camera_index = int(self._visitor_watch_cfg.get("camera_index", 0) or 0)
+        cooldown = float(self._visitor_watch_cfg.get("realert_cooldown_seconds", 1800) or 1800)
+        cluster_window_days = int(self._visitor_watch_cfg.get("cluster_window_days", 30) or 30)
+
+        await asyncio.sleep(30)
+        while True:
+            try:
+                await asyncio.sleep(interval)
+                if self._local_speech_gate_active():
+                    continue
+
+                from auth import capture_unknown_visitor_check
+
+                profiles = get_authorized_profiles()
+                profile_keys = ["primary"] + list((profiles.get("authorized") or {}).keys())
+
+                loop = asyncio.get_running_loop()
+                check = await loop.run_in_executor(
+                    None,
+                    lambda: capture_unknown_visitor_check(profile_keys, camera_index=camera_index),
+                )
+                if not check or check.get("status") != "unknown":
+                    continue
+
+                entry = await loop.run_in_executor(
+                    None,
+                    lambda: record_unknown_sighting(
+                        check.get("embedding"),
+                        frame=check.get("frame"),
+                        score=check.get("score", 0.0),
+                        camera_index=camera_index,
+                        cluster_window_days=cluster_window_days,
+                    ),
+                )
+                visitor_id = str(entry.get("visitor_id", ""))
+                self.ui.write_log(f"[VisitorWatch] Unrecognized visitor logged: {visitor_id} (sighting #{entry.get('sighting_count_at_time')})")
+
+                now = time.monotonic()
+                if not _should_alert_visitor(visitor_id, self._visitor_last_alert, cooldown, now):
+                    continue
+                self._visitor_last_alert[visitor_id] = now
+
+                if self.session:
+                    count = entry.get("sighting_count_at_time", 1)
+                    repeat_note = f" This is their {count}th sighting." if count > 1 else ""
+                    prompt = (
+                        f"[SYSTEM_ALERT] An unrecognized visitor was just seen at the camera.{repeat_note} "
+                        "Briefly let the user know, naturally."
+                    )
+                    await self.session.send_client_content(
+                        turns={"parts": [{"text": prompt}]},
+                        turn_complete=True,
+                    )
+            except RuntimeError as e:
+                if "cannot schedule new futures after shutdown" in str(e).lower():
+                    return
+                print(f"[VisitorWatch] ⚠️ {e}")
+            except Exception as e:
+                print(f"[VisitorWatch] ⚠️ {e}")
+
     # ── Phone audio relay ────────────────────────────────────────────────        
 
     async def _relay_phone_audio(self) -> None:
