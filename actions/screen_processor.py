@@ -639,12 +639,17 @@ def _capture_camera() -> tuple[bytes, str]:
     # asyncio worker threads), that handshake fails silently no matter how
     # it's retried. A short-lived, single-threaded subprocess sidesteps that
     # entirely — it's the same shape of process that reliably works standalone.
+    # The subprocess opens the device independently of this process, so the
+    # continuous visitor-watch monitor's handle must be released first (via
+    # request_exclusive) or the two would fight over the same physical camera.
+    from actions.camera_session import get_camera_session
     try:
-        proc = subprocess.run(
-            [sys.executable, "-c", _CAMERA_SUBPROCESS_SRC,
-             str(index), str(backend), str(_IMG_MAX_W), str(_IMG_MAX_H), str(_JPEG_Q)],
-            capture_output=True, text=True, timeout=15,
-        )
+        with get_camera_session(index).request_exclusive():
+            proc = subprocess.run(
+                [sys.executable, "-c", _CAMERA_SUBPROCESS_SRC,
+                 str(index), str(backend), str(_IMG_MAX_W), str(_IMG_MAX_H), str(_JPEG_Q)],
+                capture_output=True, text=True, timeout=15,
+            )
     except subprocess.TimeoutExpired:
         raise RuntimeError("Camera capture timed out.")
 
