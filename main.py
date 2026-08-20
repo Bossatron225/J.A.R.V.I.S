@@ -5252,6 +5252,11 @@ class JarvisLive:
         if self._remote_bridge is None:
             asyncio.create_task(self._run_vps_local_worker())
 
+        # Runs for the app's whole lifetime (not per-connection like the live
+        # voice session) — continuous camera monitoring shouldn't depend on
+        # whether Jarvis is mid-conversation.
+        asyncio.create_task(self._run_visitor_watch())
+
         if self._remote_bridge is None and _resolve_jarvis_mode() == "worker":
             # Pure Mac-side worker for a VPS-hosted brain: no local mic, no local
             # Gemini Live session, no wake word. This Mac only acts when the VPS
