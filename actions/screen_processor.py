@@ -606,6 +606,8 @@ except Exception:
 index, backend, max_w, max_h, quality = (int(a) for a in sys.argv[1:6])
 
 cap = cv2.VideoCapture(index, backend)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, max_w)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, max_h)
 if not cap.isOpened():
     print(json.dumps({"error": f"Camera index {index} could not be opened."}))
     sys.exit(0)
