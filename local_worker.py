@@ -26,6 +26,7 @@ LOCAL_ACTIONS = {
     'reminder',
     'security_biometrics',
     'send_message',
+    'visitor_log',
     'youtube_video',
 }
 
