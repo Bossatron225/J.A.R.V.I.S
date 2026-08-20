@@ -1678,6 +1678,7 @@ class JarvisLive:
             "edgetts",
             "kokoro",
             "elevenlabs",
+            "cloned_voice",
         }
 
     @staticmethod
@@ -1687,6 +1688,7 @@ class JarvisLive:
             "edgetts": "EdgeTTS",
             "kokoro": "Kokoro",
             "elevenlabs": "ElevenLabs",
+            "cloned_voice": "Cloned Voice",
         }.get(engine_name, engine_name or "external TTS")
 
     async def _tts_worker(self) -> None:
