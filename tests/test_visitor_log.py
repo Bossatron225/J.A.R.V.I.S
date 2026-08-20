@@ -5,6 +5,7 @@ import pytest
 
 import auth as auth_module
 import main as main_module
+from actions import camera_session as camera_session_module
 from actions import visitor_log as visitor_log_module
 
 requires_sface = pytest.mark.skipif(
