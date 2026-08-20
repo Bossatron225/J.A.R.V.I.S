@@ -15,7 +15,9 @@ struct ChatView: View {
     @State private var messages: [ChatMessage] = []
     @State private var draft = ""
     @State private var connected = false
+    @State private var audioEnabled = true
     private let socket = JarvisWebSocket()
+    private let audioPlayer = RemoteAudioPlayer()
 
     var body: some View {
         VStack(spacing: 0) {
