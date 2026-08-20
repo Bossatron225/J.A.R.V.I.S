@@ -281,6 +281,79 @@ def _best_cosine_match(recognizer, live_embedding, stored_embeddings) -> float:
     return best
 
 
+def identify_face(
+    embedding,
+    profile_keys: list,
+    threshold: float | None = None,
+) -> Tuple["str | None", float]:
+    """Compare one live embedding against every given profile's stored model and
+    return the best-matching profile_key (or None if nobody matches) plus its
+    score. Reuses load_face_model/_best_cosine_match per profile — no new
+    matching logic, just loops the existing single-profile check over several."""
+    if embedding is None or not _HAS_SFACE or np is None:
+        return None, -1.0
+    sface = _load_sface_recognizer()
+    if sface is None:
+        return None, -1.0
+
+    gate = _sface_threshold() if threshold is None else threshold
+    best_key = None
+    best_score = -1.0
+    for profile_key in profile_keys or []:
+        stored_embeddings = load_face_model(profile_key)
+        if stored_embeddings is None or len(stored_embeddings) == 0:
+            continue
+        score = _best_cosine_match(sface, embedding, stored_embeddings)
+        if score > best_score:
+            best_score = score
+            best_key = profile_key
+
+    if best_key is not None and best_score >= gate:
+        return best_key, best_score
+    return None, best_score
+
+
+def capture_unknown_visitor_check(
+    profile_keys: list,
+    camera_index: int = 0,
+    num_frames: int = 3,
+    threshold: float | None = None,
+) -> "dict | None":
+    """Passive poll (not a security decision, so a short burst is enough): grab a
+    few frames, detect the first face, and check it against every enrolled
+    profile. Returns {"status": "known", "profile_key", "score"},
+    {"status": "unknown", "embedding", "score", "frame"}, or None if no face
+    was seen in the burst at all."""
+    if cv2 is None or not _HAS_SFACE:
+        return None
+
+    try:
+        with _camera_lock:
+            capture = cv2.VideoCapture(camera_index)
+            if not capture.isOpened():
+                capture.release()
+                return None
+
+            result = None
+            for _ in range(num_frames):
+                ok, frame = capture.read()
+                if not ok or frame is None:
+                    continue
+                embedding = _detect_and_embed(frame)
+                if embedding is None:
+                    continue
+                profile_key, score = identify_face(embedding, profile_keys, threshold)
+                if profile_key is not None:
+                    result = {"status": "known", "profile_key": profile_key, "score": score}
+                else:
+                    result = {"status": "unknown", "embedding": embedding, "score": score, "frame": frame}
+                break
+            capture.release()
+        return result
+    except Exception:
+        return None
+
+
 def verify_face_against_model(
     recognizer,
     camera_index: int = 0,
