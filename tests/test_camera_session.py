@@ -1,5 +1,11 @@
 from actions import camera_session as camera_session_module
-from actions.camera_session import CameraSession, get_camera_session
+from actions.camera_session import (
+    CameraSession,
+    TARGET_FRAME_HEIGHT,
+    TARGET_FRAME_WIDTH,
+    apply_target_resolution,
+    get_camera_session,
+)
 
 
 class _FakeCapture:
@@ -7,6 +13,7 @@ class _FakeCapture:
         self.opened = True
         self.released = False
         self.read_count = 0
+        self.set_calls: list[tuple] = []
 
     def isOpened(self):
         return self.opened
@@ -18,6 +25,45 @@ class _FakeCapture:
     def release(self):
         self.released = True
         self.opened = False
+
+    def set(self, prop, value):
+        self.set_calls.append((prop, value))
+        return True
+
+
+def test_apply_target_resolution_requests_4k(monkeypatch):
+    cap = _FakeCapture()
+
+    apply_target_resolution(cap)
+
+    assert (camera_session_module.cv2.CAP_PROP_FRAME_WIDTH, TARGET_FRAME_WIDTH) in cap.set_calls
+    assert (camera_session_module.cv2.CAP_PROP_FRAME_HEIGHT, TARGET_FRAME_HEIGHT) in cap.set_calls
+    assert TARGET_FRAME_WIDTH == 3840
+    assert TARGET_FRAME_HEIGHT == 2160
+
+
+def test_apply_target_resolution_is_best_effort_on_capture_without_set():
+    class _NoSetCapture:
+        pass
+
+    apply_target_resolution(_NoSetCapture())  # must not raise
+    apply_target_resolution(None)  # must not raise
+
+
+def test_open_locked_applies_target_resolution(monkeypatch):
+    captures = []
+
+    def _fake_video_capture(index):
+        cap = _FakeCapture()
+        captures.append(cap)
+        return cap
+
+    monkeypatch.setattr(camera_session_module.cv2, "VideoCapture", _fake_video_capture)
+
+    session = CameraSession(camera_index=0)
+    session.get_frame()
+
+    assert (camera_session_module.cv2.CAP_PROP_FRAME_WIDTH, TARGET_FRAME_WIDTH) in captures[0].set_calls
 
 
 def test_get_frame_opens_device_lazily_once(monkeypatch):
