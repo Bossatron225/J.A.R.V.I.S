@@ -229,6 +229,7 @@ if _GUI_IMPORTS_ALLOWED:
     )
     from actions.find_my import find_my
     from actions.alexa_routines import alexa_routines, ifttt_webhooks
+    from actions.visitor_log import visitor_log, record_unknown_sighting, list_recent_sightings
 else:
     open_app = None
     weather_action = None
