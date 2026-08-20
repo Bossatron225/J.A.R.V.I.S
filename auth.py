@@ -306,27 +306,28 @@ def verify_face_against_model(
     gate = _sface_threshold() if threshold is None else threshold
 
     try:
-        capture = cv2.VideoCapture(camera_index)
-        if not capture.isOpened():
-            capture.release()
-            return False, "no-webcam"
+        with _camera_lock:
+            capture = cv2.VideoCapture(camera_index)
+            if not capture.isOpened():
+                capture.release()
+                return False, "no-webcam"
 
-        best_score = None
-        face_seen = False
-        for _ in range(num_frames):
-            ok, frame = capture.read()
-            if not ok or frame is None:
-                continue
-            embedding = _detect_and_embed(frame)
-            if embedding is None:
-                continue
-            face_seen = True
-            score = _best_cosine_match(sface, embedding, stored_embeddings)
-            if best_score is None or score > best_score:
-                best_score = score
-            if best_score is not None and best_score >= gate:
-                break
-        capture.release()
+            best_score = None
+            face_seen = False
+            for _ in range(num_frames):
+                ok, frame = capture.read()
+                if not ok or frame is None:
+                    continue
+                embedding = _detect_and_embed(frame)
+                if embedding is None:
+                    continue
+                face_seen = True
+                score = _best_cosine_match(sface, embedding, stored_embeddings)
+                if best_score is None or score > best_score:
+                    best_score = score
+                if best_score is not None and best_score >= gate:
+                    break
+            capture.release()
 
         if not face_seen:
             return False, "no-face-detected"
