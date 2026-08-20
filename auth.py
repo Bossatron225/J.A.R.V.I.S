@@ -367,7 +367,7 @@ def verify_face(reference_image: str | os.PathLike[str] | None = None, camera_in
         face_seen = False
         for frame in frames:
             frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            live_face = _extract_primary_face(frame_gray, detector)
+            live_face = _extract_primary_face(frame_gray, detectors)
             if live_face is None:
                 continue
             face_seen = True
