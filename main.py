@@ -1496,6 +1496,28 @@ TOOL_DECLARATIONS = [
             },
             "required": ["action"]
         }
+    },
+    {
+        "name": "visitor_log",
+        "description": (
+            "Reports on unrecognized visitors Jarvis has logged at the camera (not enrolled household "
+            "members). Use for asks like 'has anyone been seen', 'any visitors today', 'who's been at the door'. "
+            "Never used to identify a stranger's real name or run a background check — logging and alerting only."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "recent (default) — list recent unrecognized-visitor sightings"
+                },
+                "limit": {
+                    "type": "INTEGER",
+                    "description": "How many recent sightings to report (default 10)"
+                }
+            },
+            "required": []
+        }
     }
 ]
 
