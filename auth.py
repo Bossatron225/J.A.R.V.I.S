@@ -17,6 +17,8 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     np = None
 
+from actions.camera_session import get_camera_session
+
 _HAS_SFACE = bool(cv2 is not None and hasattr(cv2, "FaceDetectorYN") and hasattr(cv2, "FaceRecognizerSF"))
 
 _FACE_MODELS_DIR = Path(__file__).resolve().parent / "config" / "face_models"
@@ -27,11 +29,6 @@ _SFACE_MODEL_PATH = _FACE_MODELS_DIR / "face_recognition_sface.onnx"
 # similarity (calibrated on LFW) — same identity if score is at or above this.
 _SFACE_DEFAULT_THRESHOLD = 0.363
 _YUNET_SCORE_THRESHOLD = 0.6
-
-# Only one caller should hold the webcam open at a time — without this, a
-# biometric-lock check and a background visitor-watch poll could both call
-# cv2.VideoCapture(same index) concurrently and glitch each other.
-_camera_lock = threading.Lock()
 
 
 _BUNDLED_CASCADES_DIR = Path(__file__).resolve().parent / "config" / "haarcascades"
