@@ -1,6 +1,6 @@
 import SwiftUI
 
-private enum AppStage {
+private enum AppStage: Equatable {
     case loggedOut
     case needsBiometric
     case ready
