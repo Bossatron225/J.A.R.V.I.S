@@ -47,6 +47,13 @@ SKIP_SUFFIXES = {
     ".wav", ".mp3", ".mp4", ".pyc", ".pdf", ".zip", ".xml",
 }
 
+# Deliberate escape hatch for files whose *purpose* is to contain
+# credential-shaped strings — i.e. this scanner's own tests. Modelled on
+# `# noqa` / `# nosec`: it takes a visible, reviewable line in the file, so it
+# cannot be applied accidentally, and a real config file gaining this marker
+# would stand out immediately in a diff.
+ALLOW_MARKER = "check-secrets: allow-fixtures"
+
 
 def _looks_binary(data: bytes) -> bool:
     return b"\x00" in data[:4096]
