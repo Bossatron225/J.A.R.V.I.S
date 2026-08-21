@@ -5105,10 +5105,14 @@ class JarvisLive:
                     continue
                 was_active = True
 
-                if self._local_speech_gate_active():
-                    stop.wait(1.0)
-                    continue
-
+                # NOTE: the biometric-lock gate deliberately does NOT stop this
+                # loop. It used to, which meant security monitoring was disabled
+                # for exactly the period it exists to cover — while the lock is
+                # unresolved and nobody has authenticated. The gate's real
+                # purpose is preventing Jarvis's own speaker output from bleeding
+                # into the mic during voice verification, so it is applied to the
+                # SPOKEN alert only (see _handle_*_visitor_seen); snapshots,
+                # logging, and the iMessage alert continue regardless.
                 frame = session.get_frame()
                 now = time.monotonic()
                 self._sweep_departed_visitors(now, debounce)
