@@ -254,6 +254,47 @@ def test_visitor_log_tool_reports_no_visitors_when_empty() -> None:
     assert "no unrecognized visitors" in result.lower()
 
 
+def test_sighting_summary_surfaces_the_saved_photo() -> None:
+    """Regression for a real incident: Jarvis told the user it had no camera
+    captures at all while 10 JPEGs sat on disk, because the tool output only
+    ever reported IDs and timestamps."""
+    visitor_log_module.SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    fake = visitor_log_module.SNAPSHOTS_DIR / "20260101T000000Z_abc.jpg"
+    fake.write_bytes(b"not-a-real-jpeg")
+
+    entry = {
+        "id": "1", "ts": "2026-01-01T00:00:00Z", "visitor_id": "abc",
+        "sighting_count_at_time": 1, "score": 0.1,
+        "snapshot_path": str(fake), "camera_index": 0,
+    }
+    text = visitor_log_module._format_sightings_summary([entry])
+
+    assert str(fake) in text
+    assert "not video" in text.lower()
+
+
+def test_snapshots_action_lists_saved_photos() -> None:
+    visitor_log_module.SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    for name in ("20260101T000001Z_a.jpg", "20260101T000002Z_b.jpg"):
+        (visitor_log_module.SNAPSHOTS_DIR / name).write_bytes(b"x")
+
+    text = visitor_log_module.visitor_log({"action": "snapshots"})
+
+    assert "20260101T000002Z_b.jpg" in text
+    assert "no video is recorded" in text.lower()
+
+
+def test_snapshots_action_is_honest_when_none_exist() -> None:
+    text = visitor_log_module.visitor_log({"action": "snapshots"})
+    assert "no visitor photographs" in text.lower()
+
+
+def test_footage_phrasing_maps_to_snapshots() -> None:
+    """'show me the footage' must not fall through to the unknown-action path."""
+    for alias in ("footage", "photos", "images", "pictures"):
+        assert "photograph" in visitor_log_module.visitor_log({"action": alias}).lower()
+
+
 def test_visitor_log_tool_summarizes_sightings() -> None:
     visitor_log_module.record_unknown_sighting(_make_synthetic_embedding(seed=1))
 
