@@ -13,6 +13,22 @@ __pycache__/
 # Runtime state, not source — rewritten constantly by the running app, which
 # made every auto-commit dirty and buried real changes in the diff.
 .jarvis.lock
+memory/usage_log.jsonl
+memory/visitor_watch_state.json
+
+# Third-party personal data captured by the Nanny-cam protocol. These are NOT
+# the user's own synced memory (long_term.json etc. stay tracked on purpose):
+# visitor_clusters.json holds face EMBEDDINGS — biometric identifiers — and
+# visitor_snapshots/ holds photographs of people who never consented to being
+# in a git repository. `git add -A` in the auto-commit watcher would have
+# pushed both to GitHub the first time a stranger was detected.
+memory/visitor_clusters.json
+memory/visitor_log.jsonl
+memory/visitor_snapshots/
+
+# Full conversation transcripts — synced between machines over the VPS memory
+# API, not via git.
+memory/conversations.jsonl
 
 # Auto-commit helper
 scripts/__pycache__/
