@@ -5498,6 +5498,11 @@ class JarvisLive:
             # run_local.sh) skips this branch even with JARVIS_VPS_URL set, so the
             # full voice session runs while staying linked to the VPS below.
             self.ui.write_log("SYS: Remote worker mode — local voice assistant disabled; awaiting VPS tasks.")
+            # Health checks must know this: in worker mode there is deliberately
+            # never a local live session, so absence of one is correct operation,
+            # not a fault. Without this the watchdog would report a permanent
+            # false failure and train the user to ignore it.
+            self._worker_mode = True
             self.ui.set_state(self._WORKER_IDLE_STATE)
             while True:
                 await asyncio.sleep(3600)
