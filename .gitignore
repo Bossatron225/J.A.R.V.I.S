@@ -13,9 +13,12 @@ __pycache__/
 # Auto-commit helper
 scripts/__pycache__/
 
-config/api_keys.json
-config/authorized_profiles.json
-config/override_secret.json
+# Trailing * is deliberate: a timestamped backup (config/api_keys.json.bak-…)
+# was NOT matched by the bare filename and got swept into a commit by the
+# auto-commit watcher's `git add -A`, putting live API keys into git history.
+config/api_keys.json*
+config/authorized_profiles.json*
+config/override_secret.json*
 config/override_audit.log
 config/biometric_models/
 bin/jarvis_python
