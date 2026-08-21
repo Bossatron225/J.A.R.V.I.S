@@ -388,12 +388,21 @@ def _unwrap_state(state):
     return state
 
 
+def _wiz_to_brightness(raw: int | None) -> int | None:
+    """Inverse of _brightness_to_wiz: get_brightness() reports the raw 0-255 value,
+    but every brightness the user sets is 1-100%. Reporting the raw number made
+    status read "brightness=5" right after a "set to 2%" command."""
+    if raw is None:
+        return None
+    return max(1, round(int(raw) * 100 / 255))
+
+
 async def _status_for(light) -> dict[str, Any]:
     state = _unwrap_state(await light.updateState())
     return {
         "ip": getattr(light, "ip", "unknown"),
         "on": bool(state.get_state()),
-        "brightness": state.get_brightness(),
+        "brightness": _wiz_to_brightness(state.get_brightness()),
         "rgb": state.get_rgb(),
         "kelvin": state.get_colortemp(),
         "scene": state.get_scene(),
