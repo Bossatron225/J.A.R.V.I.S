@@ -193,10 +193,40 @@ def test_receive_audio_disconnect_does_not_print_traceback(monkeypatch) -> None:
 
     monkeypatch.setattr("main.traceback.print_exc", fake_print_exc)
 
-    asyncio.run(jarvis._receive_audio())
+    # The disconnect must now propagate (not be swallowed) so the enclosing
+    # TaskGroup sees the failure and the outer connection loop reconnects —
+    # silently returning here previously left the session permanently dead
+    # with nothing ever noticing.
+    with pytest.raises(RuntimeError):
+        asyncio.run(jarvis._receive_audio())
 
     assert jarvis.session is None
     assert tracebacks == []
+
+
+def test_receive_audio_raises_on_clean_empty_stream_end(monkeypatch) -> None:
+    """A graceful websocket close (e.g. server sends a plain close frame) often
+    ends session.receive()'s generator with no exception at all — that must be
+    treated as a disconnect too, not silently looped on forever."""
+    jarvis = JarvisLive(DummyUI())
+
+    class EmptyIterator:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            raise StopAsyncIteration
+
+    class FakeSession:
+        def receive(self):
+            return EmptyIterator()
+
+    jarvis.session = FakeSession()
+
+    with pytest.raises(ConnectionError):
+        asyncio.run(jarvis._receive_audio())
+
+    assert jarvis.session is None
 
 
 def test_wake_message_includes_remote_url_and_access_key() -> None:
