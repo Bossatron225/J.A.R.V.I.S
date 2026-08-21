@@ -116,21 +116,20 @@ def collect_health(jarvis) -> dict:
             checks.append(_check("camera_frames", True, "N/A — monitor not capturing right now", applicable=False))
         else:
             frame_age = None
-            gate_active = False
             try:
                 from actions.camera_session import get_camera_session
                 cfg = getattr(jarvis, "_visitor_watch_cfg", {}) or {}
                 index = int(cfg.get("camera_index", 0) or 0)
                 frame_age = get_camera_session(index).last_frame_age_seconds()
-                gate_active = bool(jarvis._local_speech_gate_active())
             except Exception as exc:
                 checks.append(_check("camera_frames", False, f"could not probe camera: {exc}"))
                 frame_age = "probe-failed"
 
+            # The biometric lock no longer excuses a dead camera: monitoring is
+            # meant to keep running while locked (that is when nobody is home),
+            # so an absent frame there is a real fault, not an N/A.
             if frame_age == "probe-failed":
                 pass
-            elif gate_active:
-                checks.append(_check("camera_frames", True, "N/A — held off by biometric lock", applicable=False))
             elif frame_age is None:
                 checks.append(_check("camera_frames", False, "engaged but camera has NEVER delivered a frame"))
             elif frame_age > CAMERA_FRAME_MAX_AGE:

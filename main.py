@@ -5121,7 +5121,14 @@ class JarvisLive:
                     stop.wait(1.0)
                     continue
 
-                if visual_context_enabled and (now - self._last_visual_context_ts) >= visual_context_interval:
+                # Ambient commentary is conversational, not security — skip it
+                # entirely while the speech gate is up (unlike visitor
+                # detection above, there is nothing lost by not doing it).
+                if (
+                    visual_context_enabled
+                    and not self._local_speech_gate_active()
+                    and (now - self._last_visual_context_ts) >= visual_context_interval
+                ):
                     self._last_visual_context_ts = now
                     self._check_visual_context(frame)
 
@@ -5264,7 +5271,10 @@ class JarvisLive:
             snapshot=entry.get("snapshot_path"),
         )
 
-        if self.session and self._loop:
+        # Spoken alert only when the speech gate is clear — the snapshot,
+        # audit record and iMessage above have already gone out regardless,
+        # which is what matters while the lock is engaged and nobody is here.
+        if self.session and self._loop and not self._local_speech_gate_active():
             prompt = (
                 f"[SYSTEM_ALERT] An unrecognized visitor was just seen at the camera.{repeat_note} "
                 "Briefly let the user know, naturally."
