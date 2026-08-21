@@ -3046,7 +3046,7 @@ class JarvisLive:
         conversation_log.append_turn itself."""
         if not self._conversation_session_id:
             return
-        asyncio.create_task(asyncio.to_thread(
+        self._spawn_task(asyncio.to_thread(
             _log_conversation_turn,
             self._conversation_session_id,
             self._conversation_source(),
