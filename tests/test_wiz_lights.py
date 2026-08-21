@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 
 from actions import wiz_lights as wiz
@@ -64,3 +65,49 @@ def test_brightness_percent_round_trips(percent):
 
 def test_wiz_to_brightness_handles_none():
     assert wiz._wiz_to_brightness(None) is None
+
+
+def test_run_blocking_works_with_no_event_loop():
+    async def _coro():
+        return "done"
+
+    assert wiz._run_blocking(_coro()) == "done"
+
+
+def test_run_blocking_works_inside_a_running_event_loop():
+    """The real bug: Jarvis calls tools from inside its live asyncio loop, where the
+    old asyncio.run() raised "asyncio.run() cannot be called from a running event
+    loop". Every WiZ command from Jarvis returned "WiZ control failed" because of
+    this, while the identical call from a sync script succeeded — which is why it
+    looked like a broken driver."""
+
+    async def _coro():
+        return "done"
+
+    async def _main():
+        return wiz._run_blocking(_coro())
+
+    assert asyncio.run(_main()) == "done"
+
+
+def test_run_blocking_propagates_exceptions_from_the_worker_thread():
+    """Errors raised on the worker thread must surface to the caller so
+    wiz_lights() can report them, rather than being swallowed."""
+
+    async def _boom():
+        raise ValueError("kaboom")
+
+    async def _main():
+        return wiz._run_blocking(_boom())
+
+    with pytest.raises(ValueError, match="kaboom"):
+        asyncio.run(_main())
+
+
+def test_wiz_lights_is_delegated_to_the_mac():
+    """WiZ bulbs are on the home LAN, unreachable from the VPS datacenter, so the
+    tool has to run on the Mac via the local-worker relay."""
+    from local_worker import ACTION_HANDLERS, LOCAL_ACTIONS
+
+    assert "wiz_lights" in LOCAL_ACTIONS
+    assert ACTION_HANDLERS["wiz_lights"] == ("actions.wiz_lights", "wiz_lights")
