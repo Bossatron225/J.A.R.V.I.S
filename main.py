@@ -4284,7 +4284,11 @@ class JarvisLive:
 
         # ── Phase 1: instant greeting ─────────────────────────────────────────
         lang_clause = f" Respond in {lang}." if lang else ""
-        name_clause = f" Address the user as {name}." if name else ""
+        # Always "sir" — never the stored identity name. This clause used to
+        # inject "Address the user as {name}.", which overrode the global
+        # address rule (it sits closer to the turn than the system prompt) and
+        # produced greetings like "Hello, Mr. Lumsden".
+        name_clause = " Address the user as \"sir\" — never by name."
 
         # Inject recent-session context without consuming it so memory persists.
         recent_sessions = await asyncio.to_thread(get_recent_sessions, 2)
