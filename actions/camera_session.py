@@ -125,6 +125,12 @@ class CameraSession:
         self._latest_frame = None
         self._proc_dead = True
         self._last_crash_ts = 0.0
+        # When the reader thread last decoded a real frame. This is the only
+        # honest "is the camera actually working" signal — a live thread and a
+        # running subprocess both stayed true during the outage where no frame
+        # was ever produced, so health checks must look at frame age, not
+        # liveness.
+        self._last_frame_ts = 0.0
 
     def _reader_loop(self, proc: subprocess.Popen) -> None:
         stdout = proc.stdout
