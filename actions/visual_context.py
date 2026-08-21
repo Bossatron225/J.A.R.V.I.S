@@ -19,6 +19,10 @@ def _get_gemini_api_key() -> str:
 
 _MODEL = "models/gemini-flash-latest"
 
+# Expected steady-state is ~60 calls/hour (one per minute). This ceiling only
+# trips if something is badly wrong with the scheduling.
+MAX_CALLS_PER_HOUR = 200
+
 _PROMPT_TEMPLATE = """You are JARVIS, glancing at a single frame from a camera watching James's room to notice \
 what he's currently doing — not to identify people or run security checks, just ambient situational awareness.
 
