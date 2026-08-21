@@ -337,6 +337,7 @@ else:
                 f"{_headless_import_error}"
             )
 from memory.config_manager     import get_brief_enabled
+from core import jarvis_logging as jlog
 from core.tts import create_tts_player, reset_audio_output
 from core.context_optimizer.context import ContextManager as _CtxMgr
 from core.context_optimizer.optimizer import ToolExecutionOptimizer as _ToolOptimizer
@@ -5412,7 +5413,17 @@ class JarvisLive:
                     self._vps_link_established_said = True
                     self.ui.write_log("SYS: VPS local worker link established.")
                 for task in completed:
-                    print(f"[Local Worker] {task.get('action')}: {task.get('local_result')}")
+                    # truncate(): this line used to print whole tool results
+                    # verbatim, including raw embedding vectors — ~300KB of
+                    # floats that made the log unreadable and hid real events.
+                    jlog.info(
+                        "LocalWorker", "task completed",
+                        action=task.get("action"), result=task.get("local_result"),
+                    )
+                    jlog.record_action(
+                        "vps_task", str(task.get("action") or ""),
+                        result=task.get("local_result"),
+                    )
             except Exception as e:
                 self._vps_link_established_said = False
                 print(f"[Local Worker] Poll error: {e}")
