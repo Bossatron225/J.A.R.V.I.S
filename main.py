@@ -5295,9 +5295,9 @@ class JarvisLive:
                 self._dashboard.set_connect_callback(self._on_phone_connected)
                 self._dashboard.set_wake_callback(self._on_dashboard_wake)
                 self._dashboard.set_public_url_callback(self._on_public_url_changed)
-                asyncio.create_task(self._dashboard.serve())
+                self._spawn_task(self._dashboard.serve())
                 # Runs for the whole lifetime, not just inside an active session
-                asyncio.create_task(self._process_dashboard_commands())
+                self._spawn_task(self._process_dashboard_commands())
             except Exception as e:
                 print(f"[Dashboard] Disabled: {e}")
                 self._dashboard = None
