@@ -4968,6 +4968,10 @@ class JarvisLive:
                     stop.wait(1.0)
                     continue
 
+                if visual_context_enabled and (now - self._last_visual_context_ts) >= visual_context_interval:
+                    self._last_visual_context_ts = now
+                    self._check_visual_context(frame)
+
                 gray = cv2.GaussianBlur(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (21, 21), 0)
                 motion_score = 0
                 if prev_gray is not None:
