@@ -10,6 +10,10 @@ __pycache__/
 .coverage
 *.log
 
+# Runtime state, not source — rewritten constantly by the running app, which
+# made every auto-commit dirty and buried real changes in the diff.
+.jarvis.lock
+
 # Auto-commit helper
 scripts/__pycache__/
 
