@@ -5250,8 +5250,8 @@ class JarvisLive:
 
         self._run_macos_permission_preflight()
         self._configure_imessage_cold_start_bridge()
-        asyncio.create_task(self._run_cold_wake_bridge_health())
-        asyncio.create_task(self._run_audio_diagnostics())
+        self._spawn_task(self._run_cold_wake_bridge_health())
+        self._spawn_task(self._run_audio_diagnostics())
         self.ui.write_log("SYS: Audio ready.")
 
         if self._wake_protocol_cfg.get("autostart", True) and callable(imessage_monitor_start):
