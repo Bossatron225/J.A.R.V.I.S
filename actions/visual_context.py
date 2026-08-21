@@ -94,6 +94,8 @@ def describe_scene(frame, last_comment: str | None = None) -> dict:
             model=_MODEL,
             contents=[gtypes.Part.from_bytes(data=jbuf.tobytes(), mime_type="image/jpeg"), prompt],
         )
+        if record_usage is not None:
+            record_usage("visual_context", "gemini_image", 1)
         raw = _strip_fences(getattr(response, "text", "") or "")
         parsed = json.loads(raw)
         return {
