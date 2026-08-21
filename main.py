@@ -4937,6 +4937,8 @@ class JarvisLive:
         debounce = float(cfg.get("presence_debounce_seconds", 8) or 8)
         cooldown = float(cfg.get("realert_cooldown_seconds", 1800) or 1800)
         cluster_window_days = int(cfg.get("cluster_window_days", 30) or 30)
+        visual_context_enabled = bool(cfg.get("visual_context_enabled", True))
+        visual_context_interval = float(cfg.get("visual_context_interval_seconds", 60) or 60)
 
         session = get_camera_session(camera_index)
         prev_gray = None
