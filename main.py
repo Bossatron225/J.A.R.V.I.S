@@ -4048,7 +4048,7 @@ class JarvisLive:
                                 self._session_log.append(f"User: {full_in}")
                                 self._log_turn_async("user", full_in)
                                 if self._dashboard:
-                                    asyncio.create_task(self._dashboard.broadcast({
+                                    self._spawn_task(self._dashboard.broadcast({
                                         "type": "log", "speaker": "user",
                                         "text": full_in,
                                         "ts": datetime.now().isoformat(),
