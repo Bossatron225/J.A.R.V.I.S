@@ -4107,7 +4107,7 @@ class JarvisLive:
                                 async def _cam_close():
                                     await asyncio.sleep(2.0)
                                     self.ui.stop_camera_stream()
-                                asyncio.create_task(_cam_close())
+                                self._spawn_task(_cam_close())
 
                     if response.tool_call:
                         fn_responses = []
