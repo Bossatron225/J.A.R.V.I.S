@@ -203,7 +203,7 @@ def test_capture_unknown_visitor_check_recognizes_known_profile(monkeypatch) -> 
     profile_a = _make_synthetic_embedding(seed=1)
     models = {"primary": np.stack([profile_a])}
     monkeypatch.setattr(auth_module, "load_face_model", lambda key: models.get(key))
-    monkeypatch.setattr(camera_session_module.cv2, "VideoCapture", lambda idx: _FakeCapture(np.zeros((4, 4, 3), dtype=np.uint8)))
+    _prime_session_with_a_frame(monkeypatch)
 
     matching = _noisy(profile_a, noise_seed=3)
     monkeypatch.setattr(auth_module, "_detect_and_embed", lambda frame: matching)
