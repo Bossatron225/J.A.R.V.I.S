@@ -585,6 +585,13 @@ class ElevenLabsTTSEngine:
                 )
                 resp.raise_for_status()
                 self.voice_id = voice_id
+                # ElevenLabs bills per character and this fires once per spoken
+                # sentence, making it the largest ongoing cost in the system.
+                try:
+                    from memory.usage_log import record_usage
+                    record_usage("elevenlabs_tts", "elevenlabs_tts", len(text or ""))
+                except Exception:
+                    pass
                 if self.audio_sink is not None:
                     print(f"[TTS] ElevenLabs audio generated, sending to sink (len={len(resp.content)})")
                     self.audio_sink(resp.content)
