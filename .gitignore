@@ -67,3 +67,6 @@ ios/**/*.xcuserstate
 
 # Auto-commit watcher single-instance lock
 .auto_commit.lock
+
+# Audit trail — records actions taken; stays on the private VPS/machine.
+memory/audit_log.jsonl
