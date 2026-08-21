@@ -1669,6 +1669,9 @@ class JarvisLive:
         # kept their threads/objects alive the whole time.
         self._last_live_activity_ts: float = 0.0
         self._local_worker_last_poll_ts: float = 0.0
+        # True when this process is a pure Mac-side worker for a VPS-hosted
+        # brain — see the worker-mode branch in run(). Health checks read this.
+        self._worker_mode: bool = False
         self._present_known: dict[str, float] = {}                     # profile_key -> last-seen monotonic
         self._present_unknown: list[list] = []                         # [embedding, visitor_id, last-seen monotonic]
         self._visitor_monitor_thread: threading.Thread | None = None
