@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import atexit
 import os
 import subprocess
 import sys
@@ -6,9 +7,39 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX
+    fcntl = None
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 POLL_SECONDS = 10
+LOCK_PATH = REPO_ROOT / ".auto_commit.lock"
+
+
+def acquire_single_instance():
+    """Exit immediately if another watcher already holds the lock.
+
+    main.py spawns this script on every startup and never reaps it, so each
+    Jarvis restart used to leave another copy running forever — 121 of them
+    had accumulated, all polling git every 10s. Now that a push also runs the
+    full test suite, that pile-up would have meant 121 concurrent pytest runs.
+    The lock is released automatically when the holder dies, so a crashed
+    watcher does not permanently block its replacement."""
+    if fcntl is None:
+        return None
+    handle = open(LOCK_PATH, "w")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        print("Another auto-commit watcher is already running — exiting.")
+        sys.exit(0)
+    handle.write(str(os.getpid()))
+    handle.flush()
+    atexit.register(handle.close)
+    return handle
 
 
 def run(cmd, cwd=None, check=True):
@@ -66,6 +97,8 @@ def main():
     if not (REPO_ROOT / ".git").exists():
         print("No git repository found.", file=sys.stderr)
         sys.exit(1)
+
+    acquire_single_instance()
 
     ensure_git_identity()
     print(f"Auto-commit watcher started for {REPO_ROOT}")

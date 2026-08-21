@@ -64,3 +64,6 @@ voice_clone/rvc_models/*.index
 ios/JarvisApp/JarvisApp.xcodeproj/
 ios/**/DerivedData/
 ios/**/*.xcuserstate
+
+# Auto-commit watcher single-instance lock
+.auto_commit.lock
