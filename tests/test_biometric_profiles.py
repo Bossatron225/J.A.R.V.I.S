@@ -1,14 +1,89 @@
 import asyncio
+import os
+import threading
+import time
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 import auth as auth_module
+from actions import camera_session as camera_session_module
 from actions import file_controller as file_controller_module
 import main as main_module
 import ui as ui_module
 from ui import ManageProfilesOverlay
+
+cv2 = pytest.importorskip("cv2")
+
+
+class _FakeCameraStream:
+    """Real os.pipe()-backed file object so the CameraSession reader thread's
+    blocking .read(n) calls behave like a real subprocess pipe."""
+
+    def __init__(self):
+        r_fd, w_fd = os.pipe()
+        self.read_file = os.fdopen(r_fd, "rb")
+        self.write_file = os.fdopen(w_fd, "wb")
+
+    def send_frame(self, jpeg_bytes: bytes) -> None:
+        self.write_file.write(len(jpeg_bytes).to_bytes(4, "big"))
+        self.write_file.write(jpeg_bytes)
+        self.write_file.flush()
+
+    def close_write_end(self) -> None:
+        self.write_file.close()
+
+
+class _FakeCameraProcess:
+    def __init__(self):
+        self.stdout_pipe = _FakeCameraStream()
+        self.stderr_pipe = _FakeCameraStream()
+        self.stdout = self.stdout_pipe.read_file
+        self.stderr = self.stderr_pipe.read_file
+        self._terminated = threading.Event()
+
+    def poll(self):
+        return 0 if self._terminated.is_set() else None
+
+    def terminate(self):
+        self._terminated.set()
+        self.stdout_pipe.close_write_end()
+        self.stderr_pipe.close_write_end()
+
+    def kill(self):
+        self._terminated.set()
+
+    def wait(self, timeout=None):
+        if not self._terminated.wait(timeout=timeout):
+            import subprocess
+            raise subprocess.TimeoutExpired(cmd="fake", timeout=timeout)
+
+
+def _encode_blank_frame():
+    img = np.zeros((4, 4, 3), dtype=np.uint8)
+    ok, buf = cv2.imencode(".jpg", img)
+    assert ok
+    return buf.tobytes()
+
+
+def _prime_camera_session_with_a_frame(monkeypatch, camera_index: int = 0):
+    """CameraSession now holds the camera open via a persistent subprocess —
+    fake that subprocess and prime one frame into the session before the
+    function under test does its own (synchronous, no-wait) get_frame() loop,
+    since frame delivery is now asynchronous (a background reader thread)."""
+    proc = _FakeCameraProcess()
+    monkeypatch.setattr(camera_session_module.subprocess, "Popen", lambda *a, **k: proc)
+
+    session = camera_session_module.get_camera_session(camera_index)
+    session.get_frame()  # triggers the (fake) subprocess launch
+    proc.stdout_pipe.send_frame(_encode_blank_frame())
+
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline:
+        if session.get_frame() is not None:
+            break
+        time.sleep(0.02)
 
 
 requires_sface = pytest.mark.skipif(
