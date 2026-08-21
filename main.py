@@ -1563,7 +1563,19 @@ TOOL_DECLARATIONS = [
             },
             "required": []
         }
-    }
+    },
+    {
+        "name": "system_health",
+        "description": (
+            "Reports whether Jarvis's own subsystems are ACTUALLY working — live session, camera "
+            "streaming, visitor monitor, VPS worker link, background tasks — by checking how recently "
+            "each one genuinely succeeded, not merely whether it is running. Use whenever the user asks "
+            "'are you working', 'is everything running', 'is the camera actually on', 'run a "
+            "self-diagnostic', 'system status' about Jarvis itself, or doubts a capability is functioning. "
+            "For CPU/RAM/temperature of the machine, use system_status instead."
+        ),
+        "parameters": {"type": "OBJECT", "properties": {}, "required": []},
+    },
 ]
 
 # --- Plugin system ---
