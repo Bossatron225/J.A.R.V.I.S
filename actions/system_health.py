@@ -74,7 +74,15 @@ def collect_health(jarvis) -> dict:
     session = getattr(jarvis, "session", None)
     last_live = getattr(jarvis, "_last_live_activity_ts", 0.0)
     live_age = (now - last_live) if last_live else None
-    if session is None:
+    if getattr(jarvis, "_worker_mode", False):
+        # Pure Mac-side worker for a VPS-hosted brain: having no local live
+        # session is correct operation here, not a fault.
+        checks.append(_check(
+            "live_session", True,
+            "N/A — remote worker mode; the VPS holds the live session",
+            applicable=False,
+        ))
+    elif session is None:
         checks.append(_check("live_session", False, "not connected — dashboard/voice commands will be dropped"))
     elif live_age is not None and live_age > LIVE_ACTIVITY_MAX_AGE:
         checks.append(_check("live_session", False, f"connected but no traffic {_fmt_age(live_age)} — may be a dead socket"))
