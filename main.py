@@ -2275,6 +2275,8 @@ class JarvisLive:
             "cluster_window_days": 30,
             "motion_threshold": 12000,
             "presence_debounce_seconds": 8,
+            "visual_context_enabled": True,
+            "visual_context_interval_seconds": 60,
         }
         try:
             with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -2286,6 +2288,11 @@ class JarvisLive:
             cfg["cluster_window_days"] = max(1, int(raw.get("visitor_watch_cluster_window_days", cfg["cluster_window_days"]) or 30))
             cfg["motion_threshold"] = max(1000, int(raw.get("visitor_watch_motion_threshold", cfg["motion_threshold"]) or 12000))
             cfg["presence_debounce_seconds"] = max(2, min(int(raw.get("visitor_watch_presence_debounce_seconds", cfg["presence_debounce_seconds"]) or 8), 120))
+            # Tied to the same Nanny-cam engage/disengage toggle — this key just
+            # lets it be turned off independently via config if ever wanted,
+            # without a separate voice command.
+            cfg["visual_context_enabled"] = bool(raw.get("visitor_watch_visual_context_enabled", cfg["visual_context_enabled"]))
+            cfg["visual_context_interval_seconds"] = max(20, min(int(raw.get("visitor_watch_visual_context_interval_seconds", cfg["visual_context_interval_seconds"]) or 60), 900))
         except Exception:
             pass
         return cfg
