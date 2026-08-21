@@ -4103,13 +4103,30 @@ class JarvisLive:
                         await self.session.send_tool_response(
                             function_responses=fn_responses
                         )
+
+                if not got_any_response:
+                    # session.receive() ended without yielding anything and without
+                    # raising — this happens on a graceful/clean websocket close
+                    # (e.g. the server sending a close frame like 1001/1000) rather
+                    # than an error. Treat it as a disconnect too: looping straight
+                    # back to `self.session.receive()` on an already-closed session
+                    # just repeats this silently forever, so self.session is left
+                    # stale and nothing ever tells the outer reconnect loop the
+                    # live session is actually dead.
+                    raise ConnectionError("Live session closed (receive stream ended cleanly)")
         except Exception as e:
             if _is_disconnect_error(e):
                 print(f"[JARVIS] ⚠️ Live session disconnected: {e}")
-                self.session = None
-                return
-            print(f"[JARVIS] ❌ Recv: {e}")
-            traceback.print_exc()
+            else:
+                print(f"[JARVIS] ❌ Recv: {e}")
+                traceback.print_exc()
+            # Re-raise (rather than swallowing) so the enclosing TaskGroup sees the
+            # failure and tears down — that's what makes the outer connection loop
+            # actually reconnect. Silently returning here previously left every
+            # other background task (VPS worker, monitors, dashboard command
+            # flush) running against a dead self.session indefinitely.
+            self.session = None
+            raise
             raise
 
     async def _play_audio(self):
