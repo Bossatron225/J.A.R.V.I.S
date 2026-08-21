@@ -1,4 +1,7 @@
 import json
+import os
+import threading
+import time
 
 import numpy as np
 import pytest
@@ -7,6 +10,8 @@ import auth as auth_module
 import main as main_module
 from actions import camera_session as camera_session_module
 from actions import visitor_log as visitor_log_module
+
+cv2 = pytest.importorskip("cv2")
 
 requires_sface = pytest.mark.skipif(
     not (auth_module._HAS_SFACE and auth_module._SFACE_MODEL_PATH.exists()),
