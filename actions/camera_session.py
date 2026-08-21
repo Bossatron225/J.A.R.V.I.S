@@ -150,6 +150,7 @@ class CameraSession:
                 if frame is not None:
                     with self._frame_lock:
                         self._latest_frame = frame
+                        self._last_frame_ts = time.monotonic()
         except Exception:
             pass
         finally:
