@@ -564,12 +564,73 @@ def _build_change_report(
     return "\n".join(parts)
 
 
+# A file at or above this many lines is never rewritten wholesale — the model
+# would have to reproduce every line perfectly, which truncates and silently
+# drops code. main.py alone is ~6,000 lines / 276KB.
+WHOLE_FILE_REWRITE_MAX_LINES = 400
+
+
+class PatchError(Exception):
+    """A proposed edit could not be applied safely."""
+
+
+def _apply_edits(current_text: str, edits: list[dict]) -> tuple[str, list[str]]:
+    """Apply {"old", "new"} replacements by exact match.
+
+    Each `old` must appear EXACTLY ONCE. Zero matches means the model
+    hallucinated the target; multiple means the edit is ambiguous and could
+    land in the wrong place. Both are rejected rather than guessed at."""
+    updated = current_text
+    applied: list[str] = []
+    for index, edit in enumerate(edits, 1):
+        old = str(edit.get("old", "") or "")
+        new = str(edit.get("new", "") or "")
+        if not old:
+            raise PatchError(f"edit {index}: empty 'old' snippet")
+        count = updated.count(old)
+        if count == 0:
+            raise PatchError(f"edit {index}: 'old' snippet not found in file")
+        if count > 1:
+            raise PatchError(f"edit {index}: 'old' snippet is ambiguous ({count} matches)")
+        updated = updated.replace(old, new, 1)
+        applied.append(str(edit.get("intent", "") or f"edit {index}"))
+    if updated == current_text:
+        raise PatchError("edits produced no change")
+    return updated, applied
+
+
+def summarize_diff(before: str, after: str, rel_path: str = "") -> str:
+    """A real unified diff so a self-improvement can be reviewed before it is
+    applied, instead of trusting an opaque wholesale rewrite."""
+    import difflib
+    diff = difflib.unified_diff(
+        before.splitlines(keepends=True), after.splitlines(keepends=True),
+        fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", n=2,
+    )
+    lines = list(diff)
+    added = sum(1 for line in lines if line.startswith("+") and not line.startswith("+++"))
+    removed = sum(1 for line in lines if line.startswith("-") and not line.startswith("---"))
+    body = "".join(lines[:200])
+    if len(lines) > 200:
+        body += f"\n… (+{len(lines) - 200} more diff lines)"
+    return f"{rel_path}: +{added} / -{removed} lines\n{body}"
+
+
 def _generate_replacement_for_file(file_path: Path, description: str, language: str) -> str:
+    """Produce the new contents of a file for a requested change.
+
+    Uses targeted edits rather than regenerating the file, because the old
+    "return the complete replacement file contents" approach cannot work on
+    anything large: reproducing ~6,000 lines verbatim reliably truncates and
+    silently deletes code. Small files still take the whole-file path, where
+    a full rewrite is both safe and simpler."""
     model = _get_model(MODEL_WRITER)
     current_text = file_path.read_text(encoding="utf-8")
     rel_path = file_path.relative_to(BASE_DIR)
+    line_count = current_text.count("\n") + 1
 
-    prompt = f"""You are improving an existing {language} source file.
+    if line_count < WHOLE_FILE_REWRITE_MAX_LINES:
+        prompt = f"""You are improving an existing {language} source file.
 You must preserve existing behavior unless the request explicitly asks for a change.
 Return ONLY the complete replacement file contents — no markdown, no explanation.
 
@@ -581,9 +642,43 @@ Current file contents:
 {current_text}
 
 Updated file contents:"""
+        response = model.generate_content(prompt)
+        return _strip_fences(_extract_text(response))
+
+    prompt = f"""You are making a SURGICAL edit to a large {language} source file ({line_count} lines).
+Do NOT reproduce the whole file — return only the exact snippets to replace.
+
+Requested change: {description}
+File path: {rel_path}
+
+Return ONLY valid JSON, no markdown:
+{{"edits": [{{"intent": "what this edit does", "old": "exact snippet to find", "new": "replacement snippet"}}]}}
+
+Rules:
+1. Each "old" snippet MUST appear EXACTLY ONCE in the file — include surrounding
+   lines for uniqueness if needed. It must match the file byte-for-byte.
+2. Keep each snippet as small as possible while staying unique.
+3. Preserve indentation exactly.
+4. Make the smallest change that accomplishes the request.
+
+Current file contents:
+{current_text}
+
+JSON:"""
 
     response = model.generate_content(prompt)
-    return _strip_fences(_extract_text(response))
+    raw = _strip_fences(_extract_text(response))
+    try:
+        parsed = json.loads(raw)
+        edits = parsed.get("edits") or []
+    except Exception as exc:
+        raise PatchError(f"model did not return valid edit JSON: {exc}")
+    if not isinstance(edits, list) or not edits:
+        raise PatchError("model returned no edits")
+
+    updated, applied = _apply_edits(current_text, edits)
+    print(f"[DevAgent] 🩹 {rel_path}: applied {len(applied)} surgical edit(s)")
+    return updated
 
 
 def _run_sandbox_validation(sandbox_dir: Path, sandbox_target: Path, timeout: int = 30) -> tuple[bool, str]:
