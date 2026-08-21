@@ -1514,11 +1514,12 @@ class ManageProfilesOverlay(QWidget):
         if not cap.isOpened():
             cap.release()
             return
-        try:
-            from actions.camera_session import apply_target_resolution
-            apply_target_resolution(cap)
-        except Exception:
-            pass
+        # Deliberately NOT requesting 4K here (unlike camera_session.py's other
+        # callers): a .set(CAP_PROP_FRAME_WIDTH/HEIGHT) resolution renegotiation
+        # on this preview's synchronous, main-thread AVFoundation capture can
+        # hang indefinitely on macOS when the screen is locked — this preview
+        # widget is small on-screen anyway, so there's no real quality benefit
+        # to offset that risk.
         self._camera_cap = cap
         try:
             if self._preview_timer is None:
