@@ -5002,6 +5002,43 @@ class JarvisLive:
 
         session.release()
 
+    def _check_visual_context(self, frame) -> None:
+        """Ambient 'what's James doing' check — tied to the same Nanny-cam
+        engage/disengage toggle as visitor detection, on its own much slower
+        cadence (this is a real Gemini vision call, ~1-3s, so it deliberately
+        runs synchronously on the monitor's own thread rather than on the
+        asyncio loop; that occasional pause doesn't meaningfully affect
+        face-detection responsiveness at a once-a-minute-ish cadence). Only
+        speaks up when describe_scene() judges something concretely worth
+        mentioning — most calls are expected to stay silent."""
+        try:
+            from actions.visual_context import describe_scene
+            result = describe_scene(frame, last_comment=self._last_visual_comment)
+        except Exception as e:
+            print(f"[VisualContext] ⚠️ {e}")
+            return
+
+        if not result.get("should_comment"):
+            return
+        comment = str(result.get("comment", "") or "").strip()
+        if not comment:
+            return
+
+        self._last_visual_comment = comment
+        if not self._loop or not self.session:
+            return
+        prompt = f"[VISUAL_CONTEXT] {comment} Mention this to the user naturally, briefly, in your own voice."
+        try:
+            asyncio.run_coroutine_threadsafe(
+                self.session.send_client_content(
+                    turns={"parts": [{"text": prompt}]},
+                    turn_complete=True,
+                ),
+                self._loop,
+            )
+        except Exception as e:
+            print(f"[VisualContext] ⚠️ speak failed: {e}")
+
     def _sweep_departed_visitors(self, now: float, debounce: float) -> None:
         """Anyone not re-seen within the debounce window is treated as having
         left — removed from the presence sets and logged (no text by default;
