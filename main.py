@@ -1633,6 +1633,8 @@ class JarvisLive:
         self._visitor_watch_cfg = self._load_visitor_watch_config()
         self._visitor_last_alert: dict[str, float] = {}
         self._known_visitor_last_alert: dict[str, float] = {}
+        self._last_visual_context_ts: float = 0.0
+        self._last_visual_comment: str | None = None
         self._present_known: dict[str, float] = {}                     # profile_key -> last-seen monotonic
         self._present_unknown: list[list] = []                         # [embedding, visitor_id, last-seen monotonic]
         self._visitor_monitor_thread: threading.Thread | None = None
