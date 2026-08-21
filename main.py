@@ -4926,6 +4926,62 @@ class JarvisLive:
             except Exception as e:
                 print(f"[SelfImprove] ⚠️ {e}")
 
+    async def _run_health_watchdog(self) -> None:
+        """Periodically self-diagnose and speak up when a subsystem breaks.
+
+        Exists because every outage in this system's history presented as
+        silence: the capability reported itself fine, nothing was logged, and
+        the failure was only found by manually inspecting a live process. This
+        closes that gap — Jarvis notices its own breakage and says so, once per
+        transition into failure (not repeatedly, which would be nagging) and
+        once again on recovery."""
+        interval = float(self._health_watchdog_cfg.get("interval_seconds", 300) or 300)
+        if not self._health_watchdog_cfg.get("enabled", True):
+            return
+
+        await asyncio.sleep(90)  # let subsystems finish starting before judging them
+        previously_failing: set[str] = set()
+
+        while True:
+            try:
+                await asyncio.sleep(interval)
+                if self._local_speech_gate_active():
+                    continue
+
+                from actions.system_health import collect_health
+                report = await asyncio.to_thread(collect_health, self)
+                now_failing = {
+                    c["name"] for c in report["checks"] if c["applicable"] and not c["ok"]
+                }
+
+                newly_failing = now_failing - previously_failing
+                recovered = previously_failing - now_failing
+                previously_failing = now_failing
+
+                if newly_failing:
+                    details = "; ".join(
+                        f"{c['name']}: {c['detail']}"
+                        for c in report["checks"]
+                        if c["name"] in newly_failing
+                    )
+                    self.ui.write_log(f"[HealthWatchdog] DEGRADED — {details}")
+                    if self.session:
+                        await self.session.send_client_content(
+                            turns={"parts": [{"text": (
+                                f"[SYSTEM_ALERT] One of your own subsystems just stopped working — {details}. "
+                                "Tell the user plainly and briefly what is broken."
+                            )}]},
+                            turn_complete=True,
+                        )
+                elif recovered:
+                    self.ui.write_log(f"[HealthWatchdog] recovered — {', '.join(sorted(recovered))}")
+            except RuntimeError as e:
+                if "cannot schedule new futures after shutdown" in str(e).lower():
+                    return
+                print(f"[HealthWatchdog] ⚠️ {e}")
+            except Exception as e:
+                print(f"[HealthWatchdog] ⚠️ {e}")
+
     async def _run_visitor_watch(self) -> None:
         """Starts (once, for the app's whole lifetime) a continuous background
         thread that holds the camera open and tracks people entering/leaving —
