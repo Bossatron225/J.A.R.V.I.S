@@ -268,10 +268,12 @@ class _FakeVisualSession:
 
 def test_check_visual_context_stays_silent_when_not_worth_commenting(monkeypatch) -> None:
     jarvis = JarvisLive(DummyUI())
-    monkeypatch.setattr("main.describe_scene", lambda frame, last_comment=None: {"should_comment": False, "comment": ""}, raising=False)
+
+    import sys
+    import types as pytypes
     monkeypatch.setitem(
-        __import__("sys").modules, "actions.visual_context",
-        __import__("types").SimpleNamespace(describe_scene=lambda frame, last_comment=None: {"should_comment": False, "comment": ""}),
+        sys.modules, "actions.visual_context",
+        pytypes.SimpleNamespace(describe_scene=lambda frame, last_comment=None: {"should_comment": False, "comment": ""}),
     )
 
     fake_session = _FakeVisualSession()
