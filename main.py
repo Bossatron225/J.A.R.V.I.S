@@ -1635,6 +1635,12 @@ class JarvisLive:
         self._known_visitor_last_alert: dict[str, float] = {}
         self._last_visual_context_ts: float = 0.0
         self._last_visual_comment: str | None = None
+        # Functional-health timestamps: "when did this last actually work",
+        # not "is the thread alive". Both outages this replaced (a dead live
+        # session that never reconnected, a garbage-collected worker poller)
+        # kept their threads/objects alive the whole time.
+        self._last_live_activity_ts: float = 0.0
+        self._local_worker_last_poll_ts: float = 0.0
         self._present_known: dict[str, float] = {}                     # profile_key -> last-seen monotonic
         self._present_unknown: list[list] = []                         # [embedding, visitor_id, last-seen monotonic]
         self._visitor_monitor_thread: threading.Thread | None = None
