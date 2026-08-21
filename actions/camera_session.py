@@ -227,6 +227,14 @@ class CameraSession:
         with self._frame_lock:
             return self._latest_frame
 
+    def last_frame_age_seconds(self) -> float | None:
+        """Seconds since the last real decoded frame, or None if none ever
+        arrived. Used by health checks to distinguish 'running' from 'working'."""
+        with self._frame_lock:
+            if not self._last_frame_ts:
+                return None
+            return time.monotonic() - self._last_frame_ts
+
     def release(self) -> None:
         """Release the device (and turn off the indicator light) when nothing
         needs it — call when continuous monitoring stops."""
