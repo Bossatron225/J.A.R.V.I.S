@@ -71,6 +71,18 @@ def main():
                     else:
                         print(commit_result.stderr.strip() or commit_result.stdout.strip())
                     
+                    # Gate the PUSH (not the commit) on the test suite. The
+                    # commit above always happens so local work is never lost,
+                    # but broken code should not propagate to GitHub and from
+                    # there to the VPS — dev_agent can rewrite this codebase on
+                    # its own, so an unreviewed bad change reaching both
+                    # machines is a real risk, not a hypothetical one.
+                    if not _tests_pass():
+                        print("Push HELD: test suite failing — committed locally, not pushing.")
+                        last_status = status
+                        time.sleep(POLL_SECONDS)
+                        continue
+
                     # Pull before pushing to avoid conflicts
                     pull_origin = run(["git", "pull", "--rebase", "origin", "HEAD"], cwd=REPO_ROOT, check=False)
                     if pull_origin.returncode != 0:
