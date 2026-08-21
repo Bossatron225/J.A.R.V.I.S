@@ -5462,6 +5462,11 @@ class JarvisLive:
         # whether Jarvis is mid-conversation.
         self._spawn_task(self._run_visitor_watch())
 
+        # Self-diagnosis runs for the app's whole lifetime too — a watchdog
+        # that only ran inside a live session would be blind to exactly the
+        # session-level outages it exists to catch.
+        self._spawn_task(self._run_health_watchdog())
+
         if self._remote_bridge is None and _resolve_jarvis_mode() == "worker":
             # Pure Mac-side worker for a VPS-hosted brain: no local mic, no local
             # Gemini Live session, no wake word. This Mac only acts when the VPS
