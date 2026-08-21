@@ -781,7 +781,23 @@ def _sandbox_test_and_apply(
         )
 
         sandbox_target = sandbox_dir / target_path.relative_to(project_root)
+        original_text = ""
+        try:
+            original_text = target_path.read_text(encoding="utf-8")
+        except Exception:
+            pass
         sandbox_target.write_text(proposed_code, encoding="utf-8")
+
+        # Show the actual diff. Previously the only visible artefact was a
+        # prose "Change: ..." note, so a self-improvement could rewrite a file
+        # arbitrarily with nothing showing what really changed.
+        if original_text:
+            diff_text = summarize_diff(
+                original_text, proposed_code, str(target_path.relative_to(project_root))
+            )
+            print(f"[DevAgent] diff for {target_path.relative_to(project_root)}:\n{diff_text}")
+            if player:
+                player.show_content("Proposed diff", diff_text)
 
         if player:
             report = _build_change_report(
