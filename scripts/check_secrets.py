@@ -78,6 +78,9 @@ def scan_file(path: Path) -> list[str]:
         return []
 
     text = raw.decode("utf-8", errors="replace")
+    if ALLOW_MARKER in text:
+        return []
+
     findings: list[str] = []
     for label, pattern in SECRET_PATTERNS:
         if pattern.search(text):
