@@ -178,6 +178,7 @@ def test_request_exclusive_terminates_subprocess_and_monitor_reopens_after(monke
         return len(processes) == 2
 
     assert _wait_until(_reopened, timeout=2.0)
+    session.release()
 
 
 def test_release_terminates_subprocess_and_clears_latest_frame(monkeypatch):
