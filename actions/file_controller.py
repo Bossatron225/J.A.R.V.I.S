@@ -535,29 +535,15 @@ def _visual_matches_baseline(live_image_bytes: bytes, baseline_image_bytes: byte
         return False
 
 
-def _verify_live_face_with_gemini(image_bytes: bytes, target_identity: str) -> bool:
-    if not image_bytes:
-        return False
-    api_key = _get_gemini_api_key()
-    if not api_key:
-        return False
-    try:
-        from google import genai
-        from google.genai import types as gtypes
-
-        client = genai.Client(api_key=api_key)
-        prompt = (
-            f"Look at this image and answer YES if it appears to be {target_identity} or a close match, otherwise NO. "
-            "Respond with a single word: YES or NO."
-        )
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=[gtypes.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"), prompt],
-        )
-        text = (getattr(response, "text", "") or "").strip().lower()
-        return "yes" in text
-    except Exception:
-        return False
+# _verify_live_face_with_gemini() was removed deliberately.
+#
+# It authenticated the user by sending a face to Gemini and asking
+# "is this <name>? YES/NO". An LLM is not an authenticator: the answer is
+# non-deterministic, it puts a network round-trip in the security path, and
+# it is promptable — a face shown alongside text instructing the model to
+# answer YES is a plausible bypass. Authentication now relies only on local,
+# deterministic biometric comparison (SFace embeddings, reference-photo
+# match, baseline comparison).
 
 
 def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, dict]:

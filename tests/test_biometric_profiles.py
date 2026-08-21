@@ -580,7 +580,6 @@ def _setup_lbph_evaluation(monkeypatch, model_match: bool, model_reason: str) ->
     monkeypatch.setattr(file_controller_module, "_verify_live_voice_with_gemini", lambda *args, **kwargs: True)
     # Legacy/network signals all say "yes" — the trained model must be authoritative regardless.
     monkeypatch.setattr(file_controller_module, "_verify_reference_face_match", lambda: (True, "ok"))
-    monkeypatch.setattr(file_controller_module, "_verify_live_face_with_gemini", lambda *args, **kwargs: True)
     monkeypatch.setattr(file_controller_module, "_load_primary_face_model", lambda: object())
     monkeypatch.setattr(file_controller_module, "_verify_live_face_with_trained_model", lambda model: (model_match, model_reason))
 
