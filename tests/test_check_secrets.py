@@ -1,3 +1,9 @@
+"""Tests for the credential scanner.
+
+check-secrets: allow-fixtures
+  ^ This file intentionally contains credential-SHAPED strings (all fake) to
+    prove the scanner catches them; without this marker it would flag itself.
+"""
 import subprocess
 import sys
 from pathlib import Path
