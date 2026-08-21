@@ -4366,7 +4366,7 @@ class JarvisLive:
                 print(f"[Briefing] Phase 2 error: {e}")
                 self.ui.write_log(f"SYS: Briefing phase 2 failed: {e}")
 
-        asyncio.create_task(_deliver_news())
+        self._spawn_task(_deliver_news())
 
     # ── Session memory ────────────────────────────────────────────────────────--
 
