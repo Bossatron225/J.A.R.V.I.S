@@ -3828,6 +3828,12 @@ class JarvisLive:
                 r = await loop.run_in_executor(None, lambda: visitor_log(parameters=args))
                 result = r or "Done."
 
+            elif name == "system_health":
+                from actions.system_health import collect_health, format_health
+                r = await loop.run_in_executor(None, lambda: format_health(collect_health(self)))
+                result = r or "Done."
+                self.ui.show_content("SELF-DIAGNOSTIC", result)
+
             else:
                 result = f"Unknown tool: {name}"
 
