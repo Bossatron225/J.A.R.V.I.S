@@ -210,6 +210,7 @@ class CameraSession:
             self._stderr_thread = None
         with self._frame_lock:
             self._latest_frame = None
+            self._last_frame_ts = 0.0
         # A deliberate close (release()/request_exclusive()) also makes the
         # reader thread hit EOF, which stamps _last_crash_ts as if this were a
         # real crash — reset it here so the retry cooldown only ever applies
