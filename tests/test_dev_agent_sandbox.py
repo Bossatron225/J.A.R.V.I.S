@@ -78,11 +78,20 @@ def test_sandbox_reporting_notifies_player_and_speech(tmp_path: Path) -> None:
     assert success is True
     assert "Sandbox validation passed" in report
     assert player.content_reports
-    assert player.content_reports[0][0] == "Jarvis edit"
-    assert "update the greeting" in player.content_reports[0][1]
-    assert "Reason:" in player.content_reports[0][1]
-    assert "Next:" in player.content_reports[0][1]
+    # Panel ORDER is not the contract — a "Proposed diff" panel now precedes
+    # the edit report so a self-improvement is reviewable before it lands.
+    # Assert the edit report exists and says the right things.
+    edit_reports = [text for title, text in player.content_reports if title == "Jarvis edit"]
+    assert edit_reports
+    assert "update the greeting" in edit_reports[0]
+    assert "Reason:" in edit_reports[0]
+    assert "Next:" in edit_reports[0]
     assert len(player.content_reports) >= 2
+
+    # The diff itself must be surfaced, not just a prose description of it.
+    diff_reports = [text for title, text in player.content_reports if title == "Proposed diff"]
+    assert diff_reports
+    assert "+" in diff_reports[0] and "-" in diff_reports[0]
     assert any("Applied to workspace" in report_text for _, report_text in player.content_reports)
     assert speech.messages
     assert any("sandboxed update" in msg.lower() or "applying the validated change" in msg.lower() or "updated" in msg.lower() for msg in speech.messages)
