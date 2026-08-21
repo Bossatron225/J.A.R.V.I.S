@@ -1625,6 +1625,7 @@ class JarvisLive:
         self._sys_monitor      = SystemMonitor()  # persistent cooldown state
         self._proactive        = ProactiveEngine()
         self._predictive_daemon = PredictiveAutomationDaemon(API_CONFIG_PATH)
+        self._background_tasks: set = set()
         self._predictive_cfg = self._load_predictive_config()
         self._diag_stream_cfg = self._load_diagnostics_stream_config()
         self._self_improve_cfg = self._load_self_improvement_config()
