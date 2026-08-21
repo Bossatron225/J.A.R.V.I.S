@@ -4271,7 +4271,6 @@ class JarvisLive:
             return (e.get("value", "") if isinstance(e, dict) else str(e)).strip()
 
         lang = _val("language")
-        name = _val("name")
         time_str = datetime.now().strftime("%H:%M")
 
         # Start fetching news immediately — runs in parallel while phase 1 plays
