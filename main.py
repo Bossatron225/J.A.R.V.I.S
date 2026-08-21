@@ -1643,6 +1643,7 @@ class JarvisLive:
         self._self_improve_cfg = self._load_self_improvement_config()
         self._visual_watch_cfg = self._load_visual_watch_config()
         self._visitor_watch_cfg = self._load_visitor_watch_config()
+        self._health_watchdog_cfg = self._load_health_watchdog_config()
         self._visitor_last_alert: dict[str, float] = {}
         self._known_visitor_last_alert: dict[str, float] = {}
         self._last_visual_context_ts: float = 0.0
