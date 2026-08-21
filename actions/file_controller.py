@@ -619,9 +619,13 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
         if voice_detected:
             reference_face_match, reference_face_reason = _verify_reference_face_match()
         if image_bytes:
-            if face_detected and (_verify_live_face_with_gemini(image_bytes, identity_name) or reference_face_match):
-                visual_detected = True
-            elif reference_face_match:
+            # An LLM is deliberately NOT part of the authentication decision.
+            # Asking Gemini "is this James? YES/NO" is non-deterministic, is a
+            # network dependency in the auth path, and is promptable — a face
+            # held next to text telling the model to answer YES is a plausible
+            # bypass of a security gate. Only local, deterministic biometric
+            # comparisons may grant access.
+            if reference_face_match:
                 visual_detected = True
             elif face_detected and stored_visual_sample:
                 try:
