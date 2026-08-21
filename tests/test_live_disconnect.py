@@ -229,6 +229,35 @@ def test_receive_audio_raises_on_clean_empty_stream_end(monkeypatch) -> None:
     assert jarvis.session is None
 
 
+def test_spawn_task_keeps_a_strong_reference_until_done() -> None:
+    """asyncio.create_task() alone only leaves a WEAK reference in the event
+    loop — per the asyncio docs, a task with nothing else referencing it can
+    be garbage-collected mid-run with no error. This is exactly what silently
+    killed the VPS local-worker poller: it ran fine for a while, then just
+    stopped with nothing in the logs. _spawn_task must hold a real reference
+    for the task's whole lifetime, and release it once the task finishes."""
+    async def _run() -> None:
+        jarvis = JarvisLive(DummyUI())
+        started = asyncio.Event()
+        finish = asyncio.Event()
+
+        async def _worker():
+            started.set()
+            await finish.wait()
+
+        task = jarvis._spawn_task(_worker())
+        await started.wait()
+
+        assert task in jarvis._background_tasks
+
+        finish.set()
+        await task
+
+        assert task not in jarvis._background_tasks
+
+    asyncio.run(_run())
+
+
 def test_wake_message_includes_remote_url_and_access_key() -> None:
     jarvis = JarvisLive(DummyUI())
 
