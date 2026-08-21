@@ -32,3 +32,11 @@ voice_clone/rvc_models/*.index
 ios/JarvisApp/JarvisApp.xcodeproj/
 ios/**/DerivedData/
 ios/**/*.xcuserstate
+
+# Vision access-log demo — local env overrides, enrolled face photos, and the
+# generated demo log are personal/machine-specific, not source.
+vision/.env
+vision/known_faces/*
+!vision/known_faces/.gitkeep
+vision/access_log_demo.jsonl
+vision/*.pt
