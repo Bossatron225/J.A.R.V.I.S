@@ -5011,6 +5011,93 @@ class JarvisLive:
             except Exception as e:
                 print(f"[SelfImprove] ⚠️ {e}")
 
+    async def _run_multi_step_task(self, args: dict) -> str:
+        """Plan (and optionally run) a request needing several dependent tools.
+
+        Execution deliberately routes each step back through _execute_tool, so
+        the biometric lock, headless-VPS guards, Mac delegation and audit trail
+        all still apply — a planner that called tools directly would bypass
+        every one of them."""
+        from actions import task_planner
+
+        request = str(args.get("request", "") or "").strip()
+        if not request:
+            return "No request provided, sir."
+        execute = bool(args.get("execute", False))
+
+        planner_tools = [
+            d["name"] for d in TOOL_DECLARATIONS
+            # Exclude self-referential and meta tools so a plan cannot recurse
+            # into itself or spend its steps on bookkeeping.
+            if d["name"] not in {"multi_step_task", "shutdown_jarvis", "dev_agent", "workspace_agent"}
+        ]
+
+        def _generate(prompt: str) -> str:
+            from google import genai as _genai
+            client = _genai.Client(api_key=_get_api_key())
+            resp = client.models.generate_content(model="models/gemini-flash-latest", contents=prompt)
+            try:
+                from memory.usage_log import record_usage
+                record_usage("multi_step_task", "gemini_text", 1)
+            except Exception:
+                pass
+            return getattr(resp, "text", "") or ""
+
+        loop = asyncio.get_running_loop()
+        try:
+            steps = await loop.run_in_executor(
+                None, lambda: task_planner.build_plan(request, planner_tools, _generate)
+            )
+        except task_planner.PlanError as exc:
+            return f"I couldn't build a workable plan for that, sir — {exc}"
+
+        plan_text = task_planner.format_plan(request, steps)
+        if not steps or not execute:
+            return plan_text
+
+        async def _run_step(tool_name: str, arguments: dict):
+            fc = types.FunctionCall(id=f"plan-{tool_name}", name=tool_name, args=arguments)
+            response = await self._execute_tool(fc)
+            return (response.response or {}).get("result")
+
+        results: list[dict] = []
+        failed: set[int] = set()
+        for index, step in enumerate(steps):
+            blocked = [d for d in step["depends_on"] if d in failed]
+            if blocked:
+                results.append({
+                    "step": index + 1, "tool": step["tool"], "intent": step["intent"],
+                    "status": "skipped",
+                    "detail": f"prerequisite step {', '.join(str(b + 1) for b in blocked)} failed",
+                })
+                failed.add(index)
+                continue
+            try:
+                output = await _run_step(step["tool"], dict(step["arguments"]))
+            except Exception as exc:
+                results.append({
+                    "step": index + 1, "tool": step["tool"], "intent": step["intent"],
+                    "status": "failed", "detail": f"raised {type(exc).__name__}: {exc}",
+                })
+                failed.add(index)
+                continue
+            ok, detail = task_planner.verify_step_output(output)
+            results.append({
+                "step": index + 1, "tool": step["tool"], "intent": step["intent"],
+                "status": "done" if ok else "failed", "detail": detail,
+            })
+            if not ok:
+                failed.add(index)
+
+        report = {
+            "ok": not failed,
+            "completed": sum(1 for r in results if r["status"] == "done"),
+            "total": len(steps),
+            "results": results,
+        }
+        jlog.record_action("multi_step_task", request, completed=f"{report['completed']}/{report['total']}")
+        return plan_text + "\n\n" + task_planner.format_execution(report)
+
     async def _run_health_watchdog(self) -> None:
         """Periodically self-diagnose and speak up when a subsystem breaks.
 
