@@ -1542,6 +1542,9 @@ TOOL_DECLARATIONS = [
             "unrecognized visitors (not enrolled household members). Use for asks like 'has anyone "
             "been seen', 'any visitors today', 'who's been at the door', 'start/engage the nanny-cam "
             "protocol', 'stop/disengage the nanny-cam protocol', or 'is the nanny-cam protocol on'. "
+            "IT DOES SAVE PHOTOGRAPHS: every unrecognized-visitor sighting writes a timestamped still "
+            "image to disk. Use action='snapshots' for 'show me the footage/photos/images/pictures'. "
+            "It records STILL PHOTOS only — never video — so say that rather than claiming nothing is stored. "
             "Works identically whether spoken to on the Mac or sent via the VPS dashboard. "
             "Never used to identify a stranger's real name or run a background check — logging and alerting only."
         ),
@@ -1552,6 +1555,7 @@ TOOL_DECLARATIONS = [
                     "type": "STRING",
                     "description": (
                         "recent (default) — list recent unrecognized-visitor sightings. "
+                        "snapshots — list the saved visitor photographs on disk. "
                         "start_watch — engage the nanny-cam protocol. "
                         "stop_watch — disengage the nanny-cam protocol. "
                         "watch_status — report whether it's currently engaged."
