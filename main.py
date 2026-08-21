@@ -1566,6 +1566,23 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "activity_report",
+        "description": (
+            "Reports what Jarvis has actually DONE — tools invoked, messages sent, visitors detected, "
+            "code changed — from its audit trail. Use for 'what did you do while I was out', "
+            "'what have you been doing', 'what happened today', 'show me your activity'. "
+            "For whether subsystems are healthy use system_health; for API spend use usage_report."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "limit": {"type": "INTEGER", "description": "How many recent actions to report (default 20)"},
+                "action": {"type": "STRING", "description": "Optional filter, e.g. tool_call, unknown_visitor_seen"},
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "usage_report",
         "description": (
             "Reports how many API calls Jarvis's own features have made and their estimated cost. "
@@ -3860,6 +3877,11 @@ class JarvisLive:
                 r = await loop.run_in_executor(None, lambda: visitor_log(parameters=args))
                 result = r or "Done."
 
+            elif name == "activity_report":
+                r = await loop.run_in_executor(None, lambda: jlog.activity_report(parameters=args))
+                result = r or "Done."
+                self.ui.show_content("ACTIVITY LOG", result)
+
             elif name == "usage_report":
                 from memory.usage_log import usage_report as _usage_report
                 r = await loop.run_in_executor(None, lambda: _usage_report(parameters=args))
@@ -3883,7 +3905,10 @@ class JarvisLive:
         if not self.ui.muted:
             self.ui.set_state("LISTENING")
 
-        print(f"[JARVIS] 📤 {name} → {str(result)[:80]}")
+        jlog.info("Tool", "completed", tool=name, result=result)
+        # Audit trail: Jarvis can send messages, control this machine, and
+        # rewrite its own source — every tool invocation is worth a record.
+        jlog.record_action("tool_call", name, result=result)
         return types.FunctionResponse(
             id=fc.id, name=name,
             response={"result": result}
@@ -5195,6 +5220,7 @@ class JarvisLive:
         else:
             name = (profiles.get("authorized") or {}).get(profile_key, {}).get("name") or profile_key
         notify_user(f"{name} was just seen at the camera.")
+        jlog.record_action("known_visitor_seen", name, profile_key=profile_key)
 
     def _handle_unknown_visitor_seen(self, result: dict, camera_index: int, cluster_window_days: int, now: float, cooldown: float) -> str | None:
         from auth import embedding_similarity, _sface_threshold
@@ -5228,6 +5254,11 @@ class JarvisLive:
         count = entry.get("sighting_count_at_time", 1)
         repeat_note = f" This is their {count}th sighting." if count > 1 else ""
         notify_user(f"An unrecognized visitor was just seen at the camera.{repeat_note}")
+        jlog.record_action(
+            "unknown_visitor_seen",
+            f"visitor {entry.get('visitor_id')} (sighting #{count})",
+            snapshot=entry.get("snapshot_path"),
+        )
 
         if self.session and self._loop:
             prompt = (
