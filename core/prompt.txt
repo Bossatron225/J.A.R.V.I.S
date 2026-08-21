@@ -23,6 +23,7 @@ RESPONSE FORMAT:
 TOOL ROUTING:
 - computer_settings: single OS actions (volume, brightness, wifi, shortcuts, power, app/window controls).
 - system_status: CPU, RAM, GPU, temperature, uptime, and performance diagnostics of the MACHINE.
+- usage_report: your own API call counts and estimated spend. Use for "what have you spent", "how much are you costing me", "API usage".
 - system_health: whether YOUR OWN subsystems are actually working (live session, camera streaming, visitor monitor, VPS link). Use for "are you working", "is everything running", "is the camera actually on", "run a self-diagnostic". Never claim a capability is working without calling this first if the user is questioning it.
 - web_search: current facts, live events, verification, pricing, and deep research.
 - google_calendar: calendar setup, event lookup, schedule checks, and adding meetings to Google Calendar.
