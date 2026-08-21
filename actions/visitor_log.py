@@ -261,11 +261,49 @@ def _format_sightings_summary(entries: list[dict]) -> str:
         by_visitor[vid] = entry  # keep the most recent entry per visitor (entries are time-sorted)
 
     parts = [f"{len(entries)} unrecognized visitor sighting{'s' if len(entries) != 1 else ''} logged recently:"]
+    saved = 0
     for vid, entry in by_visitor.items():
         ts = str(entry.get("ts", ""))
         count = entry.get("sighting_count_at_time", 1)
-        parts.append(f"- Visitor {vid}: last seen {ts}, seen {count} time{'s' if count != 1 else ''} total.")
+        # Surface the snapshot. Without this the tool reported only IDs and
+        # timestamps, so Jarvis had no idea stills existed and told the user
+        # it had no camera captures at all — while 10 JPEGs sat on disk.
+        snapshot = str(entry.get("snapshot_path") or "").strip()
+        line = f"- Visitor {vid}: last seen {ts}, seen {count} time{'s' if count != 1 else ''} total."
+        if snapshot:
+            saved += 1
+            line += f" Photo saved: {snapshot}"
+        parts.append(line)
+
+    if saved:
+        parts.append(
+            f"{saved} still image{'s are' if saved != 1 else ' is'} on disk in {SNAPSHOTS_DIR} "
+            "— these are timestamped photographs, not video (no video is ever recorded)."
+        )
     return "\n".join(parts)
+
+
+def list_snapshots(limit: int = 10) -> list[str]:
+    """Paths of the most recent saved visitor stills, newest last."""
+    if not SNAPSHOTS_DIR.exists():
+        return []
+    files = sorted(SNAPSHOTS_DIR.glob("*.jpg"), key=lambda p: p.name)
+    return [str(p) for p in (files[-limit:] if limit else files)]
+
+
+def _format_snapshots(paths: list[str]) -> str:
+    if not paths:
+        return (
+            "No visitor photographs have been saved yet, sir. Stills are only captured "
+            "when an unrecognized face is detected."
+        )
+    lines = [
+        f"{len(paths)} visitor photograph{'s' if len(paths) != 1 else ''} on disk "
+        "(timestamped stills — no video is recorded):"
+    ]
+    lines.extend(f"  {p}" for p in paths)
+    lines.append(f"Folder: {SNAPSHOTS_DIR}")
+    return "\n".join(lines)
 
 
 def visitor_log(
@@ -290,6 +328,9 @@ def visitor_log(
     if action in {"watch_status", "engaged_status"}:
         state = "engaged" if is_watch_active() else "disengaged"
         return f"Nanny-cam protocol is currently {state}, sir."
+
+    if action in {"snapshots", "photos", "footage", "images", "pictures"}:
+        return _format_snapshots(list_snapshots(limit=limit))
 
     if action in {"recent", "status", "list"}:
         entries = list_recent_sightings(limit=limit)
