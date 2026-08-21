@@ -5284,7 +5284,7 @@ class JarvisLive:
         if self._dashboard is not None:
             self._dashboard.set_connect_callback(self._on_phone_connected)
             self._dashboard.set_wake_callback(self._on_dashboard_wake)
-            asyncio.create_task(self._process_dashboard_commands())
+            self._spawn_task(self._process_dashboard_commands())
         elif vps_url:
             self.ui.write_log("SYS: VPS brain configured; local dashboard disabled to keep remote access alive.")
             self._dashboard = None
