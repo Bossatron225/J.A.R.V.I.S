@@ -4002,6 +4002,7 @@ class JarvisLive:
                 got_any_response = False
                 async for response in self.session.receive():
                     got_any_response = True
+                    self._last_live_activity_ts = time.monotonic()
 
                     if response.data:
                         if self._interrupted:
