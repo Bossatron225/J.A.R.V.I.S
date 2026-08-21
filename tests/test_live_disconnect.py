@@ -288,21 +288,22 @@ def test_check_visual_context_stays_silent_when_not_worth_commenting(monkeypatch
     assert jarvis._last_visual_comment is None
 
 
-def test_check_visual_context_speaks_and_remembers_comment_when_relevant() -> None:
+def test_check_visual_context_speaks_and_remembers_comment_when_relevant(monkeypatch) -> None:
+    import sys
+    import types as pytypes
+    monkeypatch.setitem(
+        sys.modules, "actions.visual_context",
+        pytypes.SimpleNamespace(describe_scene=lambda frame, last_comment=None: {
+            "should_comment": True,
+            "comment": "You appear to be working on a circuit board.",
+        }),
+    )
+
     async def _run():
         jarvis = JarvisLive(DummyUI())
         jarvis._loop = asyncio.get_running_loop()
         fake_session = _FakeVisualSession()
         jarvis.session = fake_session
-
-        import sys
-        import types as pytypes
-        sys.modules["actions.visual_context"] = pytypes.SimpleNamespace(
-            describe_scene=lambda frame, last_comment=None: {
-                "should_comment": True,
-                "comment": "You appear to be working on a circuit board.",
-            }
-        )
 
         jarvis._check_visual_context(frame="fake-frame")
         await asyncio.sleep(0)
@@ -316,16 +317,17 @@ def test_check_visual_context_speaks_and_remembers_comment_when_relevant() -> No
     asyncio.run(_run())
 
 
-def test_check_visual_context_does_nothing_without_a_live_session() -> None:
+def test_check_visual_context_does_nothing_without_a_live_session(monkeypatch) -> None:
+    import sys
+    import types as pytypes
+    monkeypatch.setitem(
+        sys.modules, "actions.visual_context",
+        pytypes.SimpleNamespace(describe_scene=lambda frame, last_comment=None: {"should_comment": True, "comment": "Something notable."}),
+    )
+
     jarvis = JarvisLive(DummyUI())
     jarvis._loop = None
     jarvis.session = None
-
-    import sys
-    import types as pytypes
-    sys.modules["actions.visual_context"] = pytypes.SimpleNamespace(
-        describe_scene=lambda frame, last_comment=None: {"should_comment": True, "comment": "Something notable."}
-    )
 
     jarvis._check_visual_context(frame="fake-frame")  # must not raise
 
