@@ -1565,6 +1565,21 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "usage_report",
+        "description": (
+            "Reports how many API calls Jarvis's own features have made and their estimated cost. "
+            "Use for 'what have you spent today', 'how much are you costing me', 'API usage', "
+            "'how many calls have you made'. Costs are estimates from a static rate table, not billed amounts."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "day": {"type": "STRING", "description": "Day to report in YYYY-MM-DD (default: today, UTC)"}
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "system_health",
         "description": (
             "Reports whether Jarvis's own subsystems are ACTUALLY working — live session, camera "
