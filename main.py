@@ -4074,7 +4074,7 @@ class JarvisLive:
                                 ext_audio_buf = []
                             elif self._use_external_tts and ext_audio_buf:
                                 self.ui.write_log("SYS: External TTS text missing; falling back to Gemini audio for this turn.")
-                                asyncio.create_task(self._play_external_audio_fallback(list(ext_audio_buf)))
+                                self._spawn_task(self._play_external_audio_fallback(list(ext_audio_buf)))
                                 ext_audio_buf = []
                             out_buf = []
 
