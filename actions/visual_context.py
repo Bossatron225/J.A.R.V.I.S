@@ -58,6 +58,18 @@ def describe_scene(frame, last_comment: str | None = None) -> dict:
     if not api_key:
         return {"should_comment": False}
 
+    # Runaway guard. This is the highest-volume unattended API caller in the
+    # system (~1 call/minute, forever), so a scheduling bug or a shortened
+    # interval could silently multiply spend. Cap it well above the expected
+    # rate — normal operation is ~60/hour, so 200 means something is wrong.
+    try:
+        from memory.usage_log import calls_since, record_usage
+        if calls_since("visual_context", 3600) > MAX_CALLS_PER_HOUR:
+            print("[VisualContext] hourly call cap reached — skipping (possible runaway).")
+            return {"should_comment": False}
+    except Exception:
+        record_usage = None
+
     try:
         ok, jbuf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
         if not ok:
