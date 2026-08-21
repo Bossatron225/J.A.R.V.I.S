@@ -44,6 +44,33 @@ def main():
             if status.strip():
                 if status != last_status:
                     run(["git", "add", "-A"], cwd=REPO_ROOT)
+
+                    # `git add -A` is indiscriminate — it is exactly how a
+                    # timestamped backup of config/api_keys.json (not matched by
+                    # the bare-filename ignore rule at the time) ended up staged
+                    # with live API keys in it. Scan what is actually staged and
+                    # bail out before creating the commit if anything looks like
+                    # a credential; unstage first so the next poll does not just
+                    # re-commit it.
+                    secrets = run(
+                        [sys.executable, str(REPO_ROOT / "scripts" / "check_secrets.py")],
+                        cwd=REPO_ROOT, check=False,
+                    )
+                    if secrets.returncode != 0:
+                        print(secrets.stderr.strip() or secrets.stdout.strip())
+                        print("Auto-commit ABORTED: refusing to commit credentials.")
+                        run(["git", "reset"], cwd=REPO_ROOT, check=False)
+                        last_status = status
+                        time.sleep(POLL_SECONDS)
+                        continue
+
+                    if not _tests_pass():
+                        print("Auto-commit HELD: test suite failing — not pushing broken code.")
+                        run(["git", "reset"], cwd=REPO_ROOT, check=False)
+                        last_status = status
+                        time.sleep(POLL_SECONDS)
+                        continue
+
                     message = f"chore: auto-commit {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                     commit_result = run(["git", "commit", "-m", message], cwd=REPO_ROOT, check=False)
                     if commit_result.returncode == 0:
