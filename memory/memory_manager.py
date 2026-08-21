@@ -114,8 +114,14 @@ def _trim_to_limit(memory: dict) -> dict:
             sessions.pop(0)
         memory["sessions"] = sessions
 
-    entries = _all_entries(memory)
-    entries.sort(key=lambda t: t[2].get("updated", "0000-00-00"))
+    # Least-durable category first, then oldest within a category — so a stale
+    # note is discarded long before a relationship or identity fact.
+    def _priority(item) -> tuple:
+        cat, _key, entry = item
+        rank = TRIM_PRIORITY.index(cat) if cat in TRIM_PRIORITY else len(TRIM_PRIORITY)
+        return (rank, entry.get("updated", "0000-00-00"))
+
+    entries = sorted(_all_entries(memory), key=_priority)
     for cat, key, _ in entries:
         if len(json.dumps(memory, ensure_ascii=False)) <= MEMORY_MAX_CHARS:
             break
@@ -251,8 +257,11 @@ def format_memory_for_prompt(memory: dict | None) -> str:
 
     header = "[WHAT YOU KNOW ABOUT THIS PERSON — use naturally, never recite like a list]\n"
     result = header + "\n".join(lines)
-    if len(result) > 2000:
-        result = result[:1997] + "…"
+    if len(result) > PROMPT_MAX_CHARS:
+        # Truncating the PROMPT is fine — unlike the old storage cap, nothing is
+        # lost here. Anything cut is still on disk and retrievable via the
+        # personal_memory tool's semantic search.
+        result = result[: PROMPT_MAX_CHARS - 3] + "…"
 
     return result + "\n"
 
