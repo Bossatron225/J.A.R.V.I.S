@@ -5535,7 +5535,7 @@ class JarvisLive:
                 self._current_live_model = None
                 # Only save if there was a real conversation (≥3 turns)
                 if len(self._session_log) >= 3:
-                    asyncio.create_task(self._save_session_summary())
+                    self._spawn_task(self._save_session_summary())
 
                 vps_url = os.getenv('JARVIS_VPS_URL')
                 if vps_url:
