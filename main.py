@@ -3008,6 +3008,20 @@ class JarvisLive:
         self.ui.write_log(f"ERR: {tool_name} — {short}")
         self.speak(f"Sir, {tool_name} encountered an error. {short}")
 
+    def _spawn_task(self, coro) -> asyncio.Task:
+        """asyncio.create_task() on its own only leaves a WEAK reference to the
+        task inside the event loop — per the asyncio docs, with nothing else
+        holding a strong reference the task can be garbage-collected mid-run,
+        silently, with no exception or log line. Long-running background loops
+        created this way (e.g. the VPS local-worker poller) can simply stop
+        after running fine for a while, which is exactly what happened before
+        this existed. Route every standalone (non-TaskGroup) background task
+        through here instead of calling asyncio.create_task() directly."""
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
+
     def _local_speech_gate_active(self) -> bool:
         """True only on the local desktop Mac app while BiometricLock_Protocol hasn't
         cleared — used to hold Jarvis's own speech/messages/proactive routines silent
