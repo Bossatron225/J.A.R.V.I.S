@@ -661,6 +661,38 @@ async def _run_wiz(params: dict[str, Any]) -> str:
     return "Unknown WiZ action. Use discover, status, on, off, or set."
 
 
+def _run_blocking(coro):
+    """Jarvis executes tools from inside its live asyncio loop (the Gemini Live
+    session), where asyncio.run() raises "asyncio.run() cannot be called from a
+    running event loop" — so every WiZ command from Jarvis failed with
+    "WiZ control failed", while the same call from a plain sync script worked.
+
+    When a loop is already running, run the coroutine on its own loop in a worker
+    thread and block until it finishes; otherwise use asyncio.run() directly.
+    A thread is used rather than run_coroutine_threadsafe because pywizlight's
+    sockets must be created on the same loop that awaits them."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    box: dict[str, Any] = {}
+
+    def _worker() -> None:
+        try:
+            box["value"] = asyncio.run(coro)
+        except BaseException as exc:  # re-raised on the calling thread below
+            box["error"] = exc
+
+    thread = threading.Thread(target=_worker, daemon=True, name="wiz-lights")
+    thread.start()
+    thread.join()
+
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
+
+
 def wiz_lights(parameters: dict, response=None, player=None, session_memory=None) -> str:
     if not _WIZ_OK:
         return "pywizlight is not installed. Install it with your active Python interpreter and try again."
@@ -670,6 +702,6 @@ def wiz_lights(parameters: dict, response=None, player=None, session_memory=None
     _log(f"Action: {action} Params: {params}", player)
 
     try:
-        return asyncio.run(_run_wiz(params))
+        return _run_blocking(_run_wiz(params))
     except Exception as e:
         return f"WiZ control failed: {e}"

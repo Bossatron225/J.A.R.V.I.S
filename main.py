@@ -3297,6 +3297,9 @@ class JarvisLive:
             "security_biometrics",
             "send_message",
             "visitor_log",
+            # WiZ bulbs live on the home LAN (192.168.x.x), which the VPS cannot
+            # route to from its datacenter — light commands have to run on the Mac.
+            "wiz_lights",
             "youtube_video",
         }
         request_local_action = getattr(self._remote_bridge, "request_local_action", None)
