@@ -541,25 +541,7 @@ def test_verify_face_against_model_matches_and_rejects(monkeypatch) -> None:
     assert ok is True
     stored = auth_module.np.load(auth_module.io.BytesIO(model_bytes), allow_pickle=False)
 
-    class FakeCapture:
-        def __init__(self, frame):
-            self._frame = frame
-            self._served = False
-
-        def isOpened(self):
-            return True
-
-        def read(self):
-            if self._served:
-                return False, None
-            self._served = True
-            return True, self._frame
-
-        def release(self):
-            pass
-
-    blank_frame = np.zeros((4, 4, 3), dtype=np.uint8)
-    monkeypatch.setattr(auth_module.cv2, "VideoCapture", lambda idx: FakeCapture(blank_frame))
+    _prime_camera_session_with_a_frame(monkeypatch)
 
     matching_embedding = _fake_embed_bytes(base_embedding)(bytes([7]))
     monkeypatch.setattr(auth_module, "_detect_and_embed", lambda frame: matching_embedding)
