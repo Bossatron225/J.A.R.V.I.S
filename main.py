@@ -1566,6 +1566,24 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "multi_step_task",
+        "description": (
+            "Plans and runs a request that needs SEVERAL tools in sequence, passing between them and "
+            "verifying each step actually worked before continuing. Use when a request contains multiple "
+            "dependent actions — e.g. 'find a flight, add it to my calendar and text her the details', "
+            "'check the weather then message John if it's raining'. For a single action, call that tool "
+            "directly instead. Defaults to planning only; set execute=true to actually run the steps."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "request": {"type": "STRING", "description": "The full multi-step request in the user's own words"},
+                "execute": {"type": "BOOLEAN", "description": "true to run the plan; false (default) to only show it"},
+            },
+            "required": ["request"],
+        },
+    },
+    {
         "name": "activity_report",
         "description": (
             "Reports what Jarvis has actually DONE — tools invoked, messages sent, visitors detected, "
@@ -3876,6 +3894,10 @@ class JarvisLive:
             elif name == "visitor_log":
                 r = await loop.run_in_executor(None, lambda: visitor_log(parameters=args))
                 result = r or "Done."
+
+            elif name == "multi_step_task":
+                result = await self._run_multi_step_task(args)
+                self.ui.show_content("MULTI-STEP TASK", result)
 
             elif name == "activity_report":
                 r = await loop.run_in_executor(None, lambda: jlog.activity_report(parameters=args))
