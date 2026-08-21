@@ -35,10 +35,21 @@ class _FakeClient:
         self.models = _FakeModels(response_text, captured)
 
 
+class _FakePart:
+    @staticmethod
+    def from_bytes(data, mime_type):
+        return f"<part mime_type={mime_type} bytes={len(data)}>"
+
+
 def _install_fake_genai(monkeypatch, response_text: str) -> dict:
     captured: dict = {}
-    fake_genai_module = types.SimpleNamespace(Client=lambda api_key: _FakeClient(response_text, captured))
+    fake_types_module = types.SimpleNamespace(Part=_FakePart)
+    fake_genai_module = types.SimpleNamespace(
+        Client=lambda api_key: _FakeClient(response_text, captured),
+        types=fake_types_module,
+    )
     monkeypatch.setitem(sys.modules, "google.genai", fake_genai_module)
+    monkeypatch.setitem(sys.modules, "google.genai.types", fake_types_module)
     monkeypatch.setitem(sys.modules, "google", types.SimpleNamespace(genai=fake_genai_module))
     return captured
 
