@@ -5296,6 +5296,7 @@ class JarvisLive:
                 completed = await asyncio.to_thread(
                     worker.poll_for_tasks, 5.0, 5, self._on_local_task_state
                 )
+                self._local_worker_last_poll_ts = time.monotonic()
                 if not self._vps_link_established_said:
                     self._vps_link_established_said = True
                     self.ui.write_log("SYS: VPS local worker link established.")
