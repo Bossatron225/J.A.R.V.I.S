@@ -3856,6 +3856,12 @@ class JarvisLive:
                 r = await loop.run_in_executor(None, lambda: visitor_log(parameters=args))
                 result = r or "Done."
 
+            elif name == "usage_report":
+                from memory.usage_log import usage_report as _usage_report
+                r = await loop.run_in_executor(None, lambda: _usage_report(parameters=args))
+                result = r or "Done."
+                self.ui.show_content("API USAGE", result)
+
             elif name == "system_health":
                 from actions.system_health import collect_health, format_health
                 r = await loop.run_in_executor(None, lambda: format_health(collect_health(self)))
