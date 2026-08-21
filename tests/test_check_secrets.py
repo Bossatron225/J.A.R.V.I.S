@@ -27,7 +27,10 @@ def test_detects_elevenlabs_key(tmp_path):
 
 
 def test_detects_google_oauth_style_key(tmp_path):
-    findings = _scan(tmp_path, "cfg.json", '{"gemini_api_key": "AQ.Ab8RN6' + "X" * 40 + '"}')
+    # Prefix is deliberately nonsense ("AQ.Zz0000"), NOT copied from any real
+    # key — this repo is public, so even a partial real prefix does not belong
+    # in a fixture.
+    findings = _scan(tmp_path, "cfg.json", '{"gemini_api_key": "AQ.Zz0000' + "X" * 40 + '"}')
     assert any("Google" in f for f in findings)
 
 
