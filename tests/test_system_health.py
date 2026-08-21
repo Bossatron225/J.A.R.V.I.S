@@ -135,9 +135,24 @@ def test_camera_not_marked_failed_when_disengaged(monkeypatch):
     assert report["ok"] is True
 
 
-def test_camera_not_marked_failed_while_biometric_lock_holds_it_off():
+def test_camera_must_keep_streaming_even_while_biometric_lock_is_engaged(monkeypatch):
+    """Monitoring is supposed to run while locked — that is precisely when
+    nobody is home. A stalled camera during lock is a real fault, not an N/A."""
+    from actions import camera_session
+
+    class _NeverDelivers:
+        def last_frame_age_seconds(self):
+            return None
+
+    monkeypatch.setattr(camera_session, "get_camera_session", lambda idx=0: _NeverDelivers())
+
     report = sh.collect_health(_FakeJarvis(_gate=True))
-    assert _named(report, "camera_frames")["applicable"] is False
+    assert _named(report, "camera_frames")["ok"] is False
+
+
+def test_camera_healthy_while_locked_is_reported_ok():
+    report = sh.collect_health(_FakeJarvis(_gate=True))
+    assert _named(report, "camera_frames")["ok"] is True
     assert report["ok"] is True
 
 
