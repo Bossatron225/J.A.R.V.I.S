@@ -165,27 +165,36 @@ def build_personal_memory_context(json_memory: object, obsidian_profile: object)
 
 
 def recall_personal_memory(query: str) -> str:
-    """Search both JSON-backed and Obsidian-backed memory for a query."""
-    from memory.memory_manager import load_memory, format_memory_for_prompt
+    """Search every memory store by meaning.
 
-    query_text = (query or "").strip().lower()
+    Previously this substring-matched against format_memory_for_prompt()'s
+    output, which is capped for prompt injection — so any fact past that cap
+    was unreachable, and a question phrased differently from the stored key
+    ("who is my partner" vs `girlfriend_name`) found nothing. Now delegates to
+    semantic_recall.search_memory(), which ranks the FULL stores by meaning and
+    falls back to substring matching when embeddings are unavailable."""
+    query_text = (query or "").strip()
     if not query_text:
         return "No query provided."
 
-    memory = load_memory()
-    json_text = format_memory_for_prompt(memory).strip()
-    obsidian_text = recall_user_profile().strip()
+    try:
+        from memory.semantic_recall import format_recall, search_memory
+        return format_recall(query_text, search_memory(query_text))
+    except Exception as exc:
+        # Never let recall hard-fail — fall back to the old direct scan.
+        from memory.memory_manager import format_memory_for_prompt, load_memory
 
-    hits: list[str] = []
-    if json_text and query_text in json_text.lower():
-        hits.append("JSON memory: " + json_text[:700].strip())
-    if obsidian_text and query_text in obsidian_text.lower():
-        hits.append("Obsidian memory: " + obsidian_text[:700].strip())
-
-    if not hits:
-        return f"No matching memory found for '{query}'."
-
-    return "\n\n".join(hits[:2])
+        lowered = query_text.lower()
+        hits: list[str] = []
+        json_text = format_memory_for_prompt(load_memory()).strip()
+        obsidian_text = recall_user_profile().strip()
+        if json_text and lowered in json_text.lower():
+            hits.append("JSON memory: " + json_text[:700].strip())
+        if obsidian_text and lowered in obsidian_text.lower():
+            hits.append("Obsidian memory: " + obsidian_text[:700].strip())
+        if not hits:
+            return f"No matching memory found for '{query}' ({exc})."
+        return "\n\n".join(hits[:2])
 
 
 def recall_user_profile() -> str:
