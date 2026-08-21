@@ -17,6 +17,16 @@ from ui import ManageProfilesOverlay
 cv2 = pytest.importorskip("cv2")
 
 
+@pytest.fixture(autouse=True)
+def _isolate_camera_sessions():
+    # get_camera_session() caches one CameraSession per index at module scope
+    # — clear it so a fake-subprocess session from this file's tests never
+    # leaks into (or is polluted by) another test file's session state.
+    camera_session_module._sessions.clear()
+    yield
+    camera_session_module._sessions.clear()
+
+
 class _FakeCameraStream:
     """Real os.pipe()-backed file object so the CameraSession reader thread's
     blocking .read(n) calls behave like a real subprocess pipe."""
