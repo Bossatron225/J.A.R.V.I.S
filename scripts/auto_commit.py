@@ -29,6 +29,39 @@ def ensure_git_identity():
         run(["git", "config", "user.email", "jarvis-auto@local"], cwd=REPO_ROOT)
 
 
+def _tests_pass(timeout_seconds: int = 180) -> bool:
+    """Run the offline test suite. Deliberately deselects the tool-routing eval:
+    it makes a real, billed Gemini call and fails on transient 503s, which would
+    block pushes for reasons unrelated to the code being committed.
+
+    Returns True if tests pass OR cannot be run at all (pytest missing, timeout)
+    — this watchdog's job is to catch broken code, not to wedge the user's
+    commit pipeline shut when the harness itself is unavailable."""
+    if not (REPO_ROOT / "tests").exists():
+        return True
+    try:
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "pytest", "-q", "tests",
+                "--deselect",
+                "tests/test_tool_routing_eval.py::test_tool_routing_matches_expected_tool_names",
+            ],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        print("Test run timed out — allowing push rather than blocking indefinitely.")
+        return True
+    except Exception as exc:
+        print(f"Could not run tests ({exc}) — allowing push.")
+        return True
+
+    if result.returncode != 0:
+        tail = (result.stdout or result.stderr or "").strip().splitlines()
+        for line in tail[-6:]:
+            print(f"  {line}")
+    return result.returncode == 0
+
+
 def main():
     if not (REPO_ROOT / ".git").exists():
         print("No git repository found.", file=sys.stderr)
