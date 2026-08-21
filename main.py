@@ -3089,8 +3089,10 @@ class JarvisLive:
 
         # Identity injection — overrides any hardcoded name in prompt.txt
         _addr = (
-            "ADDRESS: When speaking Turkish, always say \"efendim\". "
-            "When speaking English, always say \"sir\". "
+            "ADDRESS: Always address the user as \"sir\", in every language. "
+            "Even when replying in a language that has its own honorific, still say \"sir\" "
+            "— do not substitute \"efendim\" or any other translation. "
+            "Never say \"ma'am\" or any other form of address. "
             "Never address the user by personal name unless explicitly asked to do so. "
             "Never call the user \"James\"."
         )
