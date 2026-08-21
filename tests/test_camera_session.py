@@ -173,7 +173,11 @@ def test_request_exclusive_terminates_subprocess_and_monitor_reopens_after(monke
 
     # Reopening after a deliberate close must not be cooldown-gated — only a
     # genuine crash should ever incur the retry cooldown.
-    assert _wait_until(lambda: len(processes) == 2, timeout=2.0)
+    def _reopened():
+        session.get_frame()
+        return len(processes) == 2
+
+    assert _wait_until(_reopened, timeout=2.0)
 
 
 def test_release_terminates_subprocess_and_clears_latest_frame(monkeypatch):
