@@ -74,6 +74,15 @@ def test_healthy_process_reports_ok():
     assert report["ok"] is True
 
 
+def test_worker_mode_does_not_report_absent_live_session_as_broken():
+    """On the Mac running as a pure VPS worker there is deliberately never a
+    local live session — flagging that would be a permanent false alarm and
+    would train the user to ignore the watchdog."""
+    report = sh.collect_health(_FakeJarvis(session=None, _worker_mode=True))
+    assert _named(report, "live_session")["applicable"] is False
+    assert report["ok"] is True
+
+
 def test_missing_live_session_is_a_failure():
     report = sh.collect_health(_FakeJarvis(session=None))
     assert report["ok"] is False
