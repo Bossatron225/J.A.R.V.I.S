@@ -30,6 +30,15 @@ memory/visitor_snapshots/
 # API, not via git.
 memory/conversations.jsonl
 
+# Personal memory stays on the private VPS, never in this (public) repo.
+# The VPS is the source of truth: its service reads/writes JARVIS_DATA_DIR
+# (/var/lib/jarvis, outside the repo) and the Mac pulls from it at session
+# start via load_memory_with_vps_sync() -> GET /api/memory. Git was only ever
+# a redundant third copy, and it published personal facts — including a third
+# party's name and phone number — to a public repository.
+memory/long_term.json
+memory/document_index.json
+
 # Auto-commit helper
 scripts/__pycache__/
 
