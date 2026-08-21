@@ -539,7 +539,7 @@ async def _run_wiz(params: dict[str, Any]) -> str:
                 s = await _status_for(light)
                 rows.append(
                     f"{s['ip']}: {'on' if s['on'] else 'off'}, "
-                    f"brightness={s['brightness']}, rgb={s['rgb']}, kelvin={s['kelvin']}"
+                    f"brightness={s['brightness']}%, rgb={s['rgb']}, kelvin={s['kelvin']}"
                 )
             except Exception as e:
                 failed += 1
@@ -554,7 +554,7 @@ async def _run_wiz(params: dict[str, Any]) -> str:
                         s = await _status_for(light)
                         rows.append(
                             f"{s['ip']}: {'on' if s['on'] else 'off'}, "
-                            f"brightness={s['brightness']}, rgb={s['rgb']}, kelvin={s['kelvin']}"
+                            f"brightness={s['brightness']}%, rgb={s['rgb']}, kelvin={s['kelvin']}"
                         )
                     except Exception as e:
                         rows.append(f"{getattr(light, 'ip', 'unknown')}: status failed ({e})")
