@@ -17,7 +17,27 @@ DATA_DIR         = Path(os.getenv("JARVIS_DATA_DIR") or (BASE_DIR / "memory")).e
 MEMORY_PATH      = DATA_DIR / "long_term.json"
 _lock            = Lock()
 MAX_VALUE_LENGTH = 380
-MEMORY_MAX_CHARS = 2200
+
+# Storage limit, deliberately decoupled from the prompt limit below.
+#
+# These used to be the same 2200-char number, which meant the amount Jarvis
+# could REMEMBER was capped by how much fits in a system prompt — so facts were
+# silently deleted (see _trim_to_limit's "Trimmed" log line) once the file
+# filled up. It was at 2062/2200 when this changed: ~140 characters from losing
+# real personal history. Storage is now effectively unbounded for human-scale
+# memory; retrieval, not deletion, is what keeps the prompt small.
+MEMORY_MAX_CHARS = 400_000
+
+# How much memory gets injected into the system prompt at session start. The
+# rest stays on disk and is reachable on demand through semantic recall
+# (memory/semantic_recall.py), so nothing has to be thrown away to fit.
+PROMPT_MAX_CHARS = 2000
+
+# When storage genuinely does overflow, drop from the least durable categories
+# first. Previously trimming was purely oldest-first, which would happily
+# delete a relationship or identity fact to keep a stale note.
+TRIM_PRIORITY = ["sessions", "notes", "wishes", "projects", "preferences", "relationships", "identity"]
+
 SESSION_MAX      = 20
 SESSION_TEXT_MAX = 240
 
