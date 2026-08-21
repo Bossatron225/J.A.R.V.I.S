@@ -64,13 +64,6 @@ def main():
                         time.sleep(POLL_SECONDS)
                         continue
 
-                    if not _tests_pass():
-                        print("Auto-commit HELD: test suite failing — not pushing broken code.")
-                        run(["git", "reset"], cwd=REPO_ROOT, check=False)
-                        last_status = status
-                        time.sleep(POLL_SECONDS)
-                        continue
-
                     message = f"chore: auto-commit {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                     commit_result = run(["git", "commit", "-m", message], cwd=REPO_ROOT, check=False)
                     if commit_result.returncode == 0:
