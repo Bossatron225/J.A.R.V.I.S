@@ -1,0 +1,15 @@
+# Optional dependencies for vision/person_access_demo.py
+# Install with: pip install -r vision/requirements-vision.txt
+#
+# face_recognition depends on dlib, which needs cmake + a C++ toolchain to
+# build from source on most platforms:
+#   macOS:   brew install cmake
+#   Ubuntu:  sudo apt-get install -y cmake build-essential
+# If dlib fails to build, try `pip install dlib-binary` first (prebuilt
+# wheels for common platforms), then `pip install face_recognition`.
+
+opencv-python
+ultralytics
+face_recognition
+python-dotenv
+pyttsx3
