@@ -258,6 +258,76 @@ def test_spawn_task_keeps_a_strong_reference_until_done() -> None:
     asyncio.run(_run())
 
 
+class _FakeVisualSession:
+    def __init__(self):
+        self.sent = []
+
+    async def send_client_content(self, turns, turn_complete):
+        self.sent.append(turns["parts"][0]["text"])
+
+
+def test_check_visual_context_stays_silent_when_not_worth_commenting(monkeypatch) -> None:
+    jarvis = JarvisLive(DummyUI())
+    monkeypatch.setattr("main.describe_scene", lambda frame, last_comment=None: {"should_comment": False, "comment": ""}, raising=False)
+    monkeypatch.setitem(
+        __import__("sys").modules, "actions.visual_context",
+        __import__("types").SimpleNamespace(describe_scene=lambda frame, last_comment=None: {"should_comment": False, "comment": ""}),
+    )
+
+    fake_session = _FakeVisualSession()
+    jarvis.session = fake_session
+    jarvis._loop = asyncio.new_event_loop()
+    try:
+        jarvis._check_visual_context(frame="fake-frame")
+    finally:
+        jarvis._loop.close()
+
+    assert fake_session.sent == []
+    assert jarvis._last_visual_comment is None
+
+
+def test_check_visual_context_speaks_and_remembers_comment_when_relevant() -> None:
+    async def _run():
+        jarvis = JarvisLive(DummyUI())
+        jarvis._loop = asyncio.get_running_loop()
+        fake_session = _FakeVisualSession()
+        jarvis.session = fake_session
+
+        import sys
+        import types as pytypes
+        sys.modules["actions.visual_context"] = pytypes.SimpleNamespace(
+            describe_scene=lambda frame, last_comment=None: {
+                "should_comment": True,
+                "comment": "You appear to be working on a circuit board.",
+            }
+        )
+
+        jarvis._check_visual_context(frame="fake-frame")
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)  # let the scheduled coroutine actually run
+
+        assert len(fake_session.sent) == 1
+        assert "circuit board" in fake_session.sent[0]
+        assert fake_session.sent[0].startswith("[VISUAL_CONTEXT]")
+        assert jarvis._last_visual_comment == "You appear to be working on a circuit board."
+
+    asyncio.run(_run())
+
+
+def test_check_visual_context_does_nothing_without_a_live_session() -> None:
+    jarvis = JarvisLive(DummyUI())
+    jarvis._loop = None
+    jarvis.session = None
+
+    import sys
+    import types as pytypes
+    sys.modules["actions.visual_context"] = pytypes.SimpleNamespace(
+        describe_scene=lambda frame, last_comment=None: {"should_comment": True, "comment": "Something notable."}
+    )
+
+    jarvis._check_visual_context(frame="fake-frame")  # must not raise
+
+
 def test_wake_message_includes_remote_url_and_access_key() -> None:
     jarvis = JarvisLive(DummyUI())
 
