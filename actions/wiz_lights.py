@@ -374,8 +374,22 @@ async def _discover(wait_sec: float = 2.5):
     return discovered
 
 
+def _unwrap_state(state):
+    """pywizlight >= 0.6 changed updateState() to return a list of PilotParser —
+    one entry per head (dual-head bulbs get two, single-head bulbs one) — instead
+    of a bare PilotParser. Entries can also be None when a head didn't report.
+    Both shapes are accepted here because the Mac and the VPS can end up on
+    different pywizlight versions; before this, every status call died with
+    "'list' object has no attribute 'get_state'"."""
+    if isinstance(state, (list, tuple)):
+        state = next((entry for entry in state if entry is not None), None)
+    if state is None:
+        raise RuntimeError("bulb returned no state")
+    return state
+
+
 async def _status_for(light) -> dict[str, Any]:
-    state = await light.updateState()
+    state = _unwrap_state(await light.updateState())
     return {
         "ip": getattr(light, "ip", "unknown"),
         "on": bool(state.get_state()),
