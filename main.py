@@ -4113,7 +4113,7 @@ class JarvisLive:
                     # just repeats this silently forever, so self.session is left
                     # stale and nothing ever tells the outer reconnect loop the
                     # live session is actually dead.
-                    raise ConnectionError("Live session closed (receive stream ended cleanly)")
+                    raise ConnectionError("Live session disconnected (receive stream ended cleanly, no close error)")
         except Exception as e:
             if _is_disconnect_error(e):
                 print(f"[JARVIS] ⚠️ Live session disconnected: {e}")
