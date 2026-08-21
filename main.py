@@ -2286,6 +2286,18 @@ class JarvisLive:
         return cfg
 
     @staticmethod
+    def _load_health_watchdog_config() -> dict:
+        cfg = {"enabled": True, "interval_seconds": 300}
+        try:
+            with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            cfg["enabled"] = bool(raw.get("health_watchdog_enabled", cfg["enabled"]))
+            cfg["interval_seconds"] = max(60, min(int(raw.get("health_watchdog_interval_seconds", cfg["interval_seconds"]) or 300), 3600))
+        except Exception:
+            pass
+        return cfg
+
+    @staticmethod
     def _load_visitor_watch_config() -> dict:
         cfg = {
             "enabled": True,
