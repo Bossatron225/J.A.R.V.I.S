@@ -2581,7 +2581,7 @@ class JarvisLive:
                 self._reboot_in_progress = False
                 return
 
-        asyncio.create_task(_do_reboot())
+        self._spawn_task(_do_reboot())
         return True
 
     async def _maybe_handle_imessage_wake_protocol(self, alert: dict) -> bool:
