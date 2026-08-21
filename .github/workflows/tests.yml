@@ -1,0 +1,44 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install test dependencies
+        # Deliberately not installing requirements.txt: it pulls the full
+        # desktop stack (PyQt, sounddevice, portaudio) which needs system
+        # packages and a display, none of which exist on a CI runner. The
+        # suite's own modules degrade gracefully when optional deps are
+        # missing (see the pytest.importorskip / _HAS_* guards), so this
+        # installs just what the offline tests genuinely need.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest numpy requests opencv-contrib-python-headless google-genai
+
+      - name: Secret scan
+        # Same guard the auto-commit watcher runs locally — catches a
+        # credential-shaped string that reached the repo by any other route.
+        run: python scripts/check_secrets.py $(git ls-files)
+
+      - name: Run tests
+        # The tool-routing eval makes a real billed Gemini call and needs a key
+        # that CI does not have; it self-skips without config/api_keys.json,
+        # but deselect it explicitly so a transient 503 can never red the build.
+        run: |
+          pytest -q tests \
+            --deselect tests/test_tool_routing_eval.py::test_tool_routing_matches_expected_tool_names
