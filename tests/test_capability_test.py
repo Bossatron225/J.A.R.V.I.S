@@ -265,7 +265,8 @@ def test_an_unknown_capability_name_is_rejected_helpfully():
 def test_age_phrasing_does_not_imply_a_fresh_check():
     assert ct._age_phrase(None) == "never tested"
     assert ct._age_phrase(1000.0, now=1000.0) == "just now"
-    assert "d ago" in ct._age_phrase(0.0, now=10 * 86400)
+    assert "d ago" in ct._age_phrase(1000.0, now=1000.0 + 10 * 86400)
+    assert "h ago" in ct._age_phrase(1000.0, now=1000.0 + 3 * 3600)
 
 
 # ── the real probes, without touching real hardware ────────────────────────
