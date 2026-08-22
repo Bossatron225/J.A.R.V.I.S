@@ -204,17 +204,33 @@ def probe_wiz_lights() -> ProbeResult:
     except Exception as exc:
         return ProbeResult("wiz_lights", UNVERIFIABLE, f"module unavailable: {exc}", PASSIVE)
 
-    discover = getattr(wl, "discover_bulbs", None)
-    if not callable(discover):
-        return ProbeResult("wiz_lights", UNVERIFIABLE, "no discovery entry point", PASSIVE)
     try:
-        bulbs = discover()
+        ips = wl._load_cached_ips()
     except Exception as exc:
-        return ProbeResult("wiz_lights", UNVERIFIABLE, f"discovery failed: {exc}", PASSIVE)
-    if not bulbs:
-        return ProbeResult("wiz_lights", UNVERIFIABLE,
-                           "no bulbs found — expected on the VPS, which cannot reach the home LAN", PASSIVE)
-    return ProbeResult("wiz_lights", WORKING, f"{len(bulbs)} bulb(s) reachable", PASSIVE)
+        return ProbeResult("wiz_lights", UNVERIFIABLE, f"could not read bulb cache: {exc}", PASSIVE)
+    if not ips:
+        return ProbeResult("wiz_lights", UNVERIFIABLE, "no bulbs have been discovered yet", PASSIVE)
+
+    # A plain synchronous UDP getPilot, deliberately NOT the module's async
+    # discovery: asyncio.run() cannot be called from inside Jarvis's running
+    # live loop, and a probe that only works standalone is worse than none.
+    import socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.settimeout(1.5)
+        for ip in ips[:3]:
+            try:
+                sock.sendto(b'{"method":"getPilot","params":{}}', (str(ip), 38899))
+                sock.recvfrom(2048)
+                return ProbeResult("wiz_lights", WORKING, f"bulb at {ip} responded", PASSIVE)
+            except Exception:
+                continue
+    finally:
+        sock.close()
+
+    return ProbeResult("wiz_lights", UNVERIFIABLE,
+                       f"{len(ips)} known bulb(s), none responding — expected on the VPS, "
+                       "which cannot route to the home LAN", PASSIVE)
 
 
 PROBES: dict[str, callable] = {
