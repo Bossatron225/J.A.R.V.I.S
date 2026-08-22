@@ -38,7 +38,7 @@ BIOMETRIC_MIN_ENROLL_SAMPLES = 4
 _DEPS_OK = False
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
-    from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+    from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
     import uvicorn
     _DEPS_OK = True
 except ImportError:
@@ -813,6 +813,33 @@ class DashboardServer:
 
     # ── broadcast ────────────────────────────────────────────────────────
 
+    # How long a pushed screenshot stays viewable, and how many are retained.
+    SCREENSHOT_TTL_SECONDS = 600
+    SCREENSHOT_MAX_HELD = 5
+
+    def put_screenshot(self, data: bytes, mime: str = "image/jpeg", label: str = "screen") -> str:
+        """Hold one screenshot for viewing and return its id."""
+        self._expire_screenshots()
+        shot_id = secrets.token_urlsafe(12)
+        self._screenshots[shot_id] = {
+            "data": data, "mime": mime or "image/jpeg",
+            "label": label or "screen", "created_at": time.time(),
+        }
+        # Oldest-first trim, so a burst of requests can't grow without bound.
+        while len(self._screenshots) > self.SCREENSHOT_MAX_HELD:
+            oldest = min(self._screenshots, key=lambda k: self._screenshots[k]["created_at"])
+            self._screenshots.pop(oldest, None)
+        return shot_id
+
+    def _expire_screenshots(self) -> None:
+        cutoff = time.time() - self.SCREENSHOT_TTL_SECONDS
+        for shot_id in [k for k, v in self._screenshots.items() if v["created_at"] < cutoff]:
+            self._screenshots.pop(shot_id, None)
+
+    def get_screenshot(self, shot_id: str) -> dict | None:
+        self._expire_screenshots()
+        return self._screenshots.get(shot_id)
+
     async def broadcast(self, msg: dict) -> None:
         if isinstance(msg, dict) and msg.get("type") == "status":
             self._current_state = str(msg.get("state") or "sleeping")
@@ -1161,6 +1188,24 @@ class DashboardServer:
             if not path.exists() or not path.is_file():
                 return JSONResponse({"error": "Not found"}, status_code=404)
             return FileResponse(str(path), filename=safe)
+
+        @app.get("/screen/{shot_id}")
+        async def view_screenshot(shot_id: str, token: str = ""):
+            # Token in the query string because an <img src> cannot send
+            # headers — same constraint (and same check) as /uploads.
+            tok = token.strip()
+            if not tok or not self._is_token_valid(tok):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            shot = self.get_screenshot(re.sub(r"[^A-Za-z0-9_-]", "", shot_id))
+            if not shot:
+                return JSONResponse({"error": "Expired or not found"}, status_code=404)
+            return Response(
+                content=shot["data"],
+                media_type=shot["mime"],
+                # Never cached: it is a picture of the user's screen, and the
+                # id is reused by nothing.
+                headers={"Cache-Control": "no-store, max-age=0"},
+            )
 
         @app.websocket("/ws")
         async def ws_ep(websocket: WebSocket, token: str = ""):
