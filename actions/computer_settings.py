@@ -818,7 +818,137 @@ def shutdown_computer():
     else:
         subprocess.run(["systemctl", "poweroff"], capture_output=True)
 
+def get_volume() -> dict:
+    """Current output volume as {"level": 0-100, "muted": bool}.
+
+    Jarvis could set the volume but had no way to read it, so he had to tell
+    the user he didn't know what it was currently at."""
+    if _OS == "Darwin":
+        try:
+            level = subprocess.run(
+                ["osascript", "-e", "output volume of (get volume settings)"],
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip()
+            muted = subprocess.run(
+                ["osascript", "-e", "output muted of (get volume settings)"],
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip().lower()
+            return {"level": int(level), "muted": muted == "true"}
+        except Exception:
+            return {"level": None, "muted": None}
+
+    if _OS == "Linux":
+        try:
+            out = subprocess.run(
+                ["pactl", "get-sink-volume", "@DEFAULT_SINK@"],
+                capture_output=True, text=True, timeout=5,
+            ).stdout
+            m = re.search(r"(\d+)%", out)
+            muted_out = subprocess.run(
+                ["pactl", "get-sink-mute", "@DEFAULT_SINK@"],
+                capture_output=True, text=True, timeout=5,
+            ).stdout
+            return {"level": int(m.group(1)) if m else None, "muted": "yes" in muted_out.lower()}
+        except Exception:
+            return {"level": None, "muted": None}
+
+    return {"level": None, "muted": None}
+
+
+def get_brightness() -> int | None:
+    """Current display brightness as a percentage, or None if unreadable.
+
+    Read from IOKit via ioreg — no extra tooling required. Apple Silicon
+    exposes AppleARMBacklight; Intel Macs use AppleBacklightDisplay, so both
+    are tried. External monitors generally report neither, hence None being a
+    valid, expected answer rather than an error."""
+    if _OS != "Darwin":
+        if _OS == "Linux":
+            try:
+                out = subprocess.run(["brightnessctl", "-m"], capture_output=True, text=True, timeout=5).stdout
+                m = re.search(r"(\d+)%", out)
+                return int(m.group(1)) if m else None
+            except Exception:
+                return None
+        return None
+
+    for service in ("AppleARMBacklight", "AppleBacklightDisplay"):
+        try:
+            out = subprocess.run(
+                ["ioreg", "-c", service, "-r", "-d", "1"],
+                capture_output=True, text=True, timeout=5,
+            ).stdout
+            m = re.search(r'"brightness"=\{[^}]*"max"=(\d+)[^}]*"value"=(\d+)', out)
+            if m:
+                max_v, value = int(m.group(1)), int(m.group(2))
+                if max_v > 0:
+                    return max(0, min(100, round(value / max_v * 100)))
+        except Exception:
+            continue
+    return None
+
+
+# Each brightness key press moves roughly 1/16 of the range on macOS.
+_BRIGHTNESS_STEP_PERCENT = 100 / 16
+
+
+def brightness_set(value: int) -> str:
+    """Set brightness to an approximate percentage.
+
+    macOS exposes no supported way to set brightness directly without extra
+    tooling, but now that the CURRENT level is readable, the gap can be closed
+    by stepping the media keys and re-reading — which also self-corrects if a
+    step lands differently than expected."""
+    target = max(0, min(100, int(value)))
+    current = get_brightness()
+    if current is None:
+        return "I can't read the current brightness on this display, sir, so I can't set it precisely."
+
+    for _ in range(24):  # bounded: never loop on an unresponsive display
+        current = get_brightness()
+        if current is None:
+            break
+        delta = target - current
+        if abs(delta) <= _BRIGHTNESS_STEP_PERCENT / 2:
+            break
+        try:
+            pyautogui.press("brightnessup" if delta > 0 else "brightnessdown")
+        except Exception:
+            break
+        time.sleep(0.12)
+
+    final = get_brightness()
+    return f"Brightness is now about {final}%, sir." if final is not None else "Brightness adjusted, sir."
+
+
+def report_levels() -> str:
+    """Spoken-friendly summary of the current display and audio levels."""
+    vol = get_volume()
+    bright = get_brightness()
+
+    parts: list[str] = []
+    if vol.get("level") is None:
+        parts.append("I can't read the volume on this system, sir")
+    elif vol.get("muted"):
+        parts.append(f"Volume is muted (set to {vol['level']}%)")
+    else:
+        parts.append(f"Volume is at {vol['level']}%")
+
+    if bright is None:
+        parts.append("brightness isn't readable on this display")
+    else:
+        parts.append(f"brightness is at {bright}%")
+
+    return ", and ".join(parts) + "."
+
+
 ACTION_MAP: dict[str, callable] = {
+    "get_volume":          lambda: report_levels(),
+    "get_brightness":      lambda: report_levels(),
+    "get_levels":          lambda: report_levels(),
+    "levels":              lambda: report_levels(),
+    "brightness_set":      brightness_set,
+    "set_brightness":      brightness_set,
     "volume_up":           volume_up,
     "volume_down":         volume_down,
     "mute":                volume_mute,
