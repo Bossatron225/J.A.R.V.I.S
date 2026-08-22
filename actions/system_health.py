@@ -152,6 +152,21 @@ def collect_health(jarvis) -> dict:
         else:
             checks.append(_check("vps_worker_link", True, f"polling, last poll {_fmt_age(poll_age)}"))
 
+    # ── Cloud reachability ─────────────────────────────────────────────────
+    # Reported but NOT counted as a failure: being offline is a condition to
+    # degrade through, not a fault in Jarvis. Flagging it red would make the
+    # watchdog cry wolf every time the network hiccups.
+    try:
+        from core.offline_mode import cloud_reachable
+        online = cloud_reachable()
+        checks.append(_check(
+            "cloud", True,
+            "reachable" if online else "UNREACHABLE — running in degraded mode (local answers only)",
+            applicable=False,
+        ))
+    except Exception:
+        pass
+
     # ── Background tasks ───────────────────────────────────────────────────
     tasks = getattr(jarvis, "_background_tasks", None)
     if tasks is None:
