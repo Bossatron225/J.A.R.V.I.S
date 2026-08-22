@@ -26,6 +26,7 @@ LOCAL_ACTIONS = {
     'imessage_control',
     'mail_control',
     'reminder',
+    'screen_awareness',
     'security_biometrics',
     'send_message',
     'visitor_log',
@@ -47,6 +48,8 @@ QUIET_ACTIONS = {
 ACTION_HANDLERS = {
     'open_app': ('actions.open_app', 'open_app'),
     'browser_control': ('actions.browser_control', 'browser_control'),
+    'capability_self_test': ('actions.capability_test', 'capability_self_test'),
+    'screen_awareness': ('actions.screen_awareness', 'screen_awareness'),
     'computer_control': ('actions.computer_control', 'computer_control'),
     'computer_settings': ('actions.computer_settings', 'computer_settings'),
     'desktop_control': ('actions.desktop', 'desktop_control'),
