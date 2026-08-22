@@ -243,8 +243,24 @@ def _scroll(direction: str = "down", amount: int = 3) -> str:
 
 
 def _move(x: int, y: int, duration: float = 0.3) -> str:
+    """Move the pointer, then CHECK it arrived.
+
+    Reading the position back catches the failure mode that made this look
+    broken: if macOS has not granted this process Accessibility permission,
+    pyautogui's move is accepted and does nothing at all, and without a
+    read-back there is nothing to distinguish that from success."""
     _require_pyautogui()
     pyautogui.moveTo(x, y, duration=duration)
+    time.sleep(0.05)
+    try:
+        landed = pyautogui.position()
+    except Exception:
+        return f"Mouse → ({x}, {y})"
+
+    if abs(landed[0] - x) > 2 or abs(landed[1] - y) > 2:
+        return (f"Could not move the mouse — asked for ({x}, {y}) but the pointer is at "
+                f"({landed[0]}, {landed[1]}). Jarvis likely lacks Accessibility permission "
+                f"(System Settings → Privacy & Security → Accessibility).")
     return f"Mouse → ({x}, {y})"
 
 
@@ -390,7 +406,14 @@ def _screen_find(description: str) -> tuple[int, int] | None:
 
         match = re.search(r"(\d+)\s*,\s*(\d+)", text)
         if match:
-            return int(match.group(1)), int(match.group(2))
+            # Screenshot pixels are not click coordinates on a Retina display.
+            # Clicking raw image pixels lands at double the intended position —
+            # silently, and usually on the wrong control entirely.
+            from actions.computer_use import scale_to_click_space
+            return scale_to_click_space(
+                int(match.group(1)), int(match.group(2)),
+                shot_size=img.size, screen_size=tuple(pyautogui.size()),
+            )
 
     except Exception as e:
         print(f"[ComputerControl] ⚠️ screen_find failed: {e}")
@@ -477,7 +500,22 @@ def computer_control(
             return _click(params.get("x"), params.get("y"), "right", 1)
 
         if action == "move":
-            return _move(int(params.get("x", 0)), int(params.get("y", 0)))
+            # Never default missing coordinates to (0, 0). "Move the mouse to
+            # the Claude window" arrives with no x/y, and silently parking the
+            # pointer in the top-left corner while reporting "Mouse → (0, 0)"
+            # is worse than saying what is missing. If a description is given,
+            # find it on screen the same way screen_click does.
+            x_raw, y_raw = params.get("x"), params.get("y")
+            if x_raw is None or y_raw is None:
+                desc = str(params.get("description") or params.get("target") or "").strip()
+                if not desc:
+                    return ("I need either coordinates or a description of what to move to, sir — "
+                            "no x/y was given.")
+                coords = _screen_find(desc)
+                if not coords:
+                    return f"I couldn't find '{desc}' on the screen, sir, so I haven't moved the mouse."
+                return _move(coords[0], coords[1])
+            return _move(int(x_raw), int(y_raw))
 
         if action == "drag":
             return _drag(
