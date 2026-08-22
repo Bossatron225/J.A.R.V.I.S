@@ -73,3 +73,6 @@ memory/audit_log.jsonl
 
 # Derived embedding cache for memory recall — regenerable, machine-local.
 memory/memory_embed_cache.json
+
+# Standing goals — personal objectives, stays on the private machine/VPS.
+memory/goals.json
