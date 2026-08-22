@@ -6016,9 +6016,22 @@ class JarvisLive:
                         self._use_external_tts = True
                         self.ui.write_log("SYS: Voice ready.")
                     except Exception as e:
-                        self.ui.write_log(
-                            f"SYS: {self._external_tts_label(runtime_cfg)} unavailable, using Gemini voice. {e}"
-                        )
+                        # Do NOT silently substitute Gemini's voice. Per James's
+                        # instruction: if the configured voice is unavailable he
+                        # wants no voice at all, not a different one. Staying on
+                        # external TTS keeps speech suppressed (the player is
+                        # None) while text output continues normally.
+                        from core.offline_mode import fallback_voice_allowed
+                        label = self._external_tts_label(runtime_cfg)
+                        if fallback_voice_allowed():
+                            self.ui.write_log(f"SYS: {label} unavailable, using Gemini voice. {e}")
+                        else:
+                            self._use_external_tts = True
+                            self._tts_player = None
+                            self.ui.write_log(
+                                f"SYS: {label} unavailable — staying silent rather than using a "
+                                f"substitute voice. Responses will be text only. ({e})"
+                            )
                 config = self._build_config()
 
                 # Fresh client on every reconnect — avoids stale HTTP session state
