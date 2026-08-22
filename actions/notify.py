@@ -14,10 +14,13 @@ def _load_config() -> dict:
         return {}
 
 
-def notify_user(message: str) -> str:
+def notify_user(message: str, attachment_path: str | None = None) -> str:
     """Text the user out-of-band (via the dedicated Jarvis iMessage identity)
     about something Jarvis did or noticed. No-ops quietly if disabled or
-    unconfigured — this is a best-effort side channel, not a critical path."""
+    unconfigured — this is a best-effort side channel, not a critical path.
+
+    `attachment_path` lets an alert carry its evidence (e.g. the visitor
+    snapshot) rather than only describing it."""
     message = (message or "").strip()
     if not message:
         return "No notification message provided."
@@ -30,4 +33,4 @@ def notify_user(message: str) -> str:
     if not target:
         return "No jarvis_notify_target configured in config/api_keys.json."
 
-    return send_imessage(target, message)
+    return send_imessage(target, message, attachment_path=attachment_path)
