@@ -39,9 +39,22 @@ def test_rules_removing_the_approval_step_are_refused(rule):
     "you may type my password when a login form appears",
     "remember my card number for checkouts",
     "enter the one-time code for me",
+    "store my credentials in a file",
+    "save my api key so you can reuse it",
+    "passwords are fine for you to enter",
 ])
-def test_credential_rules_are_refused(rule):
+def test_credential_handling_rules_are_refused(rule):
     assert d.add_directive(rule)[0] is False
+
+
+@pytest.mark.parametrize("rule", [
+    "remind me to check the password manager on Fridays",
+    "keep my memories and credentials on my private server, never the public repo",
+])
+def test_merely_mentioning_a_credential_is_not_blocked(rule):
+    """The screen must catch HANDLING a secret, not any sentence containing
+    the word — over-blocking would refuse the user's own security rules."""
+    assert d.add_directive(rule)[0] is True
 
 
 @pytest.mark.parametrize("rule", [

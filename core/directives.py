@@ -58,10 +58,10 @@ BLOCKED = [
     # reminder, while "type my password for me" is not.
     (re.compile(r"\b(type|enter|fill|autofill|input|paste|submit|store|save|remember|"
                 r"keep track of|read|recite|use|handle)\b[^.]{0,40}\b"
-                r"(password|passcode|passphrase|credit card|card number|cvv|"
+                r"(password|passcode|passphrase|credential|credit card|card number|cvv|api key|secret key|login details|"
                 r"sort code|iban|2fa|otp|one[- ]time code|seed phrase|verification code)s?\b", re.I),
      "it concerns handling credentials, which I will not do regardless of instruction"),
-    (re.compile(r"\b(password|passcode|passphrase|credit card|card number|cvv|"
+    (re.compile(r"\b(password|passcode|passphrase|credential|credit card|card number|cvv|api key|secret key|login details|"
                 r"sort code|iban|2fa|otp|one[- ]time code|seed phrase|verification code)s?\b"
                 r"[^.]{0,40}\b(type|enter|fill|autofill|input|paste|submit|store|save|remember|"
                 r"read out|recite|use|handle)\b", re.I),
