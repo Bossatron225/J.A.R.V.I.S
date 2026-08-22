@@ -928,7 +928,7 @@ def report_levels() -> str:
 
     parts: list[str] = []
     if vol.get("level") is None:
-        parts.append("I can't read the volume on this system, sir")
+        parts.append("I can't read the volume on this system")
     elif vol.get("muted"):
         parts.append(f"Volume is muted (set to {vol['level']}%)")
     else:
@@ -939,7 +939,7 @@ def report_levels() -> str:
     else:
         parts.append(f"brightness is at {bright}%")
 
-    return ", and ".join(parts) + "."
+    return ", and ".join(parts) + ", sir."
 
 
 ACTION_MAP: dict[str, callable] = {
