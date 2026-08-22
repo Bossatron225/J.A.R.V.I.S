@@ -176,7 +176,7 @@ def search_memory(query: str, limit: int = 6, include_conversations: bool = True
     for source, text in candidates:
         score = 0.0
         if query_vector and embed_text and cosine:
-            vector = embed_text(text, task_type="RETRIEVAL_DOCUMENT")
+            vector = _embed_cached(text, embed_text)
             if vector:
                 score = cosine(query_vector, vector)
         if not score:

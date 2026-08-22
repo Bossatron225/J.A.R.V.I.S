@@ -70,3 +70,6 @@ ios/**/*.xcuserstate
 
 # Audit trail — records actions taken; stays on the private VPS/machine.
 memory/audit_log.jsonl
+
+# Derived embedding cache for memory recall — regenerable, machine-local.
+memory/memory_embed_cache.json
