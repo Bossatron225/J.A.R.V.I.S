@@ -9,6 +9,7 @@ another room.
 So the tests care about two things: the image reaches the person who asked,
 and every failure path says so plainly instead of claiming success.
 """
+import asyncio
 import sys
 import time
 from pathlib import Path
@@ -116,62 +117,56 @@ def send(monkeypatch):
     return _make
 
 
-@pytest.mark.asyncio
-async def test_no_dashboard_is_reported_honestly(send):
-    out = await send(dashboard=None)({})
+def test_no_dashboard_is_reported_honestly(send):
+    out = asyncio.run(send(dashboard=None)({}))
     assert "no dashboard" in out.lower()
     assert "sir" in out
 
 
-@pytest.mark.asyncio
-async def test_a_rejection_from_the_mac_is_reported_not_papered_over(send):
+def test_a_rejection_from_the_mac_is_reported_not_papered_over(send):
     class _Bridge:
         def request_local_action(self, action, payload, timeout):
             return {"status": "rejected", "reason": "not a local worker action"}
 
     dash = _FakeDashboard()
-    out = await send(dashboard=dash, bridge=_Bridge())({})
+    out = asyncio.run(send(dashboard=dash, bridge=_Bridge())({}))
     assert "couldn't capture" in out
     assert "not a local worker action" in out
     assert dash.broadcasts == [], "must not announce an image it never got"
 
 
-@pytest.mark.asyncio
-async def test_an_empty_capture_is_reported(send):
+def test_an_empty_capture_is_reported(send):
     class _Bridge:
         def request_local_action(self, action, payload, timeout):
             return {"status": "completed", "result": {}}
 
     dash = _FakeDashboard()
-    out = await send(dashboard=dash, bridge=_Bridge())({})
+    out = asyncio.run(send(dashboard=dash, bridge=_Bridge())({}))
     assert "nothing came back" in out
     assert dash.broadcasts == []
 
 
-@pytest.mark.asyncio
-async def test_undecodable_image_data_is_reported(send):
+def test_undecodable_image_data_is_reported(send):
     class _Bridge:
         def request_local_action(self, action, payload, timeout):
             return {"status": "completed", "result": {"image_b64": "!!!not base64!!!"}}
 
     dash = _FakeDashboard()
-    out = await send(dashboard=dash, bridge=_Bridge())({})
+    out = asyncio.run(send(dashboard=dash, bridge=_Bridge())({}))
     assert "unreadable" in out
     assert dash.broadcasts == []
 
 
-@pytest.mark.asyncio
-async def test_a_capture_exception_is_reported(send):
+def test_a_capture_exception_is_reported(send):
     class _Bridge:
         def request_local_action(self, action, payload, timeout):
             raise RuntimeError("mac offline")
 
-    out = await send(dashboard=_FakeDashboard(), bridge=_Bridge())({})
+    out = asyncio.run(send(dashboard=_FakeDashboard(), bridge=_Bridge())({}))
     assert "couldn't capture" in out and "mac offline" in out
 
 
-@pytest.mark.asyncio
-async def test_a_successful_capture_is_stored_and_broadcast(send):
+def test_a_successful_capture_is_stored_and_broadcast(send):
     import base64
 
     class _Bridge:
@@ -182,7 +177,7 @@ async def test_a_successful_capture_is_stored_and_broadcast(send):
                 "mime_type": "image/jpeg", "label": "screen"}}
 
     dash = _FakeDashboard()
-    out = await send(dashboard=dash, bridge=_Bridge())({})
+    out = asyncio.run(send(dashboard=dash, bridge=_Bridge())({}))
 
     assert dash.stored == [(b"JPEGBYTES", "image/jpeg", "screen")]
     assert len(dash.broadcasts) == 1
@@ -192,8 +187,7 @@ async def test_a_successful_capture_is_stored_and_broadcast(send):
     assert "dashboard" in out and "sir" in out
 
 
-@pytest.mark.asyncio
-async def test_the_broadcast_does_not_carry_the_image_itself(send):
+def test_the_broadcast_does_not_carry_the_image_itself(send):
     """The image goes by reference: broadcast history is replayed to every new
     client, so embedding ~140KB would bloat memory and re-show an old capture
     of the user's screen on any device that connects later."""
@@ -205,14 +199,13 @@ async def test_the_broadcast_does_not_carry_the_image_itself(send):
                 "image_b64": base64.b64encode(b"X" * 5000).decode()}}
 
     dash = _FakeDashboard()
-    await send(dashboard=dash, bridge=_Bridge())({})
+    asyncio.run(send(dashboard=dash, bridge=_Bridge())({}))
     serialised = repr(dash.broadcasts[0])
     assert len(serialised) < 500
     assert "image_b64" not in serialised
 
 
-@pytest.mark.asyncio
-async def test_target_arguments_are_passed_through(send):
+def test_target_arguments_are_passed_through(send):
     import base64
     seen = {}
 
@@ -222,14 +215,13 @@ async def test_target_arguments_are_passed_through(send):
             return {"status": "completed", "result": {
                 "image_b64": base64.b64encode(b"x").decode()}}
 
-    await send(dashboard=_FakeDashboard(), bridge=_Bridge())(
-        {"target_type": "app", "app_name": "Safari"})
+    asyncio.run(send(dashboard=_FakeDashboard(), bridge=_Bridge())(
+        {"target_type": "app", "app_name": "Safari"}))
     assert seen["target_type"] == "app"
     assert seen["app_name"] == "Safari"
 
 
-@pytest.mark.asyncio
-async def test_it_defaults_to_the_whole_screen(send):
+def test_it_defaults_to_the_whole_screen(send):
     import base64
     seen = {}
 
@@ -239,12 +231,11 @@ async def test_it_defaults_to_the_whole_screen(send):
             return {"status": "completed", "result": {
                 "image_b64": base64.b64encode(b"x").decode()}}
 
-    await send(dashboard=_FakeDashboard(), bridge=_Bridge())({})
+    asyncio.run(send(dashboard=_FakeDashboard(), bridge=_Bridge())({}))
     assert seen["target_type"] == "screen"
 
 
-@pytest.mark.asyncio
-async def test_it_captures_locally_when_there_is_no_bridge(send, monkeypatch):
+def test_it_captures_locally_when_there_is_no_bridge(send, monkeypatch):
     """On the Mac itself there is nothing to delegate to."""
     import base64
     import actions.screen_processor as sp
@@ -253,7 +244,7 @@ async def test_it_captures_locally_when_there_is_no_bridge(send, monkeypatch):
                         lambda p: {"image_b64": base64.b64encode(b"LOCAL").decode(),
                                    "mime_type": "image/jpeg", "label": "screen"})
     dash = _FakeDashboard()
-    out = await send(dashboard=dash, bridge=None)({})
+    out = asyncio.run(send(dashboard=dash, bridge=None)({}))
     assert dash.stored[0][0] == b"LOCAL"
     assert "dashboard" in out
 
