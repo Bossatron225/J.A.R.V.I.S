@@ -1,0 +1,44 @@
+{
+  "brightness": {
+    "name": "brightness",
+    "status": "working",
+    "detail": "verified: set to 56, read back 56",
+    "kind": "active",
+    "checked_at": 1787399101.6684859
+  },
+  "volume": {
+    "name": "volume",
+    "status": "working",
+    "detail": "verified: set to 20, read back 20",
+    "kind": "active",
+    "checked_at": 1787399102.884359
+  },
+  "camera": {
+    "name": "camera",
+    "status": "unverifiable",
+    "detail": "not currently streaming",
+    "kind": "passive",
+    "checked_at": 1787399103.074315
+  },
+  "app_listing": {
+    "name": "app_listing",
+    "status": "working",
+    "detail": "18 line(s) of apps/windows",
+    "kind": "passive",
+    "checked_at": 1787399107.802638
+  },
+  "cloud": {
+    "name": "cloud",
+    "status": "working",
+    "detail": "reachable",
+    "kind": "passive",
+    "checked_at": 1787399108.013298
+  },
+  "wiz_lights": {
+    "name": "wiz_lights",
+    "status": "working",
+    "detail": "bulb at 192.168.0.14 responded",
+    "kind": "passive",
+    "checked_at": 1787399108.1888242
+  }
+}
