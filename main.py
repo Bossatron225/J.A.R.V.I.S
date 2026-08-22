@@ -976,6 +976,9 @@ TOOL_DECLARATIONS = [
             "Controls the computer: volume, brightness, window management, keyboard shortcuts, "
             "typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, "
             "scrolling, tab management, Safari tab listing/closing, zoom, screenshots, lock screen, refresh/reload page. "
+            "Also READS the current volume and brightness: use action=get_levels for "
+            "'what's the volume/brightness at', 'how loud is it', 'is it muted'. "
+            "Use action=volume_set or brightness_set with value=0-100 to set an exact level. "
             "Use for ANY single computer control command."
         ),
         "parameters": {

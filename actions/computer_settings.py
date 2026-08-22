@@ -1023,7 +1023,7 @@ def _detect_action(description: str) -> dict:
     _client = _genai.Client(api_key=_get_api_key())
 
     available = ", ".join(sorted(ACTION_MAP.keys())) + \
-                ", volume_set, type_text, press_key, reload_n, list_apps, list_windows"
+                ", volume_set, brightness_set, type_text, press_key, reload_n, list_apps, list_windows"
 
     prompt = f"""You are an intent detector for a computer control assistant.
 
@@ -1036,7 +1036,8 @@ Return ONLY a valid JSON object:
 
 Rules:
 - Pick the single best matching action from the available list.
-- For volume_set: value is an integer 0-100.
+- For volume_set and brightness_set: value is an integer 0-100.
+- Asking what the volume or brightness currently IS (not changing it) is get_levels.
 - For type_text: value is the exact text to type.
 - For press_key: value is the key name (e.g. "f5", "tab", "enter").
 - For reload_n: value is an integer (number of times to reload).
@@ -1170,8 +1171,10 @@ def computer_settings(
         return f"Unknown action: '{raw_action}'."
 
     try:
-        func()
-        return f"Done: {action}."
+        # Most actions just do a thing; readers (get_volume, get_levels…) return
+        # the answer, which must reach the user rather than a generic "Done".
+        result = func()
+        return result if isinstance(result, str) and result.strip() else f"Done: {action}."
     except Exception as e:
         print(f"[Settings] Action failed ({action}): {e}")
         return f"Action failed ({action}): {e}"
