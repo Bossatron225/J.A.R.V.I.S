@@ -1756,6 +1756,28 @@ TOOL_DECLARATIONS = [
             "required": [],
         },
     },
+    {
+        "name": "screen_awareness",
+        "description": (
+            "Ambient background awareness of the user's SCREEN — periodic glances where Jarvis speaks up "
+            "only when he can genuinely help (a failed build left on screen, an error, something stuck or "
+            "half-finished). Off by default. "
+            "action=start for 'watch my screen', 'keep an eye on what I'm doing', 'tell me if I get stuck'. "
+            "action=stop for 'stop watching my screen'. action=status for whether it's on. "
+            "action=block with app_name for 'never look at X'. action=interval with value in minutes. "
+            "This is whole-desktop ambient watching; for looking at ONE specific window or tab now use "
+            "screen_process, and for ongoing monitoring of one named target use visual_watch."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "start, stop, status, block, or interval"},
+                "app_name": {"type": "STRING", "description": "Application to never look at (for block)"},
+                "value": {"type": "STRING", "description": "Minutes between glances (for interval)"},
+            },
+            "required": [],
+        },
+    },
 ]
 
 # --- Plugin system ---
@@ -5650,6 +5672,66 @@ class JarvisLive:
             except Exception as e:
                 print(f"[HealthWatchdog] ⚠️ {e}")
 
+    async def _run_screen_awareness(self) -> None:
+        """Ambient glances at the screen, speaking only when able to help.
+
+        Only the local Mac has a screen worth looking at — the headless VPS
+        instance no-ops. Every gate (enabled, biometric lock, sensitive
+        window, hourly cap) is re-checked on each pass rather than cached, so
+        turning it off, or bringing a password manager forward, takes effect
+        on the very next cycle instead of one cycle later."""
+        if isinstance(self.ui, _HeadlessUI):
+            return
+
+        await asyncio.sleep(120)  # don't glance during startup churn
+        last_observation: str | None = None
+
+        while True:
+            try:
+                from actions import screen_awareness as sa
+                await asyncio.sleep(sa.interval_seconds())
+
+                allowed, reason = await asyncio.to_thread(
+                    sa.should_look, self._local_speech_gate_active()
+                )
+                if not allowed:
+                    # Logged, not spoken: this is the audit trail for what was
+                    # and was not looked at.
+                    if sa.is_enabled():
+                        self.ui.write_log(f"[ScreenAwareness] skipped — {reason}")
+                    continue
+
+                png = await asyncio.to_thread(sa.capture_screen_png)
+                if not png:
+                    continue
+
+                result = await asyncio.to_thread(sa.analyse_screen, png, last_observation)
+                if not result.get("should_speak"):
+                    continue
+
+                observation = str(result.get("observation", "") or "").strip()
+                offer = str(result.get("offer", "") or "").strip()
+                if not observation:
+                    continue
+                last_observation = observation
+
+                self.ui.write_log(f"[ScreenAwareness] {observation}")
+                if not self.session:
+                    continue
+                await self.session.send_client_content(
+                    turns={"parts": [{"text": (
+                        f"[SCREEN_CONTEXT] {observation} {offer} "
+                        "Say this naturally in one or two short sentences, in your own voice."
+                    )}]},
+                    turn_complete=True,
+                )
+            except RuntimeError as e:
+                if "cannot schedule new futures after shutdown" in str(e).lower():
+                    return
+                print(f"[ScreenAwareness] ⚠️ {e}")
+            except Exception as e:
+                print(f"[ScreenAwareness] ⚠️ {e}")
+
     async def _run_visitor_watch(self) -> None:
         """Starts (once, for the app's whole lifetime) a continuous background
         thread that holds the camera open and tracks people entering/leaving —
@@ -6186,6 +6268,7 @@ class JarvisLive:
         # that only ran inside a live session would be blind to exactly the
         # session-level outages it exists to catch.
         self._spawn_task(self._run_health_watchdog())
+        self._spawn_task(self._run_screen_awareness())
 
         # Standing goals run for the app's whole lifetime — a goal that
         # only advanced during a live voice session would defeat the point
