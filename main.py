@@ -1243,7 +1243,7 @@ TOOL_DECLARATIONS = [
                 "amount":      {"type": "INTEGER", "description": "Scroll amount (default: 3)"},
                 "seconds":     {"type": "NUMBER",  "description": "Seconds to wait"},
                 "title":       {"type": "STRING",  "description": "Window title or app name for focus_window"},
-                "description": {"type": "STRING",  "description": "Element description for screen_find/screen_click"},
+                "description": {"type": "STRING",  "description": "What to move to or click: a window/app name (looked up exactly) or an on-screen element. Use with action=move or screen_click INSTEAD of x/y."},
                 "type":        {"type": "STRING",  "description": "Data type for random_data"},
                 "field":       {"type": "STRING",  "description": "Field for user_data: name|email|city"},
                 "clear_first": {"type": "BOOLEAN", "description": "Clear field before typing (default: true)"},
