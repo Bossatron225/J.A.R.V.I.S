@@ -24,6 +24,7 @@ TOOL ROUTING:
 - computer_settings: single OS actions (volume, brightness, wifi, shortcuts, power, app/window controls).
 - system_status: CPU, RAM, GPU, temperature, uptime, and performance diagnostics of the MACHINE.
 - multi_step_task: a request needing SEVERAL dependent tools in sequence ("find a flight, add it to my calendar and text her"). Pass the user's full request. It plans first; set execute=true when the user wants it carried out. For a single action, call that tool directly instead.
+- goals: something to WATCH or PURSUE over time rather than do once ("keep an eye out for…", "let me know if… appears", "watch for…"). Also "what are you working on", pausing/closing a goal, or dismissing a result the user didn't want. Goals only look things up unless the user explicitly wants them to act.
 - open_loops: unfinished business — commitments not acted on, actions that failed, proposals awaiting approval. Use for "what's outstanding", "anything I've forgotten", "loose ends", "what should I pick up".
 - activity_report: what you have actually DONE (tools run, messages sent, visitors detected). Use for "what did you do while I was out", "what have you been doing", "what happened today".
 - usage_report: your own API call counts and estimated spend. Use for "what have you spent", "how much are you costing me", "API usage".

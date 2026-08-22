@@ -1588,6 +1588,31 @@ TOOL_DECLARATIONS = [
         },
     },
     {
+        "name": "goals",
+        "description": (
+            "Standing goals Jarvis pursues over time on his own, rather than one-off requests. "
+            "Use when the user wants something WATCHED or PURSUED rather than done once: "
+            "'keep an eye out for a flat under 1800 in Dublin 8', 'let me know if a cheaper flight to "
+            "Malaga appears', 'watch for X and tell me'. Also for managing them: 'what are you working "
+            "on', 'pause that goal', 'stop watching for flights', or dismissing a result you didn't want. "
+            "Goals only look things up unless allow_actions is set. For something to do RIGHT NOW, use "
+            "the relevant tool or multi_step_task instead."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "list (default) | add | pause | resume | close | reject"},
+                "objective": {"type": "STRING", "description": "For add: what to pursue, in the user's own words"},
+                "criteria": {"type": "STRING", "description": "For add: what makes a result worth raising (price, location, timing…)"},
+                "interval_hours": {"type": "NUMBER", "description": "For add: how often to check (default 6, minimum 1)"},
+                "allow_actions": {"type": "BOOLEAN", "description": "For add: permit acting, not just looking up (default false)"},
+                "goal_id": {"type": "STRING", "description": "For pause/resume/close/reject: which goal"},
+                "text": {"type": "STRING", "description": "For reject: the finding the user is dismissing"},
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "open_loops",
         "description": (
             "Reports unfinished business — commitments the user mentioned but hasn't acted on, actions "
@@ -1716,6 +1741,7 @@ class JarvisLive:
         self._visual_watch_cfg = self._load_visual_watch_config()
         self._visitor_watch_cfg = self._load_visitor_watch_config()
         self._health_watchdog_cfg = self._load_health_watchdog_config()
+        self._goal_cfg = self._load_goal_config()
         self._visitor_last_alert: dict[str, float] = {}
         self._known_visitor_last_alert: dict[str, float] = {}
         self._last_visual_context_ts: float = 0.0
@@ -3938,6 +3964,12 @@ class JarvisLive:
                 result = await self._run_multi_step_task(args)
                 self.ui.show_content("MULTI-STEP TASK", result)
 
+            elif name == "goals":
+                from actions.goals import goals_tool
+                r = await loop.run_in_executor(None, lambda: goals_tool(parameters=args))
+                result = r or "Done."
+                self.ui.show_content("STANDING GOALS", result)
+
             elif name == "open_loops":
                 from actions.open_loops import open_loops as _open_loops
                 r = await loop.run_in_executor(None, lambda: _open_loops(parameters=args))
@@ -5866,6 +5898,11 @@ class JarvisLive:
         # that only ran inside a live session would be blind to exactly the
         # session-level outages it exists to catch.
         self._spawn_task(self._run_health_watchdog())
+
+        # Standing goals run for the app's whole lifetime — a goal that
+        # only advanced during a live voice session would defeat the point
+        # of stating it once and letting Jarvis own it.
+        self._spawn_task(self._run_goal_pursuit())
 
         # Local wake word, if opted in and a local engine is present. Started
         # here (not inside the live-session branch) so it also works in worker
