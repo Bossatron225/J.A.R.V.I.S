@@ -76,3 +76,11 @@ memory/memory_embed_cache.json
 
 # Standing goals — personal objectives, stays on the private machine/VPS.
 memory/goals.json
+
+# Machine-local runtime state for the self-test / directives / screen-awareness
+# features. standing_directives.json in particular holds the user's own personal
+# behavioural rules, and capability_state.json records LAN details such as bulb
+# IPs — neither belongs in the repo.
+memory/capability_state.json
+memory/standing_directives.json
+memory/screen_awareness.json
