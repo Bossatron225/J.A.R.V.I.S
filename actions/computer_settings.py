@@ -889,6 +889,23 @@ def _display_services():
         return None, None
 
 
+def set_muted(muted: bool) -> None:
+    """Explicitly mute or unmute, rather than blind-toggling.
+
+    Needed because `volume_set` clears the mute flag as a side effect on
+    macOS — anything that changes the level must be able to put mute back."""
+    if _OS == "Darwin":
+        subprocess.run(
+            ["osascript", "-e", f"set volume output muted {'true' if muted else 'false'}"],
+            capture_output=True, timeout=5,
+        )
+    elif _OS == "Linux":
+        subprocess.run(
+            ["pactl", "set-sink-mute", "@DEFAULT_SINK@", "1" if muted else "0"],
+            capture_output=True, timeout=5,
+        )
+
+
 def get_brightness() -> int | None:
     """Current display brightness as a percentage, or None if unreadable.
 
