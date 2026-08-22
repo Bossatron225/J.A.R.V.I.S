@@ -92,4 +92,7 @@ def test_unknown_visitor_departure_is_logged_not_texted(monkeypatch) -> None:
 
     assert live._present_unknown == []
     assert any("left the camera" in log for log in live.ui.logs)
-    assert notified == ["An unrecognized visitor was just seen at the camera."]  # only on arrival
+    # The contract is "alert on arrival, stay silent on departure" — not the
+    # exact wording, which is now severity-aware (time of day / repeat count).
+    assert len(notified) == 1
+    assert "nrecognised" in notified[0] or "nrecognized" in notified[0]
