@@ -1588,6 +1588,23 @@ TOOL_DECLARATIONS = [
         },
     },
     {
+        "name": "open_loops",
+        "description": (
+            "Reports unfinished business — commitments the user mentioned but hasn't acted on, actions "
+            "that failed and were never retried, and self-improvement proposals still awaiting approval. "
+            "Use for 'what's outstanding', 'anything I've forgotten', 'what do I still need to do', "
+            "'loose ends', or when the user asks what they should pick up next."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "min_age_hours": {"type": "NUMBER", "description": "Only report loops older than this (default 6)"},
+                "kind": {"type": "STRING", "description": "Optional filter: commitment | failed_action | pending_self_improvement"},
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "activity_report",
         "description": (
             "Reports what Jarvis has actually DONE — tools invoked, messages sent, visitors detected, "
@@ -3906,6 +3923,12 @@ class JarvisLive:
             elif name == "multi_step_task":
                 result = await self._run_multi_step_task(args)
                 self.ui.show_content("MULTI-STEP TASK", result)
+
+            elif name == "open_loops":
+                from actions.open_loops import open_loops as _open_loops
+                r = await loop.run_in_executor(None, lambda: _open_loops(parameters=args))
+                result = r or "Done."
+                self.ui.show_content("OPEN LOOPS", result)
 
             elif name == "activity_report":
                 r = await loop.run_in_executor(None, lambda: jlog.activity_report(parameters=args))
