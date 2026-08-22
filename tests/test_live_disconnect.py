@@ -149,8 +149,45 @@ def test_wake_protocol_accepts_any_sender_when_sender_is_unset() -> None:
     assert jarvis._is_authorized_wake_sender("+3531234567", "James") is True
 
 
+def test_cloud_speech_listener_is_off_by_default(monkeypatch) -> None:
+    """_handle_speech_callback uploads room audio to Google's speech API.
+    Continuous cloud transcription of a private room must require explicit
+    opt-in, and must never run while the biometric lock is engaged."""
+    jarvis = JarvisLive(DummyUI())
+    called = {"n": 0}
+    monkeypatch.setattr(jarvis, "_on_text_command", lambda text: called.__setitem__("n", called["n"] + 1))
+    monkeypatch.setattr(jarvis, "_local_speech_gate_active", lambda: False)
+    monkeypatch.setattr(JarvisLive, "_cloud_speech_opt_in", staticmethod(lambda: False))
+
+    class FakeRecognizer:
+        @staticmethod
+        def recognize_google(audio, language):
+            raise AssertionError("audio must not be uploaded without opt-in")
+
+    jarvis._wake_phrases = ["jarvis"]
+    jarvis._handle_speech_callback(FakeRecognizer(), object())
+
+    assert called["n"] == 0
+
+
+def test_cloud_speech_listener_blocked_while_locked(monkeypatch) -> None:
+    """A voice is not proof of identity — it must not reach a locked surface."""
+    jarvis = JarvisLive(DummyUI())
+    monkeypatch.setattr(jarvis, "_local_speech_gate_active", lambda: True)
+    monkeypatch.setattr(JarvisLive, "_cloud_speech_opt_in", staticmethod(lambda: True))
+
+    class FakeRecognizer:
+        @staticmethod
+        def recognize_google(audio, language):
+            raise AssertionError("audio must not be uploaded while locked")
+
+    jarvis._handle_speech_callback(FakeRecognizer(), object())
+
+
 def test_service_is_accepted_as_wake_phrase(monkeypatch) -> None:
     jarvis = JarvisLive(DummyUI())
+    monkeypatch.setattr(jarvis, "_local_speech_gate_active", lambda: False)
+    monkeypatch.setattr(JarvisLive, "_cloud_speech_opt_in", staticmethod(lambda: True))
     got = {"called": False}
 
     def fake_on_text_command(text: str) -> None:
