@@ -55,8 +55,13 @@ def _install_fake_genai(monkeypatch, response_text: str) -> dict:
 
 
 @pytest.fixture(autouse=True)
-def _fake_api_key(monkeypatch):
+def _fake_api_key(monkeypatch, tmp_path):
     monkeypatch.setattr(visual_context_module, "_get_gemini_api_key", lambda: "test-key")
+    # Isolate the usage log. Without this these tests read the REAL production
+    # log, so once live usage crossed the hourly runaway cap the tests started
+    # failing for reasons entirely unrelated to the code under test.
+    from memory import usage_log
+    monkeypatch.setattr(usage_log, "USAGE_PATH", tmp_path / "usage_log.jsonl")
 
 
 def test_describe_scene_returns_no_comment_without_frame():
