@@ -249,3 +249,182 @@ def test_the_prompt_describes_the_image_actually_sent():
     assert "iw, ih = img.size" in body
     assert "{iw}×{ih}" in body
     assert "w, h  = pyautogui.size()" not in body
+
+
+# ── scrolling ──────────────────────────────────────────────────────────────
+
+class _ScrollGUI(_FakePyAutoGUI):
+    """Adds scroll capture and a controllable screen fingerprint."""
+
+    def __init__(self, changes=True, **kw):
+        super().__init__(**kw)
+        self.scrolls = []
+        self.hscrolls = []
+        self.changes = changes
+        self._tick = 0
+
+    def scroll(self, clicks, x=None, y=None):
+        self.scrolls.append(clicks)
+        if self.changes:
+            self._tick += 1
+
+    def hscroll(self, clicks, x=None, y=None):
+        self.hscrolls.append(clicks)
+        if self.changes:
+            self._tick += 1
+
+
+@pytest.fixture
+def scroll_gui(monkeypatch):
+    fake = _ScrollGUI()
+    monkeypatch.setattr(cc, "pyautogui", fake)
+    monkeypatch.setattr(cc, "_require_pyautogui", lambda: None)
+    monkeypatch.setattr(cc.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(cc, "_smooth_move_to",
+                        lambda x, y, duration=None: setattr(fake, "_pos", (x, y)))
+    monkeypatch.setattr(cc, "_region_fingerprint",
+                        lambda w: b"state-%d" % fake._tick if w else None)
+    return fake
+
+
+def test_scrolling_a_named_window_moves_the_pointer_there_first(scroll_gui, windows):
+    """A scroll wheel event goes to whatever is under the POINTER. This never
+    positioned it, so it scrolled whichever window the cursor was left over."""
+    out = cc.computer_control({"action": "scroll", "direction": "down", "target": "Claude"})
+    assert scroll_gui.position() == (501, 433)
+    assert scroll_gui.scrolls == [-10]
+    assert "Claude" in out
+
+
+def test_scroll_direction_maps_to_sign(scroll_gui, windows):
+    cc.computer_control({"action": "scroll", "direction": "up", "target": "Claude"})
+    assert scroll_gui.scrolls == [10]
+
+
+def test_horizontal_scrolling_uses_hscroll(scroll_gui, windows):
+    cc.computer_control({"action": "scroll", "direction": "right", "target": "Claude"})
+    assert scroll_gui.hscrolls == [10] and scroll_gui.scrolls == []
+
+
+def test_the_default_scroll_amount_is_not_a_nudge(scroll_gui, windows):
+    """3 clicks is three lines, which reads as nothing happening."""
+    cc.computer_control({"action": "scroll", "direction": "down", "target": "Claude"})
+    assert abs(scroll_gui.scrolls[0]) >= 10
+
+
+def test_a_scroll_that_changes_nothing_is_reported(monkeypatch, windows):
+    fake = _ScrollGUI(changes=False)
+    monkeypatch.setattr(cc, "pyautogui", fake)
+    monkeypatch.setattr(cc, "_require_pyautogui", lambda: None)
+    monkeypatch.setattr(cc.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(cc, "_smooth_move_to", lambda x, y, duration=None: None)
+    monkeypatch.setattr(cc, "_region_fingerprint", lambda w: b"unchanged" if w else None)
+
+    out = cc.computer_control({"action": "scroll", "direction": "down", "target": "Claude"})
+    assert "nothing moved" in out
+
+
+def test_scrolling_an_unknown_target_refuses(scroll_gui, windows):
+    out = cc.computer_control({"action": "scroll", "direction": "down", "target": "Excel"})
+    assert "couldn't find" in out
+    assert scroll_gui.scrolls == []
+
+
+def test_scrolling_with_the_pointer_over_nothing_says_so(scroll_gui, monkeypatch):
+    """Better than silently scrolling the void and calling it done."""
+    monkeypatch.setattr(cc, "list_windows", lambda: [])
+    out = cc.computer_control({"action": "scroll", "direction": "down"})
+    assert "isn't over any window" in out
+    assert scroll_gui.scrolls == []
+
+
+def test_an_untargeted_scroll_names_the_window_under_the_pointer(scroll_gui, windows):
+    scroll_gui._pos = (501, 433)
+    out = cc.computer_control({"action": "scroll", "direction": "down"})
+    assert scroll_gui.scrolls == [-10]
+    assert "Claude" in out or "JARVIS" in out
+
+
+def test_a_whole_screen_fingerprint_is_refused():
+    """Without a window the fingerprint would include the clock and caret, so
+    it would always differ and the check could never fail."""
+    assert cc._region_fingerprint(None) is None
+
+
+# ── movement feel ──────────────────────────────────────────────────────────
+
+def test_easing_is_symmetric_and_bounded():
+    assert cc._ease_in_out(0.0) == pytest.approx(0.0)
+    assert cc._ease_in_out(1.0) == pytest.approx(1.0)
+    assert cc._ease_in_out(0.5) == pytest.approx(0.5)
+    # Slow at the ends, fast in the middle.
+    assert cc._ease_in_out(0.1) < 0.1
+    assert cc._ease_in_out(0.9) > 0.9
+
+
+def test_a_move_passes_through_many_intermediate_points(monkeypatch):
+    """pyautogui's own stepping gives ~6 visible jumps over a third of a
+    second, which reads as teleporting rather than moving."""
+    fake = _FakePyAutoGUI(start=(0, 0))
+    seen = []
+    fake.moveTo = lambda x, y, duration=0: seen.append((x, y))
+    monkeypatch.setattr(cc, "pyautogui", fake)
+    monkeypatch.setattr(cc, "_require_pyautogui", lambda: None)
+
+    cc._smooth_move_to(1000, 600, duration=0.3)
+    assert len(seen) > 15, f"only {len(seen)} intermediate points"
+
+
+def test_a_move_lands_exactly_on_target(monkeypatch):
+    fake = _FakePyAutoGUI(start=(0, 0))
+    monkeypatch.setattr(cc, "pyautogui", fake)
+    monkeypatch.setattr(cc, "_require_pyautogui", lambda: None)
+    cc._smooth_move_to(1000, 600, duration=0.1)
+    assert fake.position() == (1000, 600)
+
+
+def test_a_tiny_move_does_not_bother_interpolating(monkeypatch):
+    fake = _FakePyAutoGUI(start=(100, 100))
+    seen = []
+    fake.moveTo = lambda x, y, duration=0: seen.append((x, y))
+    monkeypatch.setattr(cc, "pyautogui", fake)
+    monkeypatch.setattr(cc, "_require_pyautogui", lambda: None)
+    cc._smooth_move_to(101, 100)
+    assert seen == [(101, 100)]
+
+
+def test_longer_journeys_take_longer(monkeypatch):
+    """A short hop should feel brisk; a cross-screen sweep deliberate."""
+    fake = _FakePyAutoGUI(start=(0, 0))
+    monkeypatch.setattr(cc, "pyautogui", fake)
+    monkeypatch.setattr(cc, "_require_pyautogui", lambda: None)
+
+    import time as _t
+    fake._pos = (0, 0)
+    t0 = _t.perf_counter(); cc._smooth_move_to(60, 40); short = _t.perf_counter() - t0
+    fake._pos = (0, 0)
+    t0 = _t.perf_counter(); cc._smooth_move_to(1400, 900); long_ = _t.perf_counter() - t0
+    assert long_ > short
+    assert short >= cc._MOVE_MIN_DURATION * 0.8
+    assert long_ <= cc._MOVE_MAX_DURATION * 1.4
+
+
+def test_pyautogui_pause_is_restored_even_if_a_move_fails(monkeypatch):
+    """The loop zeroes PAUSE for smoothness; leaking that would silently strip
+    the safety delay from every later automation call."""
+    fake = _FakePyAutoGUI(start=(0, 0))
+    fake.PAUSE = 0.05
+    calls = {"n": 0}
+
+    def boom(x, y, duration=0):
+        calls["n"] += 1
+        if calls["n"] > 2:
+            raise RuntimeError("device gone")
+
+    fake.moveTo = boom
+    monkeypatch.setattr(cc, "pyautogui", fake)
+    monkeypatch.setattr(cc, "_require_pyautogui", lambda: None)
+
+    with pytest.raises(RuntimeError):
+        cc._smooth_move_to(1000, 600, duration=0.3)
+    assert fake.PAUSE == 0.05

@@ -1,5 +1,6 @@
 #computer_control.py
 import io
+import math
 import json
 import platform
 import re
@@ -217,7 +218,11 @@ def _click(x=None, y=None, button: str = "left", clicks: int = 1) -> str:
     _require_pyautogui()
     if x is not None and y is not None:
         x, y = int(x), int(y)
-        pyautogui.click(x, y, button=button, clicks=clicks)
+        # Glide to the target first, then click in place: pyautogui.click(x, y)
+        # teleports the pointer, which looks abrupt and gives hover-sensitive UI
+        # no chance to react before the press lands.
+        _smooth_move_to(x, y)
+        pyautogui.click(button=button, clicks=clicks)
         # A click cannot be observed directly, but the pointer landing where it
         # was aimed is a necessary condition — and its absence is exactly what a
         # missing Accessibility grant looks like.
@@ -247,11 +252,15 @@ def _press(key: str) -> str:
 
 
 def _region_fingerprint(window: dict | None) -> bytes | None:
-    """Cheap pixel snapshot of a window, for telling whether a scroll moved it."""
+    """Cheap pixel snapshot of a window, for telling whether a scroll moved it.
+
+    Returns None without a window: a whole-screen fingerprint is useless here
+    because the clock, the caret and any animation change it every time, so it
+    would report "something moved" no matter what."""
+    if not window:
+        return None
     try:
         shot = pyautogui.screenshot()
-        if not window:
-            return shot.resize((64, 40)).tobytes()
         # Screenshot pixels are 2x click coordinates on a Retina display.
         scale = shot.size[0] / max(1, pyautogui.size()[0])
         box = (int(window["x"] * scale), int(window["y"] * scale),
@@ -285,6 +294,9 @@ def _scroll(direction: str = "down", amount: int = 10, target: str = "") -> str:
         # report which window that is, so a scroll into the void is visible.
         try:
             pos = pyautogui.position()
+            # Quartz lists windows front-to-back, so the first match is the one
+            # actually on top at that point — which is what will receive the
+            # scroll, even if a different window is also underneath.
             window = next(
                 (w for w in list_windows()
                  if w["x"] <= pos[0] <= w["x"] + w["width"]
@@ -293,6 +305,10 @@ def _scroll(direction: str = "down", amount: int = 10, target: str = "") -> str:
             )
         except Exception:
             window = None
+
+        if window is None:
+            return ("The pointer isn't over any window, sir, so a scroll would go nowhere. "
+                    "Tell me which window to scroll and I'll move there first.")
 
     before = _region_fingerprint(window)
 
@@ -312,7 +328,72 @@ def _scroll(direction: str = "down", amount: int = 10, target: str = "") -> str:
     return f"Scrolled {direction} ×{amount}{where}"
 
 
-def _move(x: int, y: int, duration: float = 0.3) -> str:
+# Pointer motion feel. pyautogui's own moveTo steps at MINIMUM_SLEEP (0.05s),
+# giving roughly six visible jumps over a third of a second — which reads as
+# teleporting rather than moving. These drive a proper interpolation instead.
+_MOVE_STEPS_PER_SECOND = 90
+_MOVE_MIN_DURATION = 0.25
+_MOVE_MAX_DURATION = 1.1
+# Pixels per second the pointer travels; longer journeys take proportionally
+# longer, so a short hop feels brisk and a cross-screen sweep still looks
+# deliberate rather than instantaneous.
+_MOVE_SPEED = 2200.0
+
+
+def _ease_in_out(t: float) -> float:
+    """Cubic ease-in-out: accelerate away, coast, settle onto the target.
+
+    Constant-velocity motion is what makes automated cursors look robotic;
+    easing is most of the difference between 'a script moved that' and 'someone
+    moved that'."""
+    return 4 * t * t * t if t < 0.5 else 1 - pow(-2 * t + 2, 3) / 2
+
+
+def _smooth_move_to(x: int, y: int, duration: float | None = None) -> None:
+    """Glide the pointer to (x, y) with eased interpolation."""
+    _require_pyautogui()
+    try:
+        start_x, start_y = pyautogui.position()
+    except Exception:
+        pyautogui.moveTo(x, y)
+        return
+
+    dx, dy = x - start_x, y - start_y
+    distance = math.hypot(dx, dy)
+    if distance < 2:
+        pyautogui.moveTo(x, y)
+        return
+
+    if duration is None:
+        duration = min(_MOVE_MAX_DURATION,
+                       max(_MOVE_MIN_DURATION, distance / _MOVE_SPEED))
+
+    # Driven by the clock rather than a fixed step count: posting each event
+    # costs real time, so a fixed sleep-per-step overshoots the requested
+    # duration (a full-width sweep took 1.5s against a 1.1s cap). Deriving
+    # progress from elapsed time keeps the duration honest and simply draws
+    # fewer intermediate points if the machine is busy.
+    previous_pause = getattr(pyautogui, "PAUSE", 0.1)
+    pyautogui.PAUSE = 0
+    frame = 1.0 / _MOVE_STEPS_PER_SECOND
+    try:
+        started = time.perf_counter()
+        while True:
+            elapsed = time.perf_counter() - started
+            if elapsed >= duration:
+                break
+            progress = _ease_in_out(elapsed / duration)
+            pyautogui.moveTo(int(round(start_x + dx * progress)),
+                             int(round(start_y + dy * progress)))
+            remaining = frame - ((time.perf_counter() - started) - elapsed)
+            if remaining > 0:
+                time.sleep(remaining)
+        pyautogui.moveTo(x, y)  # land exactly on target
+    finally:
+        pyautogui.PAUSE = previous_pause
+
+
+def _move(x: int, y: int, duration: float | None = None) -> str:
     """Move the pointer, then CHECK it arrived.
 
     Reading the position back catches the failure mode that made this look
@@ -320,7 +401,7 @@ def _move(x: int, y: int, duration: float = 0.3) -> str:
     pyautogui's move is accepted and does nothing at all, and without a
     read-back there is nothing to distinguish that from success."""
     _require_pyautogui()
-    pyautogui.moveTo(x, y, duration=duration)
+    _smooth_move_to(x, y, duration=duration)
     time.sleep(0.05)
     try:
         landed = pyautogui.position()
@@ -336,8 +417,9 @@ def _move(x: int, y: int, duration: float = 0.3) -> str:
 
 def _drag(x1: int, y1: int, x2: int, y2: int, duration: float = 0.5) -> str:
     _require_pyautogui()
-    pyautogui.moveTo(x1, y1, duration=0.2)
-    pyautogui.dragTo(x2, y2, duration=duration, button="left")
+    _smooth_move_to(x1, y1)
+    pyautogui.dragTo(x2, y2, duration=max(duration, 0.4), button="left",
+                     tween=pyautogui.easeInOutQuad)
     return f"Dragged ({x1},{y1}) → ({x2},{y2})"
 
 
@@ -713,7 +795,11 @@ def computer_control(
         if action == "scroll":
             return _scroll(
                 direction=params.get("direction", "down"),
-                amount=int(params.get("amount", 3)),
+                # 3 "clicks" is three lines — barely a nudge, and easily mistaken
+                # for nothing happening at all.
+                amount=int(params.get("amount", 10)),
+                target=str(params.get("target") or params.get("description")
+                           or params.get("title") or "").strip(),
             )
 
         if action == "copy":
