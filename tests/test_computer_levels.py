@@ -206,8 +206,12 @@ def test_read_actions_reach_the_user(stub_levels, action):
 def test_brightness_set_action_passes_the_value(monkeypatch):
     monkeypatch.setattr(cs, "_PYAUTOGUI", True)
     seen = {}
-    monkeypatch.setattr(cs, "brightness_set",
-                        lambda v: seen.setdefault("value", v) or "ok, sir")
+
+    def fake_set(v):
+        seen["value"] = v
+        return "ok, sir"
+
+    monkeypatch.setattr(cs, "brightness_set", fake_set)
     assert cs.computer_settings({"action": "brightness_set", "value": "35"}) == "ok, sir"
     assert seen["value"] == 35
 
