@@ -123,6 +123,8 @@ def test_speech_is_skipped_off_macos(monkeypatch):
 
 def test_speech_uses_the_builtin_say_binary(monkeypatch):
     calls = {}
+    # Must opt in: a substitute voice is disabled by default.
+    monkeypatch.setattr(om, "fallback_voice_allowed", lambda: True)
     monkeypatch.setattr(om.platform, "system", lambda: "Darwin")
     monkeypatch.setattr(om.shutil, "which", lambda name: "/usr/bin/say")
     monkeypatch.setattr(om.subprocess, "Popen", lambda cmd, **k: calls.setdefault("cmd", cmd))
@@ -133,6 +135,7 @@ def test_speech_uses_the_builtin_say_binary(monkeypatch):
 
 
 def test_speech_failure_is_non_fatal(monkeypatch):
+    monkeypatch.setattr(om, "fallback_voice_allowed", lambda: True)
     monkeypatch.setattr(om.platform, "system", lambda: "Darwin")
     monkeypatch.setattr(om.shutil, "which", lambda name: "/usr/bin/say")
     monkeypatch.setattr(om.subprocess, "Popen",
