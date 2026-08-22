@@ -437,6 +437,15 @@ class DashboardServer:
         self._login_attempts: dict[str, list[float]] = {}
         self._login_blocked_until: dict[str, float] = {}
         self._uploads_dir                 = UPLOADS_DIR
+        # Screenshots pushed from the Mac for viewing on the phone. Held in
+        # memory and served by reference rather than embedded in the broadcast:
+        # a screenshot is ~140KB, and `broadcast` keeps 300 messages of history
+        # that are REPLAYED to every new client — embedding them would bloat
+        # memory and re-show an old screen capture on any device that connects
+        # later. Kept in memory (never written to disk) and expired, because a
+        # picture of the user's whole screen is not something to leave lying
+        # around.
+        self._screenshots: dict[str, dict] = {}
         self._login_html                  = _read("login.html")
         self._app_html                    = _read("app.html")
         self.app                          = self._build_app()
