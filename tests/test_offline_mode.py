@@ -142,3 +142,40 @@ def test_speech_failure_is_non_fatal(monkeypatch):
 
 def test_empty_text_is_not_spoken():
     assert om.speak_offline("") is False
+
+
+# ── no substitute voice (explicit user instruction) ────────────────────────
+
+def test_no_substitute_voice_by_default(monkeypatch):
+    """James's rule: if ElevenLabs is unavailable he wants NO voice, not a
+    different one. A different voice is a different assistant."""
+    monkeypatch.setattr(om, "fallback_voice_allowed", lambda: False)
+    monkeypatch.setattr(om.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(om.shutil, "which", lambda name: "/usr/bin/say")
+    spoke = {"n": 0}
+    monkeypatch.setattr(om.subprocess, "Popen", lambda *a, **k: spoke.__setitem__("n", spoke["n"] + 1))
+
+    assert om.speak_offline("hello sir") is False
+    assert spoke["n"] == 0  # nothing was spoken
+
+
+def test_substitute_voice_used_only_when_explicitly_enabled(monkeypatch):
+    monkeypatch.setattr(om, "fallback_voice_allowed", lambda: True)
+    monkeypatch.setattr(om.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(om.shutil, "which", lambda name: "/usr/bin/say")
+    monkeypatch.setattr(om.subprocess, "Popen", lambda *a, **k: None)
+
+    assert om.speak_offline("hello sir") is True
+
+
+def test_fallback_voice_defaults_to_disabled_without_config(monkeypatch, tmp_path):
+    monkeypatch.setattr(om.Path if hasattr(om, "Path") else om, "__name__", om.__name__, raising=False)
+    # No config key present -> must be False
+    assert om.fallback_voice_allowed() is False
+
+
+def test_offline_replies_still_returned_as_text_when_silent(monkeypatch):
+    """Silence must not mean losing the answer — the text still comes back."""
+    monkeypatch.setattr(om, "fallback_voice_allowed", lambda: False)
+    answer = om.handle_locally("what time is it")
+    assert answer and "sir" in answer

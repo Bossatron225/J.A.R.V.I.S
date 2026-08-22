@@ -4340,8 +4340,17 @@ class JarvisLive:
                                         self._tts_pending_sentence = ""
                                 ext_audio_buf = []
                             elif self._use_external_tts and ext_audio_buf:
-                                self.ui.write_log("SYS: External TTS text missing; falling back to Gemini audio for this turn.")
-                                self._spawn_task(self._play_external_audio_fallback(list(ext_audio_buf)))
+                                # Same rule as the init-failure path: Gemini's
+                                # voice is not an acceptable stand-in for the
+                                # configured one. Drop the buffered audio and
+                                # stay silent for this turn unless a substitute
+                                # voice has been explicitly permitted.
+                                from core.offline_mode import fallback_voice_allowed
+                                if fallback_voice_allowed():
+                                    self.ui.write_log("SYS: External TTS text missing; falling back to Gemini audio for this turn.")
+                                    self._spawn_task(self._play_external_audio_fallback(list(ext_audio_buf)))
+                                else:
+                                    self.ui.write_log("SYS: External TTS text missing — staying silent this turn (no substitute voice).")
                                 ext_audio_buf = []
                             out_buf = []
 
