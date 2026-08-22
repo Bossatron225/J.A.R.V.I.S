@@ -216,7 +216,19 @@ def _smart_type(text: str, clear_first: bool = True) -> str:
 def _click(x=None, y=None, button: str = "left", clicks: int = 1) -> str:
     _require_pyautogui()
     if x is not None and y is not None:
+        x, y = int(x), int(y)
         pyautogui.click(x, y, button=button, clicks=clicks)
+        # A click cannot be observed directly, but the pointer landing where it
+        # was aimed is a necessary condition — and its absence is exactly what a
+        # missing Accessibility grant looks like.
+        try:
+            landed = pyautogui.position()
+            if abs(landed[0] - x) > 2 or abs(landed[1] - y) > 2:
+                return (f"Could not click ({x}, {y}) — the pointer never moved there "
+                        f"(it is at {landed[0]}, {landed[1]}). Jarvis likely lacks Accessibility "
+                        f"permission (System Settings → Privacy & Security → Accessibility).")
+        except Exception:
+            pass
         return f"{'Double-c' if clicks == 2 else 'C'}licked ({x}, {y}) [{button}]"
     pyautogui.click(button=button, clicks=clicks)
     return f"Clicked at current position [{button}]"

@@ -156,6 +156,52 @@ def probe_volume() -> ProbeResult:
                 pass
 
 
+def probe_mouse() -> ProbeResult:
+    """Can Jarvis actually move the pointer?
+
+    Without Accessibility permission macOS accepts every pyautogui move and
+    performs none of them — no error, no exception, the call simply returns.
+    That is indistinguishable from success unless the position is read back,
+    which is why "I have clicked it for you, sir" was said about clicks that
+    never happened. Restores the original pointer position afterwards."""
+    try:
+        import pyautogui
+    except Exception as exc:
+        return ProbeResult("mouse", UNVERIFIABLE, f"pyautogui unavailable: {exc}", ACTIVE)
+
+    try:
+        origin = pyautogui.position()
+        width, height = pyautogui.size()
+    except Exception as exc:
+        return ProbeResult("mouse", UNVERIFIABLE, f"could not read pointer: {exc}", ACTIVE)
+
+    # Somewhere central and harmless, and never where the pointer already is.
+    target = (int(width * 0.5), int(height * 0.5))
+    if abs(origin[0] - target[0]) < 5 and abs(origin[1] - target[1]) < 5:
+        target = (int(width * 0.3), int(height * 0.3))
+
+    try:
+        pyautogui.moveTo(target[0], target[1], duration=0.1)
+        time.sleep(0.1)
+        landed = pyautogui.position()
+    except Exception as exc:
+        return ProbeResult("mouse", BROKEN, f"move raised: {exc}", ACTIVE)
+    finally:
+        try:
+            pyautogui.moveTo(origin[0], origin[1], duration=0.1)
+        except Exception:
+            pass
+
+    if abs(landed[0] - target[0]) <= 2 and abs(landed[1] - target[1]) <= 2:
+        return ProbeResult("mouse", WORKING, f"pointer moved to {target} as instructed", ACTIVE)
+    return ProbeResult(
+        "mouse", BROKEN,
+        f"pointer did not move — asked for {target}, stayed at {tuple(landed)}. "
+        f"Accessibility permission is probably not granted.",
+        ACTIVE,
+    )
+
+
 def probe_camera() -> ProbeResult:
     """Passive: is the camera currently delivering frames?
 
