@@ -156,6 +156,41 @@ def probe_volume() -> ProbeResult:
                 pass
 
 
+def accessibility_trusted() -> bool | None:
+    """Does macOS consider THIS process trusted for Accessibility?
+
+    Asks the system directly instead of inferring it from a move that did
+    nothing. Worth having because the permission is attached to the running
+    executable's identity, which is not necessarily the thing the user ticked
+    in System Settings — here the launcher is a bash script, so the process
+    macOS actually sees is the Python framework's own app bundle.
+
+    None means the question could not be asked (not macOS, or no API)."""
+    if platform.system() != "Darwin":
+        return None
+    try:
+        import ctypes
+        import ctypes.util
+
+        path = ctypes.util.find_library("ApplicationServices")
+        if not path:
+            return None
+        lib = ctypes.CDLL(path)
+        lib.AXIsProcessTrusted.restype = ctypes.c_bool
+        return bool(lib.AXIsProcessTrusted())
+    except Exception:
+        return None
+
+
+def accessibility_report() -> str:
+    """One line naming the trust state AND the executable it applies to."""
+    trusted = accessibility_trusted()
+    if trusted is None:
+        return "Accessibility: not applicable on this platform"
+    return (f"Accessibility: {'GRANTED' if trusted else 'NOT GRANTED'} "
+            f"for {sys.executable}")
+
+
 def probe_mouse() -> ProbeResult:
     """Can Jarvis actually move the pointer?
 
