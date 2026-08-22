@@ -373,6 +373,93 @@ def _focus_window(title: str) -> str:
 
     return f"focus_window: unknown OS '{os_name}'"
 
+def list_windows() -> list[dict]:
+    """On-screen windows with their real geometry, via the macOS window server.
+
+    Coordinates come back already in click space (the same 1470x956 that
+    pyautogui uses), so nothing needs scaling and nothing needs guessing. This
+    exists because asking a vision model for pixel coordinates is not reliable
+    enough to click with: asked to locate the clock in the top-RIGHT of a
+    2940px-wide screenshot, it answered x=959. The window server simply knows."""
+    if _get_os() != "mac":
+        return []
+    try:
+        import Quartz
+    except Exception:
+        return []
+
+    try:
+        raw = Quartz.CGWindowListCopyWindowInfo(
+            Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
+            Quartz.kCGNullWindowID,
+        )
+    except Exception:
+        return []
+
+    windows: list[dict] = []
+    for entry in raw or []:
+        bounds = entry.get("kCGWindowBounds") or {}
+        width, height = float(bounds.get("Width", 0)), float(bounds.get("Height", 0))
+        # Skip menu-bar strips, tiny helper panels and other non-targets.
+        if width < 120 or height < 80:
+            continue
+        owner = str(entry.get("kCGWindowOwnerName") or "")
+        if owner in {"Window Server", "Notification Centre", "Notification Center", "Dock"}:
+            continue
+        windows.append({
+            "owner": owner,
+            "title": str(entry.get("kCGWindowName") or ""),
+            "x": float(bounds.get("X", 0)), "y": float(bounds.get("Y", 0)),
+            "width": width, "height": height,
+        })
+    return windows
+
+
+def find_window(query: str) -> dict | None:
+    """Best on-screen window matching an app name or window title."""
+    query = str(query or "").strip().lower()
+    if not query:
+        return None
+
+    windows = list_windows()
+    if not windows:
+        return None
+
+    # Most specific first: exact app name, then app-name substring, then title.
+    for match in (
+        lambda w: w["owner"].lower() == query,
+        lambda w: query in w["owner"].lower(),
+        lambda w: w["owner"].lower() in query,
+        lambda w: query in w["title"].lower(),
+    ):
+        found = [w for w in windows if match(w)]
+        if found:
+            # Largest match — the main window rather than a palette.
+            return max(found, key=lambda w: w["width"] * w["height"])
+    return None
+
+
+def window_centre(window: dict) -> tuple[int, int]:
+    return (int(window["x"] + window["width"] / 2),
+            int(window["y"] + window["height"] / 2))
+
+
+def _resolve_point(description: str) -> tuple[tuple[int, int] | None, str]:
+    """Where is the thing the user described? Returns (point, how_it_was_found).
+
+    Real window geometry is tried first because it is exact; the vision search
+    is only a fallback for things that are not windows (a button, an icon), and
+    is inherently approximate."""
+    window = find_window(description)
+    if window:
+        label = window["title"] or window["owner"]
+        return window_centre(window), f"the {label} window"
+    point = _screen_find(description)
+    if point:
+        return point, f"'{description}' (located visually — approximate)"
+    return None, ""
+
+
 def _screen_find(description: str) -> tuple[int, int] | None:
     api_key = _get_api_key()
     if not api_key:
