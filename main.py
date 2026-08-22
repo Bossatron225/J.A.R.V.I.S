@@ -1228,6 +1228,8 @@ TOOL_DECLARATIONS = [
             "screen_click and NO x/y — the real window position is looked up exactly. Never invent x/y coordinates "
             "for something you have not located; guessed coordinates click the wrong thing. "
             "To bring a window to the front use action=focus_window with title. "
+            "When scrolling, ALWAYS pass target naming the window to scroll — the wheel acts on whatever "
+            "is under the pointer, so an untargeted scroll often goes to the wrong window or nowhere. "
             "Report back exactly what the tool returns: it verifies the pointer actually moved and will say so if it did not."
         ),
         "parameters": {
@@ -1240,7 +1242,8 @@ TOOL_DECLARATIONS = [
                 "keys":        {"type": "STRING", "description": "Key combination e.g. 'ctrl+c'"},
                 "key":         {"type": "STRING", "description": "Single key e.g. 'enter'"},
                 "direction":   {"type": "STRING", "description": "up | down | left | right"},
-                "amount":      {"type": "INTEGER", "description": "Scroll amount (default: 3)"},
+                "amount":      {"type": "INTEGER", "description": "Scroll amount (default 10; a page is roughly 25)"},
+                "target":      {"type": "STRING", "description": "For scroll: the window or app to scroll (e.g. 'Safari'). Always pass this when scrolling — the wheel acts on whatever is under the pointer, so without it the scroll may go to the wrong window."},
                 "seconds":     {"type": "NUMBER",  "description": "Seconds to wait"},
                 "title":       {"type": "STRING",  "description": "Window title or app name for focus_window"},
                 "description": {"type": "STRING",  "description": "What to move to or click: a window/app name (looked up exactly) or an on-screen element. Use with action=move or screen_click INSTEAD of x/y."},
