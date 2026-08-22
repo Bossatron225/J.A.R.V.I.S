@@ -636,6 +636,51 @@ def evaluate_live_biometric_security(target_identity: str = "") -> tuple[bool, d
     }
 
 
+def capture_enrollment_samples(
+    target_count: int = 8,
+    timeout_seconds: float = 12.0,
+    camera_index: int = 0,
+) -> list[bytes]:
+    """Collect several JPEG frames that actually contain a detectable face.
+
+    Enrollment needs multiple poses/distances or the trained model only
+    recognises one angle. Frames without a detectable face are discarded rather
+    than counted, so a dark room yields few samples and the caller can say so
+    instead of training a useless model on empty frames.
+    """
+    try:
+        import cv2 as _cv2
+        from actions.camera_session import get_camera_session
+        from auth import _detect_and_embed
+    except Exception:
+        return []
+
+    session = get_camera_session(camera_index)
+    samples: list[bytes] = []
+    deadline = time.monotonic() + timeout_seconds
+    last_kept = 0.0
+
+    while len(samples) < target_count and time.monotonic() < deadline:
+        frame = session.get_frame()
+        if frame is None:
+            time.sleep(0.2)
+            continue
+        # Space samples out so the set spans real head movement rather than
+        # several near-identical frames from one instant.
+        if time.monotonic() - last_kept < 0.6:
+            time.sleep(0.15)
+            continue
+        if _detect_and_embed(frame) is None:
+            time.sleep(0.15)
+            continue
+        ok, buf = _cv2.imencode(".jpg", frame, [_cv2.IMWRITE_JPEG_QUALITY, 92])
+        if ok:
+            samples.append(buf.tobytes())
+            last_kept = time.monotonic()
+
+    return samples
+
+
 def establish_biometric_baseline(
     name: str = "James Lumsden",
     visual_samples: list[bytes] | None = None,
