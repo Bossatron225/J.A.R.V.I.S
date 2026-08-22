@@ -943,12 +943,10 @@ def report_levels() -> str:
 
 
 ACTION_MAP: dict[str, callable] = {
-    "get_volume":          lambda: report_levels(),
-    "get_brightness":      lambda: report_levels(),
-    "get_levels":          lambda: report_levels(),
-    "levels":              lambda: report_levels(),
-    "brightness_set":      brightness_set,
-    "set_brightness":      brightness_set,
+    "get_volume":          report_levels,
+    "get_brightness":      report_levels,
+    "get_levels":          report_levels,
+    "levels":              report_levels,
     "volume_up":           volume_up,
     "volume_down":         volume_down,
     "mute":                volume_mute,
@@ -1096,6 +1094,13 @@ def computer_settings(
             return f"Volume set to {value}%."
         except Exception as e:
             return f"Could not set volume: {e}"
+
+    # Handled here rather than via ACTION_MAP because it takes a target value.
+    if action in ("brightness_set", "set_brightness"):
+        try:
+            return brightness_set(int(value or 50))
+        except Exception as e:
+            return f"Could not set brightness: {e}"
 
     app_name = (
         str(params.get("app_name", "") or params.get("target", "") or params.get("window", "") or params.get("description", "") or params.get("value", ""))
