@@ -127,15 +127,18 @@ def probe_brightness() -> ProbeResult:
 
 
 def probe_volume() -> ProbeResult:
-    """Round-trips output volume.
+    """Round-trips output volume, preserving the mute state.
 
-    Deliberately does NOT touch the mute state: if the user has muted the
-    machine, this probe must stay inaudible. Volume can be set and read while
-    muted, so the round trip still proves the control works."""
+    Mute must be saved and restored explicitly: on macOS `set volume output
+    volume N` silently clears the mute flag, so a naive round trip leaves a
+    deliberately-silenced Mac audible. Caught by this module's own first run,
+    which is a fair advertisement for the approach."""
     from actions import computer_settings as cs
 
     if cs._OS not in ("Darwin", "Linux"):
         return ProbeResult("volume", UNVERIFIABLE, "not supported on this OS", ACTIVE)
+
+    was_muted = cs.get_volume().get("muted")
 
     def read():
         return cs.get_volume().get("level")
@@ -143,7 +146,14 @@ def probe_volume() -> ProbeResult:
     def pick(current):
         return current - 5 if current >= 10 else current + 5
 
-    return _round_trip("volume", read=read, write=cs.volume_set, pick_test_value=pick)
+    try:
+        return _round_trip("volume", read=read, write=cs.volume_set, pick_test_value=pick)
+    finally:
+        if was_muted is not None:
+            try:
+                cs.set_muted(bool(was_muted))
+            except Exception:
+                pass
 
 
 def probe_camera() -> ProbeResult:
