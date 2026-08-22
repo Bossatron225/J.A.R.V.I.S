@@ -208,9 +208,19 @@ def test_the_vision_search_is_still_used_for_non_windows(gui, monkeypatch):
 # ── screen_click ───────────────────────────────────────────────────────────
 
 def test_screen_click_on_a_window_clicks_its_centre(gui, windows):
+    """The pointer glides to the target and clicks in place, so the click
+    carries no coordinates — where it landed is what matters."""
     out = cc.computer_control({"action": "screen_click", "description": "Claude"})
-    assert gui.clicks and gui.clicks[0][:2] == (501, 433)
+    assert gui.clicks, "no click was performed"
+    assert gui.position() == (501, 433)
     assert "Clicked" in out
+
+
+def test_clicking_glides_rather_than_teleporting(gui, windows):
+    """pyautogui.click(x, y) jumps the pointer, which looks abrupt and gives
+    hover-sensitive UI no chance to react before the press lands."""
+    cc.computer_control({"action": "screen_click", "description": "Claude"})
+    assert gui.clicks[0][0] is None and gui.clicks[0][1] is None
 
 
 def test_screen_click_reports_a_pointer_that_never_moved(monkeypatch, windows):
