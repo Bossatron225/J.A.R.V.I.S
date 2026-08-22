@@ -1935,7 +1935,14 @@ class JarvisLive:
         # both the verdict and the executable makes a mismatch obvious at a
         # glance, instead of surfacing later as a click that does nothing.
         try:
-            from actions.capability_test import accessibility_report
+            from actions.capability_test import (
+                accessibility_report, accessibility_trusted, request_accessibility,
+            )
+            if accessibility_trusted() is False:
+                # Ask through the supported API so macOS registers the identity
+                # it actually considers responsible, rather than whichever
+                # bundle looked right when adding it by hand.
+                request_accessibility()
             print(accessibility_report())
         except Exception:
             pass

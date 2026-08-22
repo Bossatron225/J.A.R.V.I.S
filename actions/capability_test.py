@@ -184,6 +184,49 @@ def accessibility_trusted() -> bool | None:
         return None
 
 
+def request_accessibility() -> bool | None:
+    """Ask macOS for Accessibility, showing the system prompt if needed.
+
+    This is the supported way to get the RIGHT entry into System Settings.
+    Adding an app by hand can register an identity that does not match the
+    process that actually runs — which is what happened here: both the
+    JarvisWorker wrapper and the Python framework bundle were ticked, and the
+    running process was still reported untrusted. Calling the prompting API
+    from inside the real process lets macOS register whatever it considers
+    responsible, rather than us guessing."""
+    if platform.system() != "Darwin":
+        return None
+    try:
+        import ctypes
+        import ctypes.util
+
+        app_services = ctypes.util.find_library("ApplicationServices")
+        core_foundation = ctypes.util.find_library("CoreFoundation")
+        if not app_services or not core_foundation:
+            return None
+
+        cf = ctypes.CDLL(core_foundation)
+        ax = ctypes.CDLL(app_services)
+
+        cf.CFStringCreateWithCString.restype = ctypes.c_void_p
+        cf.CFStringCreateWithCString.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_uint32]
+        cf.CFDictionaryCreate.restype = ctypes.c_void_p
+        cf.CFDictionaryCreate.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p),
+                                          ctypes.POINTER(ctypes.c_void_p), ctypes.c_long,
+                                          ctypes.c_void_p, ctypes.c_void_p]
+        ax.AXIsProcessTrustedWithOptions.restype = ctypes.c_bool
+        ax.AXIsProcessTrustedWithOptions.argtypes = [ctypes.c_void_p]
+
+        key = cf.CFStringCreateWithCString(None, b"AXTrustedCheckOptionPrompt", 0x08000100)
+        true_value = ctypes.c_void_p.in_dll(cf, "kCFBooleanTrue")
+        keys = (ctypes.c_void_p * 1)(key)
+        values = (ctypes.c_void_p * 1)(true_value)
+        options = cf.CFDictionaryCreate(None, keys, values, 1, None, None)
+        return bool(ax.AXIsProcessTrustedWithOptions(options))
+    except Exception:
+        return None
+
+
 def accessibility_report() -> str:
     """One line naming the trust state AND the executable it applies to."""
     trusted = accessibility_trusted()
