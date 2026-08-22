@@ -246,12 +246,70 @@ def _press(key: str) -> str:
     return f"Pressed: {key}"
 
 
-def _scroll(direction: str = "down", amount: int = 3) -> str:
+def _region_fingerprint(window: dict | None) -> bytes | None:
+    """Cheap pixel snapshot of a window, for telling whether a scroll moved it."""
+    try:
+        shot = pyautogui.screenshot()
+        if not window:
+            return shot.resize((64, 40)).tobytes()
+        # Screenshot pixels are 2x click coordinates on a Retina display.
+        scale = shot.size[0] / max(1, pyautogui.size()[0])
+        box = (int(window["x"] * scale), int(window["y"] * scale),
+               int((window["x"] + window["width"]) * scale),
+               int((window["y"] + window["height"]) * scale))
+        return shot.crop(box).resize((64, 40)).tobytes()
+    except Exception:
+        return None
+
+
+def _scroll(direction: str = "down", amount: int = 10, target: str = "") -> str:
+    """Scroll, over the right window, and check that something actually moved.
+
+    A scroll wheel event goes to whatever sits under the POINTER, which this
+    never positioned — so it scrolled whichever window the cursor had been left
+    over, frequently the top-left corner of the desktop where nothing scrolls,
+    and reported success regardless. Naming a target moves the pointer there
+    first."""
     _require_pyautogui()
-    vertical   = direction in ("up", "down")
-    clicks     = amount if direction in ("up", "right") else -amount
+
+    window = None
+    if target:
+        window = find_window(target)
+        if not window:
+            return f"I couldn't find '{target}' on the screen, sir, so I haven't scrolled."
+        centre = window_centre(window)
+        _smooth_move_to(centre[0], centre[1], duration=0.35)
+        time.sleep(0.15)
+    else:
+        # No target named: scroll whatever is under the pointer, but at least
+        # report which window that is, so a scroll into the void is visible.
+        try:
+            pos = pyautogui.position()
+            window = next(
+                (w for w in list_windows()
+                 if w["x"] <= pos[0] <= w["x"] + w["width"]
+                 and w["y"] <= pos[1] <= w["y"] + w["height"]),
+                None,
+            )
+        except Exception:
+            window = None
+
+    before = _region_fingerprint(window)
+
+    vertical = direction in ("up", "down")
+    clicks = amount if direction in ("up", "right") else -amount
     pyautogui.scroll(clicks) if vertical else pyautogui.hscroll(clicks)
-    return f"Scrolled {direction} ×{amount}"
+    time.sleep(0.35)  # let the target finish any smooth-scroll animation
+
+    where = f" in {window['title'] or window['owner']}" if window else ""
+    after = _region_fingerprint(window)
+    if before is not None and after is not None and before == after:
+        if not window:
+            return (f"I scrolled {direction}, sir, but nothing under the pointer moved — "
+                    f"the cursor isn't over a scrollable window. Tell me which window to scroll.")
+        return (f"I scrolled {direction}{where}, sir, but nothing moved — it may already be at "
+                f"the end, or that area doesn't scroll.")
+    return f"Scrolled {direction} ×{amount}{where}"
 
 
 def _move(x: int, y: int, duration: float = 0.3) -> str:
