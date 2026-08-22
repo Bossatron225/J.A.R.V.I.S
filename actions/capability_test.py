@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import json
 import os
+import platform
+import sys
 import time
 from pathlib import Path
 
@@ -229,10 +231,15 @@ def probe_mouse() -> ProbeResult:
 
     if abs(landed[0] - target[0]) <= 2 and abs(landed[1] - target[1]) <= 2:
         return ProbeResult("mouse", WORKING, f"pointer moved to {target} as instructed", ACTIVE)
+    trusted = accessibility_trusted()
+    cause = ("macOS reports this process is NOT trusted for Accessibility"
+             if trusted is False else
+             "macOS reports this process IS trusted, so the cause is something else"
+             if trusted else "Accessibility permission is probably not granted")
     return ProbeResult(
         "mouse", BROKEN,
         f"pointer did not move — asked for {target}, stayed at {tuple(landed)}. "
-        f"Accessibility permission is probably not granted.",
+        f"{cause} ({sys.executable}).",
         ACTIVE,
     )
 

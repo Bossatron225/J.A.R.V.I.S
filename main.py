@@ -1929,6 +1929,16 @@ class JarvisLive:
 
         print("\n" + "=" * 72)
         print("JARVIS STARTUP STATUS")
+        # macOS attaches Accessibility to the running executable's identity,
+        # which here is the Python framework's app bundle rather than the
+        # JarvisWorker wrapper that gets ticked in System Settings. Printing
+        # both the verdict and the executable makes a mismatch obvious at a
+        # glance, instead of surfacing later as a click that does nothing.
+        try:
+            from actions.capability_test import accessibility_report
+            print(accessibility_report())
+        except Exception:
+            pass
         print(f"VPS brain: {vps_url or 'not configured'}")
         if public_url:
             print(f"Remote/public URL: {public_url}")
