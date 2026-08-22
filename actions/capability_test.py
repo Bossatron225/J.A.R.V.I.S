@@ -292,6 +292,7 @@ def probe_wiz_lights() -> ProbeResult:
 PROBES: dict[str, callable] = {
     "brightness": probe_brightness,
     "volume": probe_volume,
+    "mouse": probe_mouse,
     "camera": probe_camera,
     "app_listing": probe_app_listing,
     "cloud": probe_cloud,
@@ -301,6 +302,7 @@ PROBES: dict[str, callable] = {
 PROBE_KINDS: dict[str, str] = {
     "brightness": ACTIVE,
     "volume": ACTIVE,
+    "mouse": ACTIVE,
     "camera": PASSIVE,
     "app_listing": PASSIVE,
     "cloud": PASSIVE,
