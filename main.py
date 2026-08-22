@@ -1222,7 +1222,14 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "computer_control",
-        "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen.",
+        "description": (
+            "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen. "
+            "To move or click on a WINDOW or APP, pass description (e.g. description='Claude') with action=move or "
+            "screen_click and NO x/y — the real window position is looked up exactly. Never invent x/y coordinates "
+            "for something you have not located; guessed coordinates click the wrong thing. "
+            "To bring a window to the front use action=focus_window with title. "
+            "Report back exactly what the tool returns: it verifies the pointer actually moved and will say so if it did not."
+        ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -1235,7 +1242,7 @@ TOOL_DECLARATIONS = [
                 "direction":   {"type": "STRING", "description": "up | down | left | right"},
                 "amount":      {"type": "INTEGER", "description": "Scroll amount (default: 3)"},
                 "seconds":     {"type": "NUMBER",  "description": "Seconds to wait"},
-                "title":       {"type": "STRING",  "description": "Window title for focus_window"},
+                "title":       {"type": "STRING",  "description": "Window title or app name for focus_window"},
                 "description": {"type": "STRING",  "description": "Element description for screen_find/screen_click"},
                 "type":        {"type": "STRING",  "description": "Data type for random_data"},
                 "field":       {"type": "STRING",  "description": "Field for user_data: name|email|city"},

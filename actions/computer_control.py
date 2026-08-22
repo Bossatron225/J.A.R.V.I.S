@@ -334,17 +334,37 @@ def _focus_window(title: str) -> str:
             return f"focus_window (Windows) failed: {e}"
 
     if os_name == "mac":
+        # Prefer the real app name from the window server: the user says
+        # "Claude code", the process is "Code", and a `name contains` match on
+        # the spoken phrase finds nothing.
+        window = find_window(title)
+        target = window["owner"] if window else title
         script = (
             f'tell application "System Events" to '
-            f'set frontmost of (first process whose name contains "{title}") to true'
+            f'set frontmost of (first process whose name is "{target}") to true'
         )
         try:
-            subprocess.run(
+            result = subprocess.run(
                 ["osascript", "-e", script],
-                capture_output=True, timeout=5,
+                capture_output=True, text=True, timeout=5,
             )
-            time.sleep(0.3)
-            return f"Focused window: {title}"
+            if result.returncode != 0:
+                detail = (result.stderr or "").strip().splitlines()
+                return (f"I couldn't bring '{title}' to the front, sir"
+                        + (f" — {detail[-1]}" if detail else "."))
+            time.sleep(0.4)
+            # Verify rather than assume: this used to report success even when
+            # the process did not exist.
+            check = subprocess.run(
+                ["osascript", "-e",
+                 'tell application "System Events" to get name of first '
+                 'application process whose frontmost is true'],
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip()
+            if check and check.lower() != target.lower():
+                return (f"I asked for '{target}' to come forward, sir, but '{check}' is still "
+                        f"in front.")
+            return f"Focused window: {target}"
         except Exception as e:
             return f"focus_window (macOS) failed: {e}"
 
@@ -606,14 +626,16 @@ def computer_control(
             # find it on screen the same way screen_click does.
             x_raw, y_raw = params.get("x"), params.get("y")
             if x_raw is None or y_raw is None:
-                desc = str(params.get("description") or params.get("target") or "").strip()
+                desc = str(params.get("description") or params.get("target")
+                           or params.get("title") or "").strip()
                 if not desc:
                     return ("I need either coordinates or a description of what to move to, sir — "
                             "no x/y was given.")
-                coords = _screen_find(desc)
+                coords, how = _resolve_point(desc)
                 if not coords:
                     return f"I couldn't find '{desc}' on the screen, sir, so I haven't moved the mouse."
-                return _move(coords[0], coords[1])
+                outcome = _move(coords[0], coords[1])
+                return outcome if outcome.startswith("Could not") else f"{outcome} — {how}"
             return _move(int(x_raw), int(y_raw))
 
         if action == "drag":
@@ -650,13 +672,16 @@ def computer_control(
             return f"{coords[0]},{coords[1]}" if coords else "NOT_FOUND"
 
         if action == "screen_click":
-            desc   = params.get("description", "")
-            coords = _screen_find(desc)
-            if coords:
-                time.sleep(0.2)
-                _click(x=coords[0], y=coords[1])
-                return f"Clicked '{desc}' at {coords}"
-            return f"Element not found on screen: '{desc}'"
+            desc = str(params.get("description") or params.get("target") or "").strip()
+            coords, how = _resolve_point(desc)
+            if not coords:
+                return f"I couldn't find '{desc}' on the screen, sir, so I haven't clicked anything."
+            time.sleep(0.2)
+            # Report what _click actually observed rather than assuming.
+            outcome = _click(x=coords[0], y=coords[1])
+            if outcome.startswith("Could not"):
+                return outcome
+            return f"Clicked {how} at {coords}"
 
         if action == "wait":
             secs = float(params.get("seconds", 1.0))
