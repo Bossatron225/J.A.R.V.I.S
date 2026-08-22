@@ -5380,10 +5380,23 @@ class JarvisLive:
 
         count = entry.get("sighting_count_at_time", 1)
         repeat_note = f" This is their {count}th sighting." if count > 1 else ""
-        notify_user(f"An unrecognized visitor was just seen at the camera.{repeat_note}")
+
+        from actions.visitor_alerts import build_alert_text, classify_sighting, should_send
+
+        classification = classify_sighting(count)
+        alert_text = build_alert_text(count, classification)
+
+        if should_send(classification["severity"]):
+            # Attach the photograph. The whole point of the snapshot is to show
+            # you who was there, and it is stranded on the Mac's disk otherwise
+            # — precisely when an alert fires you are usually not at the Mac.
+            notify_user(alert_text, attachment_path=entry.get("snapshot_path"))
+        else:
+            self.ui.write_log(f"[VisitorWatch] routine sighting suppressed by quiet hours: {visitor_id}")
+
         jlog.record_action(
             "unknown_visitor_seen",
-            f"visitor {entry.get('visitor_id')} (sighting #{count})",
+            f"visitor {entry.get('visitor_id')} (sighting #{count}, {classification['severity']})",
             snapshot=entry.get("snapshot_path"),
         )
 
