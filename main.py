@@ -1588,6 +1588,25 @@ TOOL_DECLARATIONS = [
         },
     },
     {
+        "name": "computer_task",
+        "description": (
+            "Performs a multi-step task on the Mac's screen using mouse and keyboard, checking after "
+            "every action that the screen actually changed as intended. Use for GUI work that has no "
+            "dedicated tool — navigating an app, filling a form, clicking through a website. "
+            "ALWAYS call first WITHOUT approved to show the plan; only call again with approved=true "
+            "after the user explicitly agrees. Refuses outright to touch passwords, payment/checkout "
+            "flows, or anything that deletes data, regardless of approval."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "goal": {"type": "STRING", "description": "What to accomplish on screen, in plain language"},
+                "approved": {"type": "BOOLEAN", "description": "true ONLY after the user has seen the plan and agreed"},
+            },
+            "required": ["goal"],
+        },
+    },
+    {
         "name": "attention_briefing",
         "description": (
             "Answers 'what needs my attention right now' by synthesising ACROSS calendar, messages, "
@@ -3985,6 +4004,9 @@ class JarvisLive:
                 result = await self._run_multi_step_task(args)
                 self.ui.show_content("MULTI-STEP TASK", result)
 
+            elif name == "computer_task":
+                result = await self._run_computer_task(args)
+
             elif name == "attention_briefing":
                 from actions.attention import attention_briefing as _brief
                 r = await loop.run_in_executor(None, lambda: _brief(parameters=args))
@@ -5252,6 +5274,124 @@ class JarvisLive:
         }
         jlog.record_action("multi_step_task", request, completed=f"{report['completed']}/{report['total']}")
         return plan_text + "\n\n" + task_planner.format_execution(report)
+
+    async def _run_computer_task(self, args: dict) -> str:
+        """Drive a GUI task with a perceive → act → verify loop.
+
+        Two-phase by design: without approved=True this only returns a plan.
+        Nothing touches the mouse or keyboard until the user has seen what is
+        proposed and said yes."""
+        from actions import computer_use as cu
+
+        goal = str(args.get("goal", "") or "").strip()
+        if not goal:
+            return "What would you like me to do on the computer, sir?"
+        approved = bool(args.get("approved", False))
+
+        # Hard blocks apply to the objective itself, before anything else.
+        allowed, reason = cu.check_safety(goal, approved=approved)
+        if not allowed and "refused" in reason:
+            jlog.record_action("computer_task_refused", goal, reason=reason)
+            return f"I {reason}"
+        if not approved:
+            return cu.describe_plan(goal, approved)
+
+        try:
+            import pyautogui
+            from actions.screen_processor import _capture_screen
+        except Exception as exc:
+            return f"I can't drive the screen right now, sir — {exc}"
+
+        def _shoot() -> tuple[bytes, tuple[int, int]]:
+            data, _mime = _capture_screen()
+            from io import BytesIO
+            import PIL.Image
+            return data, PIL.Image.open(BytesIO(data)).size
+
+        def _vision(prompt: str, images: list[bytes]) -> str:
+            from google import genai as _genai
+            from google.genai import types as _gtypes
+            client = _genai.Client(api_key=_get_api_key())
+            parts = [_gtypes.Part.from_bytes(data=img, mime_type="image/png") for img in images]
+            resp = client.models.generate_content(
+                model="models/gemini-flash-latest", contents=[*parts, prompt]
+            )
+            try:
+                from memory.usage_log import record_usage
+                record_usage("computer_use", "gemini_image", len(images))
+            except Exception:
+                pass
+            return getattr(resp, "text", "") or ""
+
+        loop = asyncio.get_running_loop()
+        screen_size = tuple(pyautogui.size())
+        history: list[str] = []
+        transcript: list[str] = [f"Task: {goal}"]
+
+        jlog.record_action("computer_task_start", goal)
+
+        for step in range(1, cu.MAX_STEPS + 1):
+            before, shot_size = await loop.run_in_executor(None, _shoot)
+
+            raw = await loop.run_in_executor(
+                None,
+                lambda: _vision(
+                    cu.ACTION_PROMPT.format(goal=goal, history="; ".join(history) or "none"),
+                    [before],
+                ),
+            )
+            try:
+                act = cu.parse_action(raw)
+            except cu.ComputerUseError as exc:
+                transcript.append(f"  step {step}: stopped — {exc}")
+                break
+
+            if act["action"] == "done":
+                transcript.append(f"  step {step}: complete — {act['reason']}")
+                break
+            if act["action"] == "fail":
+                transcript.append(f"  step {step}: gave up — {act['reason']}")
+                break
+
+            # Re-check safety on the concrete action, not just the objective:
+            # a benign-sounding task can still propose typing into a password
+            # field once it sees the screen.
+            probe = f"{act['reason']} {act['text']}"
+            ok, why = cu.check_safety(probe, approved=approved)
+            if not ok:
+                transcript.append(f"  step {step}: {why}")
+                jlog.record_action("computer_task_blocked", goal, step=step, reason=why)
+                break
+
+            try:
+                did = await loop.run_in_executor(
+                    None, lambda: cu.execute_action(act, shot_size, screen_size, pyautogui)
+                )
+            except Exception as exc:
+                transcript.append(f"  step {step}: action failed — {exc}")
+                break
+
+            await asyncio.sleep(0.8)  # let the UI settle before looking again
+            after, _ = await loop.run_in_executor(None, _shoot)
+
+            verified, detail = await loop.run_in_executor(
+                None, lambda: cu.verify_change(did, act["reason"], before, after, _vision)
+            )
+            history.append(f"{did} -> {'ok' if verified else 'no visible change'}")
+            transcript.append(f"  step {step}: {did} — {detail or 'no detail'}")
+            jlog.record_action("computer_action", f"{goal}: {did}", verified=verified)
+
+            if not verified:
+                # Stop rather than compound a mistake — the whole reason this
+                # loop exists is that the old code clicked and assumed.
+                transcript.append("  stopping: the screen didn't change as expected.")
+                break
+        else:
+            transcript.append(f"  reached the {cu.MAX_STEPS}-step limit.")
+
+        report = "\n".join(transcript)
+        self.ui.show_content("COMPUTER TASK", report)
+        return report
 
     async def _run_goal_pursuit(self) -> None:
         """Pursue standing goals on their own cadence.
