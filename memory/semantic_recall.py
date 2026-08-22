@@ -14,6 +14,77 @@ recall never simply stops working.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import os
+import threading
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.getenv("JARVIS_DATA_DIR") or (BASE_DIR / "memory")).expanduser()
+EMBED_CACHE_PATH = DATA_DIR / "memory_embed_cache.json"
+
+MAX_CACHE_ENTRIES = 5000
+
+_cache_lock = threading.Lock()
+_cache: dict[str, list[float]] | None = None
+
+
+def _cache_key(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:24]
+
+
+def _load_cache() -> dict:
+    global _cache
+    if _cache is not None:
+        return _cache
+    try:
+        if EMBED_CACHE_PATH.exists():
+            data = json.loads(EMBED_CACHE_PATH.read_text(encoding="utf-8"))
+            _cache = data if isinstance(data, dict) else {}
+        else:
+            _cache = {}
+    except Exception:
+        _cache = {}
+    return _cache
+
+
+def _save_cache() -> None:
+    cache = _load_cache()
+    try:
+        if len(cache) > MAX_CACHE_ENTRIES:
+            # Cheap bound: keep an arbitrary recent slice rather than growing
+            # without limit. Entries are pure derived data, so dropping any is
+            # only ever a cache miss.
+            cache = dict(list(cache.items())[-MAX_CACHE_ENTRIES:])
+            globals()["_cache"] = cache
+        EMBED_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        EMBED_CACHE_PATH.write_text(json.dumps(cache), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _embed_cached(text: str, embed_text) -> list[float] | None:
+    """Embed a stored memory once and reuse it.
+
+    Without this, every recall re-embedded every candidate — one API call per
+    memory entry per question (~20+ calls, several seconds, and real cost) for
+    text that almost never changes. Stored facts are keyed by content hash, so
+    an edited fact simply misses and is re-embedded."""
+    key = _cache_key(text)
+    cache = _load_cache()
+    with _cache_lock:
+        hit = cache.get(key)
+    if hit is not None:
+        return hit
+
+    vector = embed_text(text, task_type="RETRIEVAL_DOCUMENT")
+    if vector:
+        with _cache_lock:
+            cache[key] = list(vector)
+        _save_cache()
+    return vector
+
 
 def _embedding_helpers():
     """Late import so this module stays importable without the genai stack."""
