@@ -356,17 +356,23 @@ def _screen_find(description: str) -> tuple[int, int] | None:
         from google.genai import types as gtypes
 
         _require_pyautogui()
-        w, h  = pyautogui.size()
         img   = pyautogui.screenshot()
         buf   = io.BytesIO()
         img.save(buf, format="PNG")
         image_bytes = buf.getvalue()
 
         client = genai.Client(api_key=api_key)
+        # The prompt MUST describe the image actually sent. On a Retina Mac the
+        # screenshot is 2940x1912 while pyautogui.size() reports 1470x956; this
+        # used to quote the latter while sending the former, so the coordinates
+        # coming back were meaningless — which is why clicks landed nowhere near
+        # the thing they were aimed at.
+        iw, ih = img.size
         prompt = (
-            f"This is a screenshot of a {w}×{h} pixel screen. "
+            f"This is a screenshot measuring {iw}×{ih} pixels. "
             f"Locate the UI element described as: '{description}'. "
             f"Reply with ONLY the center coordinates as: x,y "
+            f"in pixels of THIS image, with 0,0 at the top-left. "
             f"If the element is not visible, reply: NOT_FOUND"
         )
 
