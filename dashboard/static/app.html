@@ -201,6 +201,36 @@
       padding: 11px 14px; display: flex; align-items: center; gap: 12px;
       max-width: 82%; animation: pop 0.18s ease;
     }
+    /* Screenshot pushed from the Mac. Left-aligned like Jarvis's own
+       messages, since it is him answering, not the user sending. */
+    .msg-shot {
+      align-self: flex-start;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; border-bottom-left-radius: 4px;
+      padding: 10px; max-width: 88%; animation: pop 0.18s ease;
+    }
+    .shot-lbl {
+      font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+      opacity:0.45; color:var(--muted); margin-bottom:7px;
+    }
+    .shot-img {
+      display:block; width:100%; height:auto; border-radius:8px;
+      border:1px solid var(--border); cursor:zoom-in; background:var(--bg);
+    }
+    .shot-time { font-size:11px; color:var(--muted); margin-top:6px; }
+    /* Full-screen viewer: a 1280px-wide capture is unreadable on a phone
+       otherwise, so tapping opens it pannable at full size. */
+    .shot-modal {
+      position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.92);
+      display:none; align-items:center; justify-content:center; overflow:auto;
+    }
+    .shot-modal.open { display:flex; }
+    .shot-modal img { max-width:none; width:auto; height:auto; cursor:zoom-out; }
+    .shot-modal-close {
+      position:fixed; top:14px; right:16px; font-size:30px; line-height:1;
+      color:#fff; background:rgba(0,0,0,0.5); border:none; border-radius:50%;
+      width:42px; height:42px; cursor:pointer; z-index:10000;
+    }
     .fc-icon { font-size: 26px; flex-shrink: 0; }
     .fc-meta { flex: 1; min-width: 0; }
     .fc-lbl  { font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase; opacity:0.45; color:var(--muted); margin-bottom:4px; }
@@ -625,6 +655,7 @@
         if (m.type === 'wake')          { sys('Wake signal received.'); setStatus('active'); }
         if (m.type === 'sys')           sys(m.text);
         if (m.type === 'file_received') _onFileReceived(m);
+        if (m.type === 'screen_image')  _onScreenImage(m);
         if (m.type === 'diagnostics')   _renderDiagnostics(m.payload || {});
         if (m.type === 'predictive_suggestion') _renderPredictive(m.payload || {});
         if (m.type === 'visual_watch')   _renderVisualWatch(m.state || 'steady', m.payload || {});
@@ -1106,6 +1137,41 @@
     }
 
     // File received by another WebSocket client (e.g., second open tab)
+    function _openShot(src) {
+      let modal = document.getElementById('shot-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'shot-modal';
+        modal.className = 'shot-modal';
+        modal.innerHTML = '<button class="shot-modal-close" aria-label="Close">&times;</button><img alt="Screen capture">';
+        modal.addEventListener('click', () => modal.classList.remove('open'));
+        document.body.appendChild(modal);
+      }
+      modal.querySelector('img').src = src;
+      modal.classList.add('open');
+    }
+
+    function _onScreenImage(m) {
+      // The image is fetched by reference rather than inlined, so an expired
+      // capture simply fails to load instead of sitting in the feed forever.
+      const src = `/screen/${encodeURIComponent(m.shot_id)}?token=${encodeURIComponent(_authToken)}`;
+      const card = document.createElement('div');
+      card.className = 'msg-shot';
+      card.innerHTML = `
+        <div class="shot-lbl">${esc(m.label || 'Mac screen')}</div>
+        <img class="shot-img" alt="Mac screen capture" src="${src}">
+        <div class="shot-time">Tap to enlarge · captured ${esc(m.captured_at || 'just now')}</div>
+      `;
+      const img = card.querySelector('img');
+      img.addEventListener('click', () => _openShot(src));
+      img.addEventListener('error', () => {
+        card.innerHTML = '<div class="shot-lbl">Mac screen</div>' +
+                         '<div class="shot-time">That capture has expired, sir — ask again for a fresh one.</div>';
+      });
+      feed.appendChild(card);
+      feed.scrollTop = feed.scrollHeight;
+    }
+
     function _onFileReceived(m) {
       const dlUrl = `/uploads/${encodeURIComponent(m.name)}?token=${encodeURIComponent(_authToken)}`;
       const card  = document.createElement('div');
