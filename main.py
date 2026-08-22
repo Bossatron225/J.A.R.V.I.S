@@ -1733,6 +1733,29 @@ TOOL_DECLARATIONS = [
             "required": [],
         },
     },
+    {
+        "name": "standing_directives",
+        "description": (
+            "Durable rules about HOW YOU SHOULD BEHAVE, stated by the user, that persist across "
+            "every future session and both machines. Call with action=add whenever the user states a "
+            "lasting instruction about your own conduct — 'always…', 'never…', 'from now on…', 'stop "
+            "doing…', 'I want you to always…'. Pass the rule in `text`, rewritten as a clear "
+            "instruction to yourself. "
+            "action=list for 'what rules are you following', 'what have I told you to do'. "
+            "action=remove with `text` naming the rule for 'forget that rule', 'you can stop doing that'. "
+            "This is for rules about YOUR behaviour — use save_memory for facts about the user instead. "
+            "Some rules are refused (anything removing an approval step or a safety control); relay the "
+            "refusal to the user rather than trying another wording."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "add, list, or remove"},
+                "text": {"type": "STRING", "description": "The rule, phrased as an instruction to yourself (for add), or a distinctive phrase identifying it (for remove)"},
+            },
+            "required": [],
+        },
+    },
 ]
 
 # --- Plugin system ---
@@ -4102,6 +4125,12 @@ class JarvisLive:
                 r = await loop.run_in_executor(None, lambda: capability_self_test(args))
                 result = r or "Done."
                 self.ui.show_content("CAPABILITY SELF-TEST", result)
+
+            elif name == "standing_directives":
+                from core.directives import standing_directives
+                r = await loop.run_in_executor(None, lambda: standing_directives(args))
+                result = r or "Done."
+                self.ui.show_content("STANDING RULES", result)
 
             else:
                 result = f"Unknown tool: {name}"
