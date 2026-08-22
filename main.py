@@ -2363,6 +2363,20 @@ class JarvisLive:
         return cfg
 
     @staticmethod
+    def _load_goal_config() -> dict:
+        cfg = {"enabled": True, "tick_seconds": 900, "max_per_tick": 2}
+        try:
+            with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            cfg["enabled"] = bool(raw.get("goals_enabled", cfg["enabled"]))
+            cfg["tick_seconds"] = max(300, min(int(raw.get("goals_tick_seconds", cfg["tick_seconds"]) or 900), 7200))
+            # Cap goals per tick so a batch of due goals can't spike API spend.
+            cfg["max_per_tick"] = max(1, min(int(raw.get("goals_max_per_tick", cfg["max_per_tick"]) or 2), 5))
+        except Exception:
+            pass
+        return cfg
+
+    @staticmethod
     def _load_health_watchdog_config() -> dict:
         cfg = {"enabled": True, "interval_seconds": 300}
         try:
@@ -5170,6 +5184,117 @@ class JarvisLive:
         }
         jlog.record_action("multi_step_task", request, completed=f"{report['completed']}/{report['total']}")
         return plan_text + "\n\n" + task_planner.format_execution(report)
+
+    async def _run_goal_pursuit(self) -> None:
+        """Pursue standing goals on their own cadence.
+
+        This is the one loop that acts without being asked, so it is
+        deliberately conservative: goals are read-only unless explicitly
+        permitted otherwise, each has a daily check budget, results are
+        filtered strictly before interrupting, and every check is written to
+        the audit trail so unattended work is reviewable."""
+        if not self._goal_cfg.get("enabled", True):
+            return
+
+        tick = float(self._goal_cfg.get("tick_seconds", 900) or 900)
+        await asyncio.sleep(120)  # let startup settle before doing unprompted work
+
+        while True:
+            try:
+                await asyncio.sleep(tick)
+                if self._local_speech_gate_active():
+                    continue
+
+                from actions import goals as goals_mod
+                due = [g for g in goals_mod.list_goals() if goals_mod.is_due(g)]
+                for goal in due[: int(self._goal_cfg.get("max_per_tick", 2) or 2)]:
+                    await self._pursue_goal(goal)
+            except RuntimeError as e:
+                if "cannot schedule new futures after shutdown" in str(e).lower():
+                    return
+                print(f"[Goals] ⚠️ {e}")
+            except Exception as e:
+                print(f"[Goals] ⚠️ {e}")
+
+    async def _pursue_goal(self, goal: dict) -> None:
+        """Run one goal's check: plan → execute (verified) → filter → surface."""
+        from actions import goal_runner, goals as goals_mod
+        from actions.task_planner import PlanError, build_plan, verify_step_output
+
+        goal_id = str(goal.get("id", ""))
+        goals_mod.record_check(goal_id)
+        jlog.info("Goals", "checking", goal=goal_id, objective=goal.get("objective"))
+
+        tool_names = goal_runner.allowed_tools(
+            [d["name"] for d in TOOL_DECLARATIONS], bool(goal.get("allow_actions"))
+        )
+
+        def _generate(prompt: str) -> str:
+            from google import genai as _genai
+            client = _genai.Client(api_key=_get_api_key())
+            resp = client.models.generate_content(model="models/gemini-flash-latest", contents=prompt)
+            try:
+                from memory.usage_log import record_usage
+                record_usage("goal_pursuit", "gemini_text", 1)
+            except Exception:
+                pass
+            return getattr(resp, "text", "") or ""
+
+        loop = asyncio.get_running_loop()
+        try:
+            steps = await loop.run_in_executor(
+                None, lambda: build_plan(goal.get("objective", ""), tool_names, _generate)
+            )
+        except PlanError as exc:
+            jlog.warn("Goals", "could not plan", goal=goal_id, error=str(exc))
+            return
+        if not steps:
+            return
+
+        outputs: list[str] = []
+        for step in steps:
+            fc = types.FunctionCall(id=f"goal-{goal_id}", name=step["tool"], args=dict(step["arguments"]))
+            try:
+                resp = await self._execute_tool(fc)
+                output = (resp.response or {}).get("result")
+            except Exception as exc:
+                jlog.warn("Goals", "step failed", goal=goal_id, tool=step["tool"], error=str(exc))
+                break
+            ok, _detail = verify_step_output(output)
+            if not ok:
+                # A step that failed means the findings are unreliable; better
+                # to skip this cycle than to filter garbage and interrupt.
+                jlog.warn("Goals", "step did not verify", goal=goal_id, tool=step["tool"])
+                break
+            outputs.append(str(output))
+
+        if not outputs:
+            return
+
+        items = await loop.run_in_executor(
+            None,
+            lambda: goal_runner.evaluate_findings(
+                goal.get("objective", ""), goal.get("criteria", ""), "\n\n".join(outputs), _generate
+            ),
+        )
+        fresh = goal_runner.filter_unseen(goals_mod.get_goal(goal_id) or goal, items)
+        if not fresh:
+            jlog.info("Goals", "nothing new", goal=goal_id)
+            return
+
+        goals_mod.record_surfaced(goal_id, [i["summary"] for i in fresh])
+        message = goal_runner.format_findings(goal, fresh)
+        jlog.record_action("goal_finding", f"{goal_id}: {len(fresh)} new", objective=goal.get("objective"))
+
+        try:
+            notify_user(message)
+        except Exception:
+            pass
+        if self.session and not self._local_speech_gate_active():
+            await self.session.send_client_content(
+                turns={"parts": [{"text": f"[SYSTEM_ALERT] {message}"}]},
+                turn_complete=True,
+            )
 
     async def _run_health_watchdog(self) -> None:
         """Periodically self-diagnose and speak up when a subsystem breaks.
