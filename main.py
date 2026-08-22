@@ -1711,6 +1711,28 @@ TOOL_DECLARATIONS = [
         ),
         "parameters": {"type": "OBJECT", "properties": {}, "required": []},
     },
+    {
+        "name": "capability_self_test",
+        "description": (
+            "Verifies that Jarvis's CONTROLS actually change something, by round-tripping them: "
+            "read the current value, set a different one, read it back, then restore. This is how a "
+            "control that reports success while doing nothing gets caught (brightness_up did exactly "
+            "that for a long time). Use for 'test yourself', 'do your controls actually work', 'run a "
+            "self-test', 'is your brightness control working', 'what's broken'. "
+            "action=status reports what is already known WITHOUT re-running anything and is the default; "
+            "action=full also runs the probes that must briefly change something (screen brightness, "
+            "volume) — only use full when the user explicitly asks for a full or deep test. "
+            "For whether subsystems are alive and streaming, use system_health instead."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "status (default, read-only report), test (run read-only probes), or full (also run probes that change and restore state)"},
+                "capability": {"type": "STRING", "description": "Optional single capability to test: brightness, volume, camera, app_listing, cloud, wiz_lights"},
+            },
+            "required": [],
+        },
+    },
 ]
 
 # --- Plugin system ---
@@ -4044,6 +4066,12 @@ class JarvisLive:
                 r = await loop.run_in_executor(None, lambda: format_health(collect_health(self)))
                 result = r or "Done."
                 self.ui.show_content("SELF-DIAGNOSTIC", result)
+
+            elif name == "capability_self_test":
+                from actions.capability_test import capability_self_test
+                r = await loop.run_in_executor(None, lambda: capability_self_test(args))
+                result = r or "Done."
+                self.ui.show_content("CAPABILITY SELF-TEST", result)
 
             else:
                 result = f"Unknown tool: {name}"
