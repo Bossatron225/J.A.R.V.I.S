@@ -4051,6 +4051,22 @@ class JarvisLive:
             self.ui.write_log(f"SYS: Speech listener unavailable ({exc})")
 
     def _handle_speech_callback(self, recognizer: sr.Recognizer, audio: sr.AudioData) -> None:
+        # SECURITY GATE. This callback uploads room audio to Google's speech
+        # API. Two things must hold before that happens:
+        #
+        #  1. The biometric lock must be clear. Otherwise anyone speaking near
+        #     the machine reaches a locked command surface — a voice is not
+        #     proof of identity.
+        #  2. The user must have opted in. Continuous cloud transcription of a
+        #     private room is not something to leave on by default; set
+        #     "cloud_speech_listener_enabled": true to accept it. For a
+        #     privacy-preserving alternative see core/wake_word.py, which
+        #     detects locally and never uploads.
+        if self._local_speech_gate_active():
+            return
+        if not self._cloud_speech_opt_in():
+            return
+
         try:
             text = recognizer.recognize_google(audio, language="en-US")
         except (sr.UnknownValueError, sr.RequestError, Exception):
@@ -4063,6 +4079,32 @@ class JarvisLive:
             if normalized == wake_phrase or normalized.startswith(wake_phrase + " ") or normalized.endswith(" " + wake_phrase) or wake_phrase in normalized:
                 self._on_text_command(text)
                 break
+
+    @staticmethod
+    def _cloud_speech_opt_in() -> bool:
+        """Whether the user has explicitly accepted continuous cloud speech
+        recognition. Defaults to False — silence rather than upload."""
+        try:
+            with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return bool(json.load(f).get("cloud_speech_listener_enabled", False))
+        except Exception:
+            return False
+
+    def _start_wake_word(self) -> None:
+        """Start local wake-word listening if a local engine is installed and
+        the user opted in. Never falls back to cloud detection."""
+        from core.wake_word import WakeWordDetector, status
+
+        self.ui.write_log(f"SYS: {status()}")
+        detector = WakeWordDetector(
+            on_wake=lambda: self._on_text_command("Jarvis"),
+            # Locked means locked: a wake word must not open a command surface.
+            gate=self._local_speech_gate_active,
+        )
+        ok, detail = detector.start()
+        if ok:
+            self._wake_word_detector = detector
+            self.ui.write_log(f"SYS: Wake word listening locally ({detail}).")
 
     async def _listen_audio(self):
         print("[JARVIS] 🎤 Mic started")
