@@ -3334,6 +3334,17 @@ class JarvisLive:
         except Exception:
             pass
 
+        # Standing directives the user has stated. Injected after the personal
+        # context but before the base prompt, so a user rule outranks default
+        # style without being able to displace the safety sections.
+        try:
+            from core.directives import directives_context
+            directive_block = directives_context()
+            if directive_block:
+                parts.append(directive_block)
+        except Exception:
+            pass
+
         parts.append(sys_prompt)
 
         turn_cfg = self._load_turn_detection_config()
