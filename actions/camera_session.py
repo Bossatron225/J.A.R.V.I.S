@@ -69,7 +69,7 @@ def apply_target_resolution(capture) -> None:
 # of re-paying the ~1.4s camera-open cost (and a fresh subprocess spawn) on
 # every poll.
 _PERSISTENT_CAMERA_SUBPROCESS_SRC = r"""
-import sys, time
+import os, sys, time
 import cv2
 
 index, width, height, quality = (int(a) for a in sys.argv[1:5])
@@ -83,11 +83,34 @@ if not cap.isOpened():
     sys.stderr.flush()
     sys.exit(1)
 
+# Give up if the camera stops delivering. Without this, a camera that opens but
+# yields nothing (macOS wedges this way) spun `continue` forever: no write ever
+# ran, so BrokenPipeError never fired, so the process never noticed its parent
+# was gone. It survived as an orphan (reparented to launchd) holding the camera
+# open, which blocked every later capture until it was killed by hand.
+MAX_CONSECUTIVE_READ_FAILURES = int(5.0 / max(interval, 0.01))
+consecutive_failures = 0
+
 out = sys.stdout.buffer
 while True:
+    # Orphan guard: on macOS a dead parent reparents this to launchd (PID 1).
+    # Checked every iteration so it also applies while reads are failing.
+    if os.getppid() == 1:
+        sys.stderr.write("PARENT_GONE\n")
+        sys.stderr.flush()
+        break
+
     ok, frame = cap.read()
     if not ok:
+        consecutive_failures += 1
+        if consecutive_failures >= MAX_CONSECUTIVE_READ_FAILURES:
+            sys.stderr.write("CAMERA_STOPPED_DELIVERING\n")
+            sys.stderr.flush()
+            break
+        time.sleep(interval)
         continue
+    consecutive_failures = 0
+
     ok2, jbuf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not ok2:
         continue
@@ -99,6 +122,8 @@ while True:
     except (BrokenPipeError, OSError):
         break
     time.sleep(interval)
+
+cap.release()
 """
 
 
