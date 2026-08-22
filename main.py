@@ -5433,6 +5433,12 @@ class JarvisLive:
         was_active = True
         stop = self._visitor_monitor_stop
 
+        # Start the visual-context clock now rather than at 0. Leaving it at 0
+        # made every restart fire a vision call immediately, so a run of
+        # deploys turned into a burst of billed API calls — enough to trip the
+        # runaway cap (201 calls in an hour against a 60s interval).
+        self._last_visual_context_ts = time.monotonic()
+
         while not stop.is_set():
             try:
                 if not is_watch_active():
