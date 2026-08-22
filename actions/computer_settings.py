@@ -1,4 +1,5 @@
 #computer_settings.py
+import ctypes
 import json
 import re
 import sys
@@ -116,11 +117,19 @@ def volume_set(value: int):
             capture_output=True)
         return
 
+def _nudge_brightness_darwin(delta_percent: int) -> None:
+    """Step macOS brightness by a relative amount, if it can be read."""
+    current = get_brightness()
+    if current is None:
+        return
+    brightness_set(current + delta_percent)
+
+
 def brightness_up():
     if _OS == "Darwin":
-        subprocess.run(["osascript", "-e",
-            'tell application "System Events" to key code 144'],
-            capture_output=True)
+        # Synthesised brightness key events (System Events key code 144) exit 0
+        # but do nothing on modern macOS, so this steps the real control.
+        _nudge_brightness_darwin(+10)
     elif _OS == "Linux":
         if subprocess.run(["which", "brightnessctl"],
                 capture_output=True).returncode == 0:
@@ -147,9 +156,7 @@ def brightness_up():
 
 def brightness_down():
     if _OS == "Darwin":
-        subprocess.run(["osascript", "-e",
-            'tell application "System Events" to key code 145'],
-            capture_output=True)
+        _nudge_brightness_darwin(-10)
     elif _OS == "Linux":
         if subprocess.run(["which", "brightnessctl"],
                 capture_output=True).returncode == 0:

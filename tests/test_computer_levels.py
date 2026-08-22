@@ -67,14 +67,64 @@ _IOREG_SAMPLE = '''
 '''
 
 
-def test_brightness_is_parsed_from_ioreg(darwin, monkeypatch):
+class _FakeDisplayServices:
+    """Stands in for the DisplayServices private framework."""
+
+    def __init__(self, level=0.5, get_rc=0, set_rc=0):
+        self.level = level
+        self.get_rc = get_rc
+        self.set_rc = set_rc
+        self.argtypes = None
+        self.restype = None
+
+    # ctypes function objects are attributes; mimic just enough of that shape.
+    @property
+    def DisplayServicesGetBrightness(self):
+        def _get(display, out_ptr):
+            if self.get_rc == 0:
+                out_ptr._obj.value = self.level
+            return self.get_rc
+        _get.argtypes = _get.restype = None
+        return _get
+
+    @property
+    def DisplayServicesSetBrightness(self):
+        def _set(display, value):
+            if self.set_rc == 0:
+                self.level = value.value if hasattr(value, "value") else float(value)
+            return self.set_rc
+        _set.argtypes = _set.restype = None
+        return _set
+
+
+@pytest.fixture
+def fake_ds(darwin, monkeypatch):
+    ds = _FakeDisplayServices()
+    monkeypatch.setattr(cs, "_display_services", lambda: (ds, 1))
+    return ds
+
+
+def test_brightness_is_read_from_display_services(fake_ds):
+    fake_ds.level = 0.62
+    assert cs.get_brightness() == 62
+
+
+def test_brightness_read_is_clamped(fake_ds):
+    fake_ds.level = 1.9
+    assert cs.get_brightness() == 100
+
+
+def test_brightness_falls_back_to_ioreg_when_the_framework_is_missing(darwin, monkeypatch):
+    """Older/locked-down machines may not expose the private framework; the
+    raw backlight value is a last resort rather than nothing at all."""
+    monkeypatch.setattr(cs, "_display_services", lambda: (None, None))
     monkeypatch.setattr(cs.subprocess, "run", lambda *a, **k: _Result(_IOREG_SAMPLE))
     assert cs.get_brightness() == 50
 
 
-def test_brightness_falls_back_to_the_intel_service(darwin, monkeypatch):
-    """Apple Silicon exposes AppleARMBacklight; Intel Macs use a different
-    service. Only finding one of them must not mean 'unreadable'."""
+def test_ioreg_fallback_tries_the_intel_service_too(darwin, monkeypatch):
+    monkeypatch.setattr(cs, "_display_services", lambda: (None, None))
+
     def fake_run(cmd, **kw):
         if "AppleARMBacklight" in cmd:
             return _Result("")  # not present on this machine
@@ -85,75 +135,67 @@ def test_brightness_falls_back_to_the_intel_service(darwin, monkeypatch):
 
 
 def test_external_display_reports_none_rather_than_zero(darwin, monkeypatch):
-    """An external monitor exposes no backlight service. Reporting 0% would be
+    """An external monitor exposes no backlight control. Reporting 0% would be
     a lie; None lets the caller say it can't see it."""
+    monkeypatch.setattr(cs, "_display_services", lambda: (None, None))
+    monkeypatch.setattr(cs.subprocess, "run", lambda *a, **k: _Result("no matches"))
+    assert cs.get_brightness() is None
+
+
+def test_failed_read_falls_through_rather_than_reporting_zero(darwin, monkeypatch):
+    monkeypatch.setattr(cs, "_display_services", lambda: (_FakeDisplayServices(get_rc=1), 1))
     monkeypatch.setattr(cs.subprocess, "run", lambda *a, **k: _Result("no matches"))
     assert cs.get_brightness() is None
 
 
 def test_zero_max_does_not_divide_by_zero(darwin, monkeypatch):
+    monkeypatch.setattr(cs, "_display_services", lambda: (None, None))
     weird = '"brightness"={"min"=0,"max"=0,"value"=0}'
     monkeypatch.setattr(cs.subprocess, "run", lambda *a, **k: _Result(weird))
     assert cs.get_brightness() is None
 
 
-def test_brightness_percentage_is_clamped(darwin, monkeypatch):
-    over = '"brightness"={"min"=0,"max"=100,"value"=999}'
-    monkeypatch.setattr(cs.subprocess, "run", lambda *a, **k: _Result(over))
-    assert cs.get_brightness() == 100
-
-
 # ── setting brightness ─────────────────────────────────────────────────────
 
-def test_brightness_set_steps_toward_the_target(darwin, monkeypatch):
-    """No supported macOS API sets brightness directly, so it steps the media
-    keys and re-reads. The point of the test is that it converges and stops."""
-    state = {"level": 20}
-    presses = []
-
-    def fake_press(key):
-        presses.append(key)
-        state["level"] += 6 if key == "brightnessup" else -6
-
-    monkeypatch.setattr(cs, "get_brightness", lambda: state["level"])
-    monkeypatch.setattr(cs.pyautogui, "press", fake_press)
-    monkeypatch.setattr(cs.time, "sleep", lambda *_: None)
-
-    cs.brightness_set(80)
-    assert presses and set(presses) == {"brightnessup"}
-    assert abs(state["level"] - 80) <= cs._BRIGHTNESS_STEP_PERCENT
+def test_brightness_set_writes_the_exact_level(fake_ds):
+    out = cs.brightness_set(85)
+    assert fake_ds.level == pytest.approx(0.85)
+    assert "85%" in out
 
 
-def test_brightness_set_goes_down_too(darwin, monkeypatch):
-    state = {"level": 90}
-    monkeypatch.setattr(cs, "get_brightness", lambda: state["level"])
-    monkeypatch.setattr(cs.pyautogui, "press",
-                        lambda k: state.__setitem__("level", state["level"] - 6))
-    monkeypatch.setattr(cs.time, "sleep", lambda *_: None)
-
-    cs.brightness_set(30)
-    assert abs(state["level"] - 30) <= cs._BRIGHTNESS_STEP_PERCENT
+def test_brightness_set_clamps_out_of_range_values(fake_ds):
+    cs.brightness_set(500)
+    assert fake_ds.level == pytest.approx(1.0)
+    cs.brightness_set(-20)
+    assert fake_ds.level == pytest.approx(0.0)
 
 
-def test_brightness_set_is_bounded_when_the_display_never_responds(darwin, monkeypatch):
-    """A display that ignores the keys must not spin forever."""
-    presses = []
-    monkeypatch.setattr(cs, "get_brightness", lambda: 10)  # never moves
-    monkeypatch.setattr(cs.pyautogui, "press", lambda k: presses.append(k))
-    monkeypatch.setattr(cs.time, "sleep", lambda *_: None)
-
-    cs.brightness_set(100)
-    assert len(presses) <= 24
+def test_brightness_set_reports_a_refusal_rather_than_claiming_success(darwin, monkeypatch):
+    monkeypatch.setattr(cs, "_display_services", lambda: (_FakeDisplayServices(set_rc=1), 1))
+    assert "refused" in cs.brightness_set(50)
 
 
-def test_brightness_set_refuses_when_level_is_unreadable(darwin, monkeypatch):
-    presses = []
+def test_brightness_set_says_so_when_control_is_unavailable(darwin, monkeypatch):
+    monkeypatch.setattr(cs, "_display_services", lambda: (None, None))
+    assert "can't control" in cs.brightness_set(50)
+
+
+def test_relative_nudges_move_the_real_control(fake_ds):
+    """Regression: brightness_up/down sent System Events key code 144/145,
+    which exits 0 on modern macOS and does nothing at all."""
+    fake_ds.level = 0.50
+    cs.brightness_up()
+    assert fake_ds.level == pytest.approx(0.60)
+    cs.brightness_down()
+    assert fake_ds.level == pytest.approx(0.50)
+
+
+def test_nudge_does_nothing_when_brightness_is_unreadable(darwin, monkeypatch):
     monkeypatch.setattr(cs, "get_brightness", lambda: None)
-    monkeypatch.setattr(cs.pyautogui, "press", lambda k: presses.append(k))
-
-    out = cs.brightness_set(50)
-    assert presses == [], "must not blindly mash keys with no feedback"
-    assert "can't read" in out
+    calls = []
+    monkeypatch.setattr(cs, "brightness_set", lambda v: calls.append(v))
+    cs.brightness_up()
+    assert calls == []
 
 
 # ── the spoken report ──────────────────────────────────────────────────────
