@@ -21,7 +21,7 @@ def _make_live():
 def test_known_visitor_arrival_notifies_once_then_suppressed_while_present(monkeypatch) -> None:
     live = _make_live()
     notified = []
-    monkeypatch.setattr(main_module, "notify_user", lambda msg: notified.append(msg))
+    monkeypatch.setattr(main_module, "notify_user", lambda msg, attachment_path=None: notified.append(msg))
 
     profiles = {"primary": {"name": "James Lumsden"}, "authorized": {}}
     now = 1000.0
@@ -36,7 +36,7 @@ def test_known_visitor_arrival_notifies_once_then_suppressed_while_present(monke
 def test_known_visitor_departure_then_return_notifies_again(monkeypatch) -> None:
     live = _make_live()
     notified = []
-    monkeypatch.setattr(main_module, "notify_user", lambda msg: notified.append(msg))
+    monkeypatch.setattr(main_module, "notify_user", lambda msg, attachment_path=None: notified.append(msg))
 
     profiles = {"primary": {"name": "James Lumsden"}, "authorized": {}}
 
@@ -61,7 +61,7 @@ def test_unknown_visitor_lingering_does_not_re_record_sighting(monkeypatch) -> N
         return {"visitor_id": "visitor-1", "sighting_count_at_time": len(record_calls)}
 
     monkeypatch.setattr(main_module, "record_unknown_sighting", _fake_record)
-    monkeypatch.setattr(main_module, "notify_user", lambda msg: None)
+    monkeypatch.setattr(main_module, "notify_user", lambda msg, attachment_path=None: None)
     import auth as auth_module
     monkeypatch.setattr(auth_module, "embedding_similarity", lambda a, b: 0.9)
     monkeypatch.setattr(auth_module, "_sface_threshold", lambda: 0.363)
@@ -77,7 +77,7 @@ def test_unknown_visitor_lingering_does_not_re_record_sighting(monkeypatch) -> N
 def test_unknown_visitor_departure_is_logged_not_texted(monkeypatch) -> None:
     live = _make_live()
     notified = []
-    monkeypatch.setattr(main_module, "notify_user", lambda msg: notified.append(msg))
+    monkeypatch.setattr(main_module, "notify_user", lambda msg, attachment_path=None: notified.append(msg))
     monkeypatch.setattr(
         main_module, "record_unknown_sighting",
         lambda embedding, **kwargs: {"visitor_id": "visitor-1", "sighting_count_at_time": 1},
