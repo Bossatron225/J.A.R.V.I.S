@@ -75,11 +75,31 @@ def cloud_reachable(force: bool = False) -> bool:
     return ok
 
 
+def fallback_voice_allowed() -> bool:
+    """Whether Jarvis may speak in a voice OTHER than his configured one.
+
+    Off by default and deliberately so: James's instruction is that if
+    ElevenLabs is unavailable he wants NO voice at all, rather than Jarvis
+    speaking in a substitute. A different voice is a different assistant, and
+    silence is better than an impostor. Offline replies still appear as text.
+    """
+    try:
+        import json
+        from pathlib import Path
+        cfg_path = Path(__file__).resolve().parent.parent / "config" / "api_keys.json"
+        return bool(json.loads(cfg_path.read_text(encoding="utf-8")).get("fallback_voice_enabled", False))
+    except Exception:
+        return False
+
+
 def speak_offline(text: str, voice: str = "Daniel") -> bool:
-    """Speak without the network. Uses macOS's built-in `say` — always present
-    on this platform, no install, no model download. Returns False where it is
-    unavailable so callers can fall back to text."""
+    """Speak without the network, ONLY if a substitute voice is permitted.
+
+    Returns False (silently, text-only) by default — see
+    fallback_voice_allowed()."""
     text = (text or "").strip()
+    if not fallback_voice_allowed():
+        return False
     if not text or platform.system() != "Darwin" or not shutil.which("say"):
         return False
     try:
