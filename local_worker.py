@@ -12,6 +12,7 @@ LOCAL_ACTIONS = {
     'status',
     'open_app',
     'browser_control',
+    'capability_self_test',
     'capture_screen',
     'capture_camera',
     'capture_visual',
