@@ -3318,6 +3318,22 @@ class JarvisLive:
         parts = [time_ctx, identity_ctx]
         if personal_context:
             parts.append(personal_context)
+
+        # Known-broken capabilities, so Jarvis stops cheerfully offering a
+        # control that has been verified dead rather than discovering it live.
+        try:
+            from actions.capability_test import known_broken
+            broken = known_broken()
+            if broken:
+                parts.append(
+                    "[KNOWN BROKEN CAPABILITIES]\n"
+                    f"These have been VERIFIED not to work: {', '.join(broken)}. "
+                    "Do not offer or claim them. If the user asks for one, say plainly that it is "
+                    "broken and offer to run a self-test to re-check.\n\n"
+                )
+        except Exception:
+            pass
+
         parts.append(sys_prompt)
 
         turn_cfg = self._load_turn_detection_config()
@@ -3419,6 +3435,9 @@ class JarvisLive:
             "reminder",
             "security_biometrics",
             "send_message",
+            # Every hardware probe (brightness, volume, camera, bulbs) targets
+            # the Mac; running it on the VPS would only ever report N/A.
+            "capability_self_test",
             "visitor_log",
             # WiZ bulbs live on the home LAN (192.168.x.x), which the VPS cannot
             # route to from its datacenter — light commands have to run on the Mac.
