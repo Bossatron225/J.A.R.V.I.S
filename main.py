@@ -3074,6 +3074,11 @@ class JarvisLive:
         if self._maybe_handle_remote_url_request(text):
             return
         if not self._loop or not self.session:
+            # No live session — answer locally rather than returning silently.
+            from core.offline_mode import handle_locally, speak_offline
+            reply = handle_locally(text)
+            self.ui.write_log(f"[Jarvis/offline]: {reply}")
+            speak_offline(reply)
             return
         asyncio.run_coroutine_threadsafe(
             self.session.send_client_content(
