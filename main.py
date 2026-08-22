@@ -1778,6 +1778,29 @@ TOOL_DECLARATIONS = [
             "required": [],
         },
     },
+    {
+        "name": "show_screen",
+        "description": (
+            "SENDS a picture of the Mac's screen to the user so they can LOOK at it — it appears in the "
+            "dashboard they are talking to. Use whenever the user wants to SEE the screen rather than "
+            "have it described: 'show me my Mac screen', 'send me a screenshot', 'let me see what's on "
+            "my screen', 'show me that window'. This is the correct tool when the user is on their phone "
+            "or the web dashboard and asks to see anything on the Mac. "
+            "Do NOT use computer_settings action=screenshot for these requests — that only saves a file "
+            "onto the Mac's own desktop, which the user cannot see from their phone. "
+            "Use screen_process instead only when the user wants the screen ANALYSED or described rather "
+            "than shown to them."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "target_type": {"type": "STRING", "description": "screen (default, the whole display), window, or app"},
+                "app_name": {"type": "STRING", "description": "Application to capture, when target_type is app"},
+                "window_title": {"type": "STRING", "description": "Window title to capture, when target_type is window"},
+            },
+            "required": [],
+        },
+    },
 ]
 
 # --- Plugin system ---
@@ -4161,6 +4184,9 @@ class JarvisLive:
                 r = await loop.run_in_executor(None, lambda: _screen_awareness(args))
                 result = r or "Done."
                 self.ui.show_content("SCREEN AWARENESS", result)
+
+            elif name == "show_screen":
+                result = await self._send_screen_to_dashboard(args)
 
             else:
                 result = f"Unknown tool: {name}"
