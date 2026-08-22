@@ -42,7 +42,13 @@ def _run_applescript(lines: list[str], args: list[str] | None = None) -> str:
     return (proc.stdout or "").strip()
 
 
-def send_imessage(receiver: str, message_text: str) -> str:
+def send_imessage(receiver: str, message_text: str, attachment_path: str | None = None) -> str:
+    """Send an iMessage, optionally with a file attached.
+
+    `attachment_path` exists so security alerts can carry the actual evidence.
+    A visitor alert that says "someone was seen" while the photograph sits on
+    the Mac's disk is close to useless when you are not at the Mac — which is
+    exactly when the alert fires."""
     if not _is_mac():
         return "iMessage integration is only available on macOS."
 
@@ -50,34 +56,48 @@ def send_imessage(receiver: str, message_text: str) -> str:
     message_text = (message_text or "").strip()
     if not receiver:
         return "Please specify a recipient for iMessage."
-    if not message_text:
+    if not message_text and not attachment_path:
         return "Please specify the iMessage text."
+
+    resolved_attachment = ""
+    if attachment_path:
+        candidate = Path(str(attachment_path)).expanduser()
+        if candidate.is_file():
+            resolved_attachment = str(candidate.resolve())
+        else:
+            # Fall through and still send the text — losing the alert entirely
+            # because a file went missing would be worse than losing the image.
+            print(f"[iMessage] attachment not found, sending text only: {attachment_path}")
 
     script = [
         "on run argv",
         "set targetText to item 1 of argv",
         "set outgoingText to item 2 of argv",
+        "set attachmentPath to item 3 of argv",
         "tell application \"Messages\"",
         "set targetService to first service whose service type = iMessage",
         "try",
-        "set targetBuddy to buddy targetText of targetService",
-        "send outgoingText to targetBuddy",
-        "return \"sent\"",
+        "set theTarget to buddy targetText of targetService",
         "on error",
+        "set theTarget to first chat whose name contains targetText",
+        "end try",
         "try",
-        "set targetChat to first chat whose name contains targetText",
-        "send outgoingText to targetChat",
+        "if length of outgoingText > 0 then",
+        "send outgoingText to theTarget",
+        "end if",
+        "if length of attachmentPath > 0 then",
+        "send (POSIX file attachmentPath as alias) to theTarget",
+        "end if",
         "return \"sent\"",
         "on error errMsg",
         "return \"error: \" & errMsg",
-        "end try",
         "end try",
         "end tell",
         "end run",
     ]
 
     try:
-        out = _run_applescript(script, [receiver, message_text])
+        out = _run_applescript(script, [receiver, message_text, resolved_attachment])
     except Exception as e:
         return (
             "Could not send iMessage. macOS may require Automation permission for "
@@ -86,7 +106,8 @@ def send_imessage(receiver: str, message_text: str) -> str:
 
     if out.lower().startswith("error:"):
         return f"Could not send iMessage: {out[6:].strip()}"
-    return f"iMessage sent to {receiver}."
+    suffix = " with attachment" if resolved_attachment else ""
+    return f"iMessage sent to {receiver}{suffix}."
 
 
 def _fetch_messages(limit: int = 5, unread_only: bool = False, newer_than_rowid: int | None = None) -> list[dict]:
