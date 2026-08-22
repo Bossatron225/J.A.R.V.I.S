@@ -248,13 +248,31 @@ def security_biometrics(parameters=None, response=None, player=None, session_mem
         visual_text = str(args.get("visual_signature") or target_identity or profile_name).strip()
         make_primary = bool(args.get("make_primary", True))
         clearance = str(args.get("clearance_level") or "omega").strip()
-        return enroll_biometric_profile(
-            profile_id=profile_id,
-            name=profile_name,
-            voice_print=voice_text,
-            visual_signature=visual_text,
-            clearance_level=clearance,
-            make_primary=make_primary,
+
+        # Capture real face samples. This path used to register a profile with
+        # only TEXT signatures and never pass visual_samples, so it could not
+        # train a face model — leaving config/biometric_models/ empty while
+        # appearing to succeed. With no model, face recognition has nothing to
+        # match against and the enrolled person is logged as an unknown
+        # visitor by their own Nanny-cam.
+        samples = capture_enrollment_samples()
+        if len(samples) < 3:
+            return (
+                f"Enrollment aborted, sir: only {len(samples)} usable face sample(s) captured "
+                "(at least 3 are needed). Ensure the camera is unobstructed and well lit, face it "
+                "directly, and move your head slowly through a few angles while capturing."
+            )
+
+        ok, message = establish_biometric_baseline(name=profile_name, visual_samples=samples)
+        try:
+            from auth import has_face_model
+            trained = has_face_model("primary" if make_primary else profile_id)
+        except Exception:
+            trained = False
+        return (
+            f"{message} Face model trained: {'yes' if trained else 'no'}. "
+            + ("Face recognition is now active." if trained else
+               "The model did not train — verification will stay pending.")
         )
 
     if action == "detect_person":

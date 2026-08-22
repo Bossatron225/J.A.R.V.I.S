@@ -766,3 +766,66 @@ def test_speak_external_tts_drops_while_locally_locked() -> None:
     asyncio.run(live._speak_external_tts("hello there"))
 
     assert player.spoken == []
+
+
+def test_voice_enroll_now_captures_face_samples(monkeypatch) -> None:
+    """Regression: security_biometrics(action='enroll') used to register a
+    profile with only TEXT signatures and never pass visual_samples, so no face
+    model was ever trained. config/biometric_models/ stayed empty while the
+    call reported success — and the enrolled user was then logged as an unknown
+    visitor by their own Nanny-cam."""
+    captured = {}
+
+    monkeypatch.setattr(
+        file_controller_module, "capture_enrollment_samples",
+        lambda *a, **k: [b"s1", b"s2", b"s3", b"s4"],
+    )
+
+    def _fake_baseline(name, visual_samples=None):
+        captured["name"] = name
+        captured["samples"] = visual_samples
+        return True, "Baseline established."
+
+    monkeypatch.setattr(file_controller_module, "establish_biometric_baseline", _fake_baseline)
+    monkeypatch.setattr("auth.has_face_model", lambda key: True)
+
+    result = file_controller_module.security_biometrics(
+        {"action": "enroll", "name": "James Lumsden"}
+    )
+
+    assert captured["samples"] == [b"s1", b"s2", b"s3", b"s4"]
+    assert "Face model trained: yes" in result
+
+
+def test_voice_enroll_aborts_rather_than_training_on_too_few_samples(monkeypatch) -> None:
+    monkeypatch.setattr(
+        file_controller_module, "capture_enrollment_samples", lambda *a, **k: [b"only-one"]
+    )
+    called = {"baseline": False}
+    monkeypatch.setattr(
+        file_controller_module, "establish_biometric_baseline",
+        lambda **k: called.__setitem__("baseline", True) or (True, "x"),
+    )
+
+    result = file_controller_module.security_biometrics({"action": "enroll"})
+
+    assert "aborted" in result.lower()
+    assert called["baseline"] is False
+
+
+def test_capture_enrollment_samples_skips_frames_without_a_face(monkeypatch) -> None:
+    """A dark room must yield few samples, not a model trained on empty frames."""
+    import actions.camera_session as cs
+
+    class _Session:
+        def get_frame(self):
+            return np.zeros((8, 8, 3), dtype=np.uint8)
+
+    monkeypatch.setattr(cs, "get_camera_session", lambda idx=0: _Session())
+    monkeypatch.setattr("auth._detect_and_embed", lambda frame: None)  # no face ever
+
+    samples = file_controller_module.capture_enrollment_samples(
+        target_count=5, timeout_seconds=0.8
+    )
+
+    assert samples == []
