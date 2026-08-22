@@ -40,13 +40,36 @@ def _safe(fn, default):
         return default
 
 
+# An integration that is unconfigured or misused answers with a help/error
+# string rather than raising. Surfacing that as "needs you" turns a setup gap
+# into a fake urgent item — precisely the noise this feature must avoid.
+_NON_CONTENT_MARKERS = (
+    "not ready yet",
+    "unknown ",
+    "not configured",
+    "unavailable",
+    "is only available on",
+    "please specify",
+    "could not",
+    "no credential",
+    "error",
+)
+
+
+def _is_real_content(text: str) -> bool:
+    lowered = (text or "").strip().lower()
+    if not lowered:
+        return False
+    return not any(marker in lowered for marker in _NON_CONTENT_MARKERS)
+
+
 # ── sources ────────────────────────────────────────────────────────────────
 
 def _calendar_items() -> list[dict]:
     from actions.google_calendar import google_calendar
     raw = google_calendar({"action": "list", "max_results": 5})
     text = str(raw or "").strip()
-    if not text or "no upcoming" in text.lower():
+    if not _is_real_content(text) or "no upcoming" in text.lower():
         return []
     return [{
         "source": "calendar",
@@ -105,18 +128,18 @@ def _open_loop_items() -> list[dict]:
 
 def _message_items() -> list[dict]:
     from actions.imessage_integration import imessage_control
-    raw = imessage_control({"action": "unread", "limit": 5})
+    raw = imessage_control({"action": "read_unread", "limit": 5})
     text = str(raw or "").strip()
-    if not text or "no unread" in text.lower():
+    if not _is_real_content(text) or "no unread" in text.lower():
         return []
     return [{"source": "messages", "score": URGENT, "text": f"Messages: {text[:200]}"}]
 
 
 def _mail_items() -> list[dict]:
     from actions.mail_integration import mail_control
-    raw = mail_control({"action": "unread", "limit": 5})
+    raw = mail_control({"action": "read_unread", "limit": 5})
     text = str(raw or "").strip()
-    if not text or "no unread" in text.lower():
+    if not _is_real_content(text) or "no unread" in text.lower():
         return []
     return [{"source": "mail", "score": NOTABLE, "text": f"Mail: {text[:200]}"}]
 
