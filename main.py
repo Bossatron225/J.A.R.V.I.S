@@ -5779,8 +5779,24 @@ class JarvisLive:
                         )
                         self.ui.write_log(f"[Web]: {command_text}")
                 else:
-                    print(f"[Dashboard] Dropped command (session timeout): {text}")
-                    self.ui.write_log(f"[Web]: Command dropped (Jarvis offline): {text}")
+                    # Degrade instead of dropping. This branch used to discard
+                    # the command with only a log line the user never sees —
+                    # the exact silent failure that made a dead live session
+                    # look like Jarvis simply ignoring them.
+                    from core.offline_mode import handle_locally, speak_offline
+                    reply = handle_locally(str(text))
+                    self.ui.write_log(f"[Web/offline]: {text}")
+                    self.ui.write_log(f"[Jarvis/offline]: {reply}")
+                    speak_offline(reply)
+                    jlog.warn("Offline", "answered locally — live session unavailable", command=text)
+                    if self._dashboard:
+                        try:
+                            await self._dashboard.broadcast({
+                                "type": "log", "speaker": "jarvis",
+                                "text": reply, "ts": datetime.now().isoformat(),
+                            })
+                        except Exception:
+                            pass
             except Exception as e:
                 print(f"[Dashboard] Flush command error: {e}")
                 await asyncio.sleep(0.5)
