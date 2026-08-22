@@ -855,23 +855,62 @@ def get_volume() -> dict:
     return {"level": None, "muted": None}
 
 
+def _display_services():
+    """(DisplayServices lib, main display id), or (None, None).
+
+    macOS ignores synthesised brightness key events (System Events key code
+    144 returns success and does nothing), so the media-key approach that
+    brightness_up/down originally used never actually moved the backlight.
+    This private framework is what does work on modern macOS, for both reading
+    and writing, and it operates on the same scale as the Settings slider."""
+    if _OS != "Darwin":
+        return None, None
+    try:
+        ds = ctypes.CDLL(
+            "/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices"
+        )
+        cg = ctypes.CDLL(
+            "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
+        )
+        cg.CGMainDisplayID.restype = ctypes.c_uint32
+        ds.DisplayServicesGetBrightness.argtypes = [ctypes.c_uint32, ctypes.POINTER(ctypes.c_float)]
+        ds.DisplayServicesGetBrightness.restype = ctypes.c_int
+        ds.DisplayServicesSetBrightness.argtypes = [ctypes.c_uint32, ctypes.c_float]
+        ds.DisplayServicesSetBrightness.restype = ctypes.c_int
+        return ds, cg.CGMainDisplayID()
+    except Exception:
+        return None, None
+
+
 def get_brightness() -> int | None:
     """Current display brightness as a percentage, or None if unreadable.
 
-    Read from IOKit via ioreg — no extra tooling required. Apple Silicon
-    exposes AppleARMBacklight; Intel Macs use AppleBacklightDisplay, so both
-    are tried. External monitors generally report neither, hence None being a
-    valid, expected answer rather than an error."""
+    External monitors typically expose no backlight control at all, so None is
+    a valid, expected answer rather than an error — reporting a made-up 0%
+    would be worse than admitting the level isn't visible."""
+    if _OS == "Linux":
+        try:
+            out = subprocess.run(["brightnessctl", "-m"], capture_output=True,
+                                 text=True, timeout=5).stdout
+            m = re.search(r"(\d+)%", out)
+            return int(m.group(1)) if m else None
+        except Exception:
+            return None
     if _OS != "Darwin":
-        if _OS == "Linux":
-            try:
-                out = subprocess.run(["brightnessctl", "-m"], capture_output=True, text=True, timeout=5).stdout
-                m = re.search(r"(\d+)%", out)
-                return int(m.group(1)) if m else None
-            except Exception:
-                return None
         return None
 
+    ds, display = _display_services()
+    if ds is not None:
+        try:
+            value = ctypes.c_float(0)
+            if ds.DisplayServicesGetBrightness(display, ctypes.byref(value)) == 0:
+                return max(0, min(100, round(value.value * 100)))
+        except Exception:
+            pass
+
+    # Fallback for machines where the private framework is unavailable. Note
+    # this raw backlight value is not linear against the Settings slider, so it
+    # can differ by a few points from the figure above — it is a last resort.
     for service in ("AppleARMBacklight", "AppleBacklightDisplay"):
         try:
             out = subprocess.run(
@@ -880,45 +919,38 @@ def get_brightness() -> int | None:
             ).stdout
             m = re.search(r'"brightness"=\{[^}]*"max"=(\d+)[^}]*"value"=(\d+)', out)
             if m:
-                max_v, value = int(m.group(1)), int(m.group(2))
+                max_v, value_i = int(m.group(1)), int(m.group(2))
                 if max_v > 0:
-                    return max(0, min(100, round(value / max_v * 100)))
+                    return max(0, min(100, round(value_i / max_v * 100)))
         except Exception:
             continue
     return None
 
 
-# Each brightness key press moves roughly 1/16 of the range on macOS.
-_BRIGHTNESS_STEP_PERCENT = 100 / 16
-
-
 def brightness_set(value: int) -> str:
-    """Set brightness to an approximate percentage.
-
-    macOS exposes no supported way to set brightness directly without extra
-    tooling, but now that the CURRENT level is readable, the gap can be closed
-    by stepping the media keys and re-reading — which also self-corrects if a
-    step lands differently than expected."""
+    """Set brightness to an exact percentage."""
     target = max(0, min(100, int(value)))
-    current = get_brightness()
-    if current is None:
-        return "I can't read the current brightness on this display, sir, so I can't set it precisely."
 
-    for _ in range(24):  # bounded: never loop on an unresponsive display
-        current = get_brightness()
-        if current is None:
-            break
-        delta = target - current
-        if abs(delta) <= _BRIGHTNESS_STEP_PERCENT / 2:
-            break
+    if _OS == "Darwin":
+        ds, display = _display_services()
+        if ds is None:
+            return "I can't control the brightness on this display, sir."
         try:
-            pyautogui.press("brightnessup" if delta > 0 else "brightnessdown")
-        except Exception:
-            break
-        time.sleep(0.12)
+            if ds.DisplayServicesSetBrightness(display, ctypes.c_float(target / 100)) != 0:
+                return "The display refused the brightness change, sir."
+        except Exception as e:
+            return f"Could not set brightness, sir: {e}"
+    elif _OS == "Linux":
+        try:
+            subprocess.run(["brightnessctl", "set", f"{target}%"],
+                           capture_output=True, timeout=5)
+        except Exception as e:
+            return f"Could not set brightness, sir: {e}"
+    else:
+        return "Brightness control isn't available on this system, sir."
 
     final = get_brightness()
-    return f"Brightness is now about {final}%, sir." if final is not None else "Brightness adjusted, sir."
+    return f"Brightness set to {final if final is not None else target}%, sir."
 
 
 def report_levels() -> str:
