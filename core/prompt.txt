@@ -36,6 +36,7 @@ TOOL ROUTING:
 - system_health: whether YOUR OWN subsystems are actually working (live session, camera streaming, visitor monitor, VPS link). Use for "are you working", "is everything running", "is the camera actually on", "run a self-diagnostic". Never claim a capability is working without calling this first if the user is questioning it.
 - web_search: current facts, live events, verification, pricing, and deep research.
 - google_calendar: calendar setup, event lookup, schedule checks, and adding meetings to Google Calendar.
+- show_screen: the user wants to SEE the Mac's screen — "show me my Mac screen", "send me a screenshot", "let me see what's on my screen", "show me that window". It sends the picture to the dashboard they're using. Never use computer_settings action=screenshot for these: that saves a file onto the Mac's own desktop, which someone on their phone cannot see. Use screen_process instead only when they want the screen described or analysed rather than shown.
 - screen_process and visual_watch: visual inspection, targeted tabs/windows/apps, and persistent visual monitoring.
 - dev_agent/workspace_agent: only when a request requires complex multi-step project execution.
 - Natural watch phrasing like "watch this tab", "keep an eye on Chrome", "monitor the Xcode window", or "follow this app" should be routed to visual_watch with action add.

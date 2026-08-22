@@ -5706,6 +5706,69 @@ class JarvisLive:
             except Exception as e:
                 print(f"[HealthWatchdog] ⚠️ {e}")
 
+    async def _send_screen_to_dashboard(self, args: dict) -> str:
+        """Capture the Mac's screen and PUSH it to the dashboard to be viewed.
+
+        Exists because "show me my Mac screen" from the phone previously routed
+        to computer_settings action=screenshot, which saves a PNG onto the Mac's
+        own desktop — perfectly true to report as done, and completely useless
+        to someone holding a phone in another room. This puts the picture where
+        the person asking can actually see it.
+
+        Every failure path below returns an honest sentence rather than a
+        success line: claiming to have shown something that was never displayed
+        is the exact failure this replaces."""
+        import base64 as _b64
+
+        payload = {
+            "target_type": str(args.get("target_type") or "screen").strip().lower() or "screen",
+            "app_name": str(args.get("app_name") or "").strip(),
+            "window_title": str(args.get("window_title") or "").strip(),
+        }
+
+        if self._dashboard is None:
+            return ("I have no dashboard to show it on, sir — that only works when you're on the "
+                    "web dashboard or your phone.")
+
+        # Capture on whichever machine has the screen: delegate from the VPS,
+        # run locally on the Mac.
+        request_local_action = getattr(self._remote_bridge, "request_local_action", None)
+        try:
+            if callable(request_local_action):
+                captured = await asyncio.to_thread(
+                    request_local_action, "capture_screen", payload, 45.0
+                )
+                if isinstance(captured, dict) and captured.get("status") not in (None, "completed"):
+                    return (f"I couldn't capture the Mac's screen, sir — the Mac reported "
+                            f"{captured.get('reason') or captured.get('error') or captured.get('status')}.")
+                image = (captured or {}).get("result") if isinstance(captured, dict) else None
+            else:
+                from actions.screen_processor import capture_targeted_visual_b64
+                image = await asyncio.to_thread(capture_targeted_visual_b64, payload)
+        except Exception as e:
+            return f"I couldn't capture the Mac's screen, sir: {e}"
+
+        if not isinstance(image, dict) or not image.get("image_b64"):
+            return "I couldn't capture the Mac's screen, sir — nothing came back from the capture."
+
+        try:
+            data = _b64.b64decode(image["image_b64"])
+        except Exception:
+            return "I captured the screen, sir, but the image came back unreadable."
+
+        shot_id = self._dashboard.put_screenshot(
+            data, image.get("mime_type", "image/jpeg"), image.get("label", "Mac screen"),
+        )
+        await self._dashboard.broadcast({
+            "type": "screen_image",
+            "shot_id": shot_id,
+            "label": image.get("label", "Mac screen"),
+            "captured_at": self._current_time_text(),
+        })
+        jlog.record_action("show_screen", str(payload["target_type"]), bytes=len(data))
+        return ("The screen is on your dashboard now, sir — tap it to enlarge. "
+                "It'll expire in ten minutes.")
+
     async def _run_screen_awareness(self) -> None:
         """Ambient glances at the screen, speaking only when able to help.
 
