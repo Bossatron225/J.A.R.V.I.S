@@ -48,7 +48,10 @@ BLOCKED = [
                 r"(ask|confirm|approv\w*|check with me|permission)\b", re.I),
      "it would remove the approval step before I act on your behalf"),
     (re.compile(r"\b(approv\w*|confirm\w*|permission)\b.{0,30}\b"
-                r"(not (needed|required)|unnecessary|automatic|always granted|pre-?approved)\b", re.I),
+                r"(not (needed|required)|unnecessary|automatic|always granted)\b", re.I),
+     "it would pre-approve actions I should be asking about each time"),
+    (re.compile(r"\b(pre[- ]?approv\w*|auto[- ]?approv\w*|always approv\w*|"
+                r"assume (my )?approval|consider .{0,20}approved)\b", re.I),
      "it would pre-approve actions I should be asking about each time"),
     (re.compile(r"\b(password|passcode|passphrase|credit card|card number|cvv|"
                 r"sort code|iban|2fa|otp|one[- ]time code|seed phrase|verification code)\b", re.I),

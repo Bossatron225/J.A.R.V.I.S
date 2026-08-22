@@ -155,8 +155,15 @@ def test_an_ambiguous_removal_asks_rather_than_guessing():
 
 
 def test_removing_something_that_does_not_exist_says_so():
+    d.add_directive("keep answers brief")
     removed, message = d.remove_directive("a rule I never gave")
     assert removed is False and "no standing rule" in message
+    assert len(d.list_directives()) == 1, "a failed removal must not delete anything"
+
+
+def test_removing_from_an_empty_store_says_so():
+    removed, message = d.remove_directive("anything")
+    assert removed is False and "not following any" in message
 
 
 def test_removing_with_no_reference_asks():
