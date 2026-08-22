@@ -1152,24 +1152,48 @@
     }
 
     function _onScreenImage(m) {
-      // The image is fetched by reference rather than inlined, so an expired
-      // capture simply fails to load instead of sitting in the feed forever.
       const src = `/screen/${encodeURIComponent(m.shot_id)}?token=${encodeURIComponent(_authToken)}`;
       const card = document.createElement('div');
       card.className = 'msg-shot';
       card.innerHTML = `
         <div class="shot-lbl">${esc(m.label || 'Mac screen')}</div>
-        <img class="shot-img" alt="Mac screen capture" src="${src}">
-        <div class="shot-time">Tap to enlarge · captured ${esc(m.captured_at || 'just now')}</div>
+        <div class="shot-time">Loading…</div>
       `;
-      const img = card.querySelector('img');
-      img.addEventListener('click', () => _openShot(src));
-      img.addEventListener('error', () => {
-        card.innerHTML = '<div class="shot-lbl">Mac screen</div>' +
-                         '<div class="shot-time">That capture has expired, sir — ask again for a fresh one.</div>';
-      });
       feed.appendChild(card);
       feed.scrollTop = feed.scrollHeight;
+
+      const fail = (why) => {
+        card.innerHTML = `<div class="shot-lbl">${esc(m.label || 'Mac screen')}</div>` +
+                         `<div class="shot-time">${esc(why)}</div>`;
+      };
+
+      // Fetched rather than set straight onto <img src> for two reasons.
+      // First, an <img> error handler cannot see the status code, so every
+      // failure looked identical — a missing route on the server was reported
+      // to the user as "that capture has expired", which sent us hunting the
+      // wrong problem. Second, holding the bytes as a blob means the picture
+      // stays viewable in the feed after the server-side copy expires: the
+      // short server TTL then bounds how long a capture of the screen sits in
+      // the VPS's memory, without the image vanishing while it's being read.
+      fetch(src)
+        .then(r => {
+          if (r.status === 401) throw new Error('Your session has expired, sir — log in again.');
+          if (r.status === 404) throw new Error('That capture is no longer on the server, sir — ask again for a fresh one.');
+          if (!r.ok) throw new Error(`Couldn't load that capture, sir (error ${r.status}).`);
+          return r.blob();
+        })
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          card.innerHTML = `
+            <div class="shot-lbl">${esc(m.label || 'Mac screen')}</div>
+            <img class="shot-img" alt="Mac screen capture">
+            <div class="shot-time">Tap to enlarge · captured ${esc(m.captured_at || 'just now')}</div>
+          `;
+          const img = card.querySelector('img');
+          img.src = url;
+          img.addEventListener('click', () => _openShot(url));
+        })
+        .catch(e => fail(e && e.message ? e.message : "Couldn't load that capture, sir."));
     }
 
     function _onFileReceived(m) {
