@@ -53,9 +53,19 @@ BLOCKED = [
     (re.compile(r"\b(pre[- ]?approv\w*|auto[- ]?approv\w*|always approv\w*|"
                 r"assume (my )?approval|consider .{0,20}approved)\b", re.I),
      "it would pre-approve actions I should be asking about each time"),
+    # Requires a HANDLING verb near the credential, not merely a mention:
+    # "remind me to check the password manager on Fridays" is a harmless
+    # reminder, while "type my password for me" is not.
+    (re.compile(r"\b(type|enter|fill|autofill|input|paste|submit|store|save|remember|"
+                r"keep track of|read|recite|use|handle)\b[^.]{0,40}\b"
+                r"(password|passcode|passphrase|credit card|card number|cvv|"
+                r"sort code|iban|2fa|otp|one[- ]time code|seed phrase|verification code)s?\b", re.I),
+     "it concerns handling credentials, which I will not do regardless of instruction"),
     (re.compile(r"\b(password|passcode|passphrase|credit card|card number|cvv|"
-                r"sort code|iban|2fa|otp|one[- ]time code|seed phrase|verification code)\b", re.I),
-     "it concerns credentials, which I will not handle regardless of instruction"),
+                r"sort code|iban|2fa|otp|one[- ]time code|seed phrase|verification code)s?\b"
+                r"[^.]{0,40}\b(type|enter|fill|autofill|input|paste|submit|store|save|remember|"
+                r"read out|recite|use|handle)\b", re.I),
+     "it concerns handling credentials, which I will not do regardless of instruction"),
     (re.compile(r"\b(disable|turn off|bypass|ignore|skip|remove|deactivate)\b.{0,40}\b"
                 r"(biometric|face|lock|security|authentication|safeguard|safety|guard ?rail)\b", re.I),
      "it would disable a security control"),
