@@ -1126,6 +1126,33 @@ def create_app() -> Flask:
             "message": "The dashboard runs on the VPS and remains active even if the Mac app shuts down.",
         })
 
+    @app.get("/screen/<shot_id>")
+    def view_screenshot(shot_id: str):
+        """Serve a screenshot pushed from the Mac for viewing on the phone.
+
+        The FastAPI DashboardServer declares this route too, but the VPS serves
+        the dashboard through THIS Flask app — so a route added only there is
+        simply absent here, and the browser gets a 404. The screenshot store
+        itself is shared: `orchestrator.dashboard_server` is the very object
+        main.py calls put_screenshot() on, in this same process.
+
+        Token goes in the query string because an <img src> cannot send
+        headers — same constraint and same check as the other browser-fetched
+        routes."""
+        dashboard = orchestrator.dashboard_server
+        if dashboard is None:
+            return jsonify({"error": "remote access not initialized"}), 503
+        token = str(request.args.get("token") or "").strip()
+        if not token or not dashboard._is_token_valid(token):
+            return jsonify({"error": "Unauthorized"}), 401
+        shot = dashboard.get_screenshot(re.sub(r"[^A-Za-z0-9_-]", "", str(shot_id)))
+        if not shot:
+            return jsonify({"error": "Expired or not found"}), 404
+        resp = Response(shot["data"], mimetype=shot.get("mime") or "image/jpeg")
+        # Never cached: it is a picture of the user's entire screen.
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return resp
+
     @app.get("/api/status")
     def api_status():
         return jsonify(orchestrator.get_status())
