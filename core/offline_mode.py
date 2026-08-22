@@ -27,6 +27,7 @@ import shutil
 import subprocess
 import threading
 import time
+import urllib.error
 import urllib.request
 
 # Treat the cloud as reachable for this long after a successful check, so a
@@ -140,8 +141,8 @@ def _intent_health(_text: str) -> str | None:
 LOCAL_INTENTS: list[tuple[re.Pattern, callable]] = [
     (re.compile(r"\b(what.*time|what.*date|what day)\b", re.I), _intent_time),
     (re.compile(r"\b(cpu|ram|memory usage|disk|temperature|system status)\b", re.I), _intent_system_status),
-    (re.compile(r"\b(visitor|who.*been|anyone.*seen|at the door|nanny.?cam)\b", re.I), _intent_visitors),
-    (re.compile(r"\b(goal|working on|watching for)\b", re.I), _intent_goals),
+    (re.compile(r"\b(visitors?|who.*been|anyone.*seen|at the door|nanny.?cam)\b", re.I), _intent_visitors),
+    (re.compile(r"\b(goals?|working on|watching for)\b", re.I), _intent_goals),
     (re.compile(r"\b(are you (ok|working|online)|status|diagnostic|offline)\b", re.I), _intent_health),
     (re.compile(r"\b(remember|recall|who is|what is|my )\b", re.I), _intent_memory),
 ]
