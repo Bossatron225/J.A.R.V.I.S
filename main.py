@@ -3494,6 +3494,8 @@ class JarvisLive:
             # Every hardware probe (brightness, volume, camera, bulbs) targets
             # the Mac; running it on the VPS would only ever report N/A.
             "capability_self_test",
+            # The screen being watched is the Mac's; the VPS has none.
+            "screen_awareness",
             "visitor_log",
             # WiZ bulbs live on the home LAN (192.168.x.x), which the VPS cannot
             # route to from its datacenter — light commands have to run on the Mac.
@@ -4153,6 +4155,12 @@ class JarvisLive:
                 r = await loop.run_in_executor(None, lambda: standing_directives(args))
                 result = r or "Done."
                 self.ui.show_content("STANDING RULES", result)
+
+            elif name == "screen_awareness":
+                from actions.screen_awareness import screen_awareness as _screen_awareness
+                r = await loop.run_in_executor(None, lambda: _screen_awareness(args))
+                result = r or "Done."
+                self.ui.show_content("SCREEN AWARENESS", result)
 
             else:
                 result = f"Unknown tool: {name}"
