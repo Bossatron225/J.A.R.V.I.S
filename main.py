@@ -1712,6 +1712,7 @@ class JarvisLive:
         # True when this process is a pure Mac-side worker for a VPS-hosted
         # brain — see the worker-mode branch in run(). Health checks read this.
         self._worker_mode: bool = False
+        self._wake_word_detector = None
         self._present_known: dict[str, float] = {}                     # profile_key -> last-seen monotonic
         self._present_unknown: list[list] = []                         # [embedding, visitor_id, last-seen monotonic]
         self._visitor_monitor_thread: threading.Thread | None = None
@@ -5717,6 +5718,16 @@ class JarvisLive:
         # that only ran inside a live session would be blind to exactly the
         # session-level outages it exists to catch.
         self._spawn_task(self._run_health_watchdog())
+
+        # Local wake word, if opted in and a local engine is present. Started
+        # here (not inside the live-session branch) so it also works in worker
+        # mode — the Mac otherwise has a microphone in the room that cannot be
+        # spoken to at all, with every voice interaction routed via the phone.
+        if not isinstance(self.ui, _HeadlessUI):
+            try:
+                self._start_wake_word()
+            except Exception as exc:
+                self.ui.write_log(f"SYS: Wake word unavailable ({exc})")
 
         if self._remote_bridge is None and _resolve_jarvis_mode() == "worker":
             # Pure Mac-side worker for a VPS-hosted brain: no local mic, no local
