@@ -50,14 +50,24 @@ def cloud_reachable(force: bool = False) -> bool:
         if not force and (now - _last_probe_ts) < _PROBE_CACHE_SECONDS:
             return _last_probe_ok
 
+    # Uses requests rather than urllib: this Python install has no CA bundle
+    # wired into urllib, so urlopen fails with CERTIFICATE_VERIFY_FAILED even
+    # when the network is perfectly fine — which would report a healthy system
+    # as permanently DEGRADED. requests bundles certifi and is already a
+    # dependency here.
     ok = False
     try:
-        urllib.request.urlopen(_PROBE_URL, timeout=_PROBE_TIMEOUT)
-        ok = True
-    except urllib.error.HTTPError:
-        ok = True  # server answered, so the path is fine
+        import requests
+        requests.get(_PROBE_URL, timeout=_PROBE_TIMEOUT)
+        ok = True  # any HTTP response means the path is up
     except Exception:
-        ok = False
+        try:
+            urllib.request.urlopen(_PROBE_URL, timeout=_PROBE_TIMEOUT)
+            ok = True
+        except urllib.error.HTTPError:
+            ok = True
+        except Exception:
+            ok = False
 
     with _state_lock:
         _last_probe_ts = now
