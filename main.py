@@ -1588,6 +1588,22 @@ TOOL_DECLARATIONS = [
         },
     },
     {
+        "name": "attention_briefing",
+        "description": (
+            "Answers 'what needs my attention right now' by synthesising ACROSS calendar, messages, "
+            "mail, unrecognised visitors, standing-goal findings and unfinished business — ranked by "
+            "urgency. Use for 'what needs me', 'what's important', 'catch me up', 'anything I should "
+            "know', 'what did I miss'. Prefer this over reading each source separately."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "urgent_only": {"type": "BOOLEAN", "description": "Only report items that genuinely need action"}
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "goals",
         "description": (
             "Standing goals Jarvis pursues over time on his own, rather than one-off requests. "
@@ -3968,6 +3984,12 @@ class JarvisLive:
             elif name == "multi_step_task":
                 result = await self._run_multi_step_task(args)
                 self.ui.show_content("MULTI-STEP TASK", result)
+
+            elif name == "attention_briefing":
+                from actions.attention import attention_briefing as _brief
+                r = await loop.run_in_executor(None, lambda: _brief(parameters=args))
+                result = r or "Done."
+                self.ui.show_content("ATTENTION", result)
 
             elif name == "goals":
                 from actions.goals import goals_tool
